@@ -10,13 +10,15 @@ import {
 import { daftarRecord, labelTa, levelDari, poinBertanda, ringkas, urutLevel, type DiscRecord, type Level } from "../lib/discipline";
 import { KODE_LABEL, type LessonsSiswa } from "../lib/perjam";
 import type { DayRecord, Kategori, ScheduleRow } from "../lib/types";
+import { gabungRec, type ManualTapAnak } from "../lib/manual";
 import { logout } from "../services/auth";
 import { r } from "../services/db";
 import { bacaSekali } from "../services/koneksi";
 
 type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level> };
 type PerJamData = { jam: Record<string, Record<string, LessonsSiswa>>; alfa: Record<string, { status: "Alfa" }> };
-type Data = { profil: { nama: string; kelas: string }; records: Record<string, DayRecord>; schedule: ScheduleRow[]; disiplin: Disiplin; perJam: PerJamData };
+/** manualDipakai: tanggal -> alasan, hanya bila presensi manual DIPAKAI (tidak ada tap alat pada bagian itu) */
+type Data = { profil: { nama: string; kelas: string }; records: Record<string, DayRecord>; manualDipakai: Record<string, string>; schedule: ScheduleRow[]; disiplin: Disiplin; perJam: PerJamData };
 
 const LABEL: Partial<Record<Kategori, string>> = { Hadir: "Tepat waktu", Alpha: "Tanpa keterangan", "Belum Tap": "Belum tap" };
 
@@ -33,13 +35,23 @@ export default function StudentPage() {
   const muat = useCallback(async () => {
     try {
       // Data kedisiplinan bersifat tambahan: gagal memuat tidak boleh merusak halaman presensi
-      const [p, a, s, dr, dl, lj, va] = await bacaSekali(() => Promise.all([
+      const [p, a, s, dr, dl, lj, va, mn] = await bacaSekali(() => Promise.all([
         get(r(`profiles/${nis}`)), get(r(`attendance/${nis}`)), get(r("config/schedule")),
         get(r(`discipline/records/${nis}`)).catch(() => null), get(r("discipline/levels")).catch(() => null),
         get(r(`lessonsByStudent/${nis}`)).catch(() => null), get(r(`validasiByStudent/${nis}`)).catch(() => null),
+        get(r(`manualTapByStudent/${nis}`)).catch(() => null),
       ]));
       if (!p.exists()) { setErr("Data siswa tidak ditemukan. Hubungi TU sekolah."); return; }
-      setData({ profil: p.val(), records: a.val() ?? {}, schedule: Object.values(s.val() ?? {}) as ScheduleRow[], disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} } });
+      // presensi manual digabung dengan data alat lewat fungsi tunggal (alat menang)
+      const alat = (a.val() ?? {}) as Record<string, DayRecord>;
+      const manual = (mn?.val() ?? {}) as Record<string, ManualTapAnak>;
+      const records: Record<string, DayRecord> = { ...alat };
+      const manualDipakai: Record<string, string> = {};
+      for (const [tgl, m] of Object.entries(manual)) {
+        const g = gabungRec(alat[tgl], m);
+        if (g) { records[tgl] = g; if (g !== alat[tgl] && (m.masuk && !alat[tgl]?.status ? true : Boolean(m.pulang && !alat[tgl]?.pulang))) manualDipakai[tgl] = m.alasan; }
+      }
+      setData({ profil: p.val(), records, manualDipakai, schedule: Object.values(s.val() ?? {}) as ScheduleRow[], disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} } });
       setUpdated(new Date());
       setErr("");
     } catch (e) {
@@ -89,7 +101,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
   nis: string; data: Data; updated: Date | null; onRefresh: () => void; onLogout: () => void;
   ta: number | null; setTa: (n: number) => void; mode: "minggu" | "bulan"; setMode: (m: "minggu" | "bulan") => void;
 }) {
-  const { profil, records, schedule, disiplin, perJam } = data;
+  const { profil, records, manualDipakai, schedule, disiplin, perJam } = data;
   const today = todayWIB();
   const now = new Date();
   const hari = namaHari(today);
@@ -162,7 +174,8 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
         <div className="today-grid no-print">
           <article className="today-card">
             <div className="today-head"><span>Tap kartu masuk</span><StatusBadge status={LABEL[kToday] ?? kToday} /></div>
-            <div className="today-main"><span className="today-icon green"><Icon name="arrow" /></span><div><strong>{recToday?.masuk ? `${recToday.masuk.slice(0, 5)} WIB` : "--:--"}</strong><small>{kToday === "Libur" ? "Hari Minggu — libur" : recToday?.ket ? `Tercatat ${recToday.ket}${recToday.catatan ? ` · ${recToday.catatan}` : ""}` : recToday?.masuk ? "Tap kartu RFID tercatat" : kToday === "Alpha" ? "Tidak ada tap masuk hari ini" : "Menunggu tap kartu"}</small></div></div>
+            {manualDipakai[today] && <p className="muted small" data-testid="ortu-manual-hari-ini">Hadir (dicatat manual: {manualDipakai[today]})</p>}
+            <div className="today-main"><span className="today-icon green"><Icon name="arrow" /></span><div><strong>{recToday?.masuk ? `${recToday.masuk.slice(0, 5)} WIB` : "--:--"}</strong><small>{kToday === "Libur" ? "Hari Minggu — libur" : recToday?.ket ? `Tercatat ${recToday.ket}${recToday.catatan ? ` · ${recToday.catatan}` : ""}` : recToday?.masuk ? (manualDipakai[today] ? `Dicatat manual (${manualDipakai[today]})` : "Tap kartu RFID tercatat") : kToday === "Alpha" ? "Tidak ada tap masuk hari ini" : "Menunggu tap kartu"}</small></div></div>
             <div className="today-foot"><span>{kToday === "Libur" ? "Libur" : `Batas masuk ${batas.Masuk[1]} WIB`}</span>{selisih != null && <b className={selisih >= 0 ? "good" : "warn"}>{selisih >= 0 ? `${selisih} menit sebelum batas` : `Terlambat ${-selisih} menit`}</b>}</div>
           </article>
           <article className="today-card">
@@ -264,7 +277,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
           {riwayat.length === 0 ? <p className="muted small">Belum ada riwayat.</p> : (
             <div className="simple-list">
               {riwayat.map(([d, x]) => (
-                <div key={d}><b>{formatTanggal(d)}</b><small>{x.masuk ? `Masuk ${x.masuk.slice(0, 5)}` : x.ket ?? ""}{x.pulang ? ` · Pulang ${x.pulang.slice(0, 5)}` : ""}</small><StatusBadge status={LABEL[(x.status ?? x.ket ?? "Alpha") as Kategori] ?? x.status ?? x.ket ?? "Alpha"} /></div>
+                <div key={d}><b>{formatTanggal(d)}</b><small>{x.masuk ? `Masuk ${x.masuk.slice(0, 5)}` : x.ket ?? ""}{manualDipakai[d] ? ` (dicatat manual: ${manualDipakai[d]})` : ""}{x.pulang ? ` · Pulang ${x.pulang.slice(0, 5)}` : ""}</small><StatusBadge status={LABEL[(x.status ?? x.ket ?? "Alpha") as Kategori] ?? x.status ?? x.ket ?? "Alpha"} /></div>
               ))}
             </div>
           )}

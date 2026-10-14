@@ -5,6 +5,7 @@ import { useAdminData } from "../admin/AdminData";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
 import { batasJam, initials, toneOf } from "../lib/attendance";
 import { formatTanggal, namaHari, nowHM, weekday } from "../lib/time";
+import type { ManualTap } from "../lib/manual";
 import type { KetHarian, LogEntry, StudentRow } from "../lib/types";
 import { aturIzin, useLive } from "../services/db";
 import type { Actor } from "../services/discipline";
@@ -33,10 +34,15 @@ export default function Validasi() {
   const logLive = useLive<Record<string, LogEntry>>(`log/${tanggal}`);
   const izinLive = useLive<Record<string, KetHarian>>(`izin/${tanggal}`);
   const valLive = useLive<Record<string, Valid>>(`validasi/${tanggal}`);
+  const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const libur = weekday(tanggal) === 0;
 
-  // masuk = entri log berkunci *_M
-  const masukSet = useMemo(() => new Set(Object.entries(logLive.data ?? {}).filter(([k]) => k.endsWith("_M")).map(([, e]) => e.nis)), [logLive.data]);
+  // masuk = entri log berkunci *_M ATAU presensi manual dengan jam masuk (siswa hadir tetapi KTM lupa/hilang/alat mati)
+  const masukSet = useMemo(() => {
+    const s = new Set(Object.entries(logLive.data ?? {}).filter(([k]) => k.endsWith("_M")).map(([, e]) => e.nis));
+    for (const [nis, t] of Object.entries(manualLive.data ?? {})) if (t.masuk) s.add(nis);
+    return s;
+  }, [logLive.data, manualLive.data]);
 
   const baris = useMemo(() => {
     return students
@@ -55,7 +61,7 @@ export default function Validasi() {
 
   // Hari ini: Alfa baru boleh dikonfirmasi setelah batas keterlambatan kelas lewat
   const alfaBelumBoleh = (kls: string) => tanggal === today && nowHM(now) <= batasJam(schedule, kls, namaHari(tanggal)).Terlambat[1];
-  const loading = logLive.loading || izinLive.loading || valLive.loading;
+  const loading = logLive.loading || izinLive.loading || valLive.loading || manualLive.loading;
 
   return (
     <section className="data-page">

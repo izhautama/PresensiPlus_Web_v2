@@ -4,6 +4,7 @@ import Icon from "../components/Icon";
 import { Empty, Spinner, StatusBadge } from "../components/ui";
 import { downloadCSV, maskUid, persenWarna, rekapBulan } from "../lib/attendance";
 import { formatTanggal, monthKey, monthLabel } from "../lib/time";
+import { gabungSemua, type ManualTap } from "../lib/manual";
 import type { DayRecord, LogEntry } from "../lib/types";
 import { r, useLive } from "../services/db";
 import { useAdminData } from "./AdminData";
@@ -39,7 +40,10 @@ function Bulanan() {
   // Dibaca sekali (bukan realtime) agar hemat kuota unduhan paket gratis
   useEffect(() => {
     setData(null); setErr("");
-    get(r("attendance")).then((s) => setData((s.val() ?? {}) as Record<string, Record<string, DayRecord>>)).catch((e) => setErr(e.message));
+    // attendance (alat + keterangan) digabung dengan manualTap (alat menang) lewat fungsi tunggal lib/manual.ts
+    Promise.all([get(r("attendance")), get(r("manualTap")).catch(() => null)])
+      .then(([a, m]) => setData(gabungSemua((a.val() ?? {}) as Record<string, Record<string, DayRecord>>, (m?.val() ?? {}) as Record<string, Record<string, ManualTap>>)))
+      .catch((e) => setErr(e.message));
   }, [muat]);
 
   const rows = useMemo(() => {

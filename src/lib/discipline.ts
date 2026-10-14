@@ -7,7 +7,7 @@ export type Kelompok = "Prestasi" | "Tanpa prestasi";
 export type Rule = { kategori: KategoriPelanggaran; nama: string; poin: number; takziran?: string; aktif: boolean; diubahOleh: string; diubahTs: number };
 export type Remisi = { kelompok: Kelompok; nama: string; poin: number; syarat?: string; aktif: boolean; diubahOleh: string; diubahTs: number };
 export type Level = { poin: number; tindakan: string };
-export type AutoMap = { terlambat?: string; tanpaTapPulang?: string; bolosJam?: string; alfa?: string };
+export type AutoMap = { terlambat?: string; tanpaTapPulang?: string; bolosJam?: string; alfa?: string; lupaKtm?: string; ktmHilang?: string };
 
 /**
  * discipline/records/{nis}/{recId} — PUBLIK (orang tua boleh membaca anak sendiri).

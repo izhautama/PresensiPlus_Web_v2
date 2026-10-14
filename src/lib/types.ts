@@ -17,7 +17,7 @@ export type DayRecord = {
 };
 
 /** /log/{tanggal}/{UID}_{M|P} */
-export type LogEntry = { jam: string; nis: string; nama?: string; kelas?: string; status: string };
+export type LogEntry = { jam: string; nis: string; nama?: string; kelas?: string; status: string; /** alasan bila entri ini berasal dari presensi manual (bukan tap alat) */ manual?: string };
 
 export type DeviceStatus = {
   lastSeen?: number;

@@ -73,4 +73,4 @@ export const SEED_LEVELS: Record<string, Level> = {
 };
 
 /** Alfa sengaja kosong: tidak ada saran poin untuk Alfa sampai diatur. */
-export const SEED_AUTOMAP: AutoMap = { terlambat: "rg07", tanpaTapPulang: "rg13", bolosJam: "sd03" };
+export const SEED_AUTOMAP: AutoMap = { terlambat: "rg07", tanpaTapPulang: "rg13", bolosJam: "sd03", lupaKtm: "rg14", ktmHilang: "rg15" };

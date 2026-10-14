@@ -63,7 +63,7 @@ export default function Students() {
             <span className="student-cell"><i className={`avatar ${toneOf(s.nis)}`}>{initials(s.nama)}</i><span><b>{s.nama}</b><small className="mono">{kepala ? maskUid(s.uid) : s.uid}</small></span></span>
             <span>{s.nis}</span>
             <span>{s.kelas}</span>
-            <span>{s.e?.masuk?.jam.slice(0, 5) ?? "—"}</span>
+            <span>{s.e?.masuk?.jam.slice(0, 5) ?? "—"}{s.e?.masuk?.manual && <small className="badge badge-ubah" title={`Dicatat manual: ${s.e.masuk.manual}`}>Manual</small>}</span>
             <span>{s.e?.pulang?.jam.slice(0, 5) ?? "—"}</span>
             <span><StatusBadge status={s.st} /></span>
             <span className="row-actions">

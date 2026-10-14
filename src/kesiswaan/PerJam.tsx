@@ -4,6 +4,7 @@ import Icon from "../components/Icon";
 import { Empty, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
+import { gabungTap, type ManualTap } from "../lib/manual";
 import type { KetHarian, LogEntry } from "../lib/types";
 import { JAM, KODE_LABEL, SIKLUS_WAKA, berikutnya, encodeKelas, type KodeJam, type LessonsKelas, type MetaJam } from "../lib/perjam";
 import { addDays, formatTanggal, weekday } from "../lib/time";
@@ -59,6 +60,7 @@ export default function PerJam() {
   const logLive = useLive<Record<string, LogEntry>>(`log/${tanggal}`);
   const izinLive = useLive<Record<string, KetHarian>>(`izin/${tanggal}`);
   const valLive = useLive<Record<string, unknown>>(`validasi/${tanggal}`);
+  const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const server = live.data;
 
   const dirty = Object.keys(draft).length > 0 || Object.keys(metaDraft).length > 0;
@@ -82,12 +84,19 @@ export default function PerJam() {
       const slot = (m[e.nis] ??= {});
       if (key.endsWith("_M")) slot.masuk = e; else slot.pulang = e;
     }
+    // presensi manual: alat menang; manual hanya mengisi yang kosong
+    for (const [nis, tapM] of Object.entries(manualLive.data ?? {})) {
+      const slot = (m[nis] ??= {});
+      const g = gabungTap({ masuk: slot.masuk, pulang: slot.pulang }, tapM);
+      if (g.masuk && !slot.masuk) slot.masuk = { jam: g.masuk.jam, nis, status: g.masuk.status, manual: g.masuk.manual };
+      if (g.pulang && !slot.pulang) slot.pulang = { jam: g.pulang.jam, nis, status: "Pulang", manual: g.pulang.manual };
+    }
     return m;
-  }, [logLive.data]);
+  }, [logLive.data, manualLive.data]);
 
   const statusRfid = (nis: string) => {
     const t = tap[nis];
-    if (t?.masuk) return { teks: `${t.masuk.status} ${t.masuk.jam.slice(0, 5)}${t.pulang ? ` · pulang ${t.pulang.jam.slice(0, 5)}` : ""}`, masuk: true, tone: t.masuk.status === "Terlambat" ? "warn" : "good" };
+    if (t?.masuk) return { teks: `${t.masuk.status} ${t.masuk.jam.slice(0, 5)}${t.masuk.manual ? ` (manual: ${t.masuk.manual})` : ""}${t.pulang ? ` · pulang ${t.pulang.jam.slice(0, 5)}` : ""}`, masuk: true, tone: t.masuk.status === "Terlambat" ? "warn" : "good" };
     const ket = izinLive.data?.[nis];
     if (ket) return { teks: ket, masuk: false, tone: "info" };
     if (valLive.data?.[nis]) return { teks: "Alfa (terverifikasi)", masuk: false, tone: "bad" };

@@ -46,7 +46,7 @@ const hariIni = "((now + 25200000) / 86400000)";
 const mundurN = "(root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2)";
 /** hariKe sah: bilangan bulat dalam [hariIni - N, hariIni + batasDepan]. hariIni dihitung desimal (>= lantai), sehingga batas bawah efektif tepat N hari. */
 const hariKeSah = (ex, depan) => `${ex}.isNumber() && ${ex}.val() % 1 === 0 && ${ex}.val() >= ${hariIni} - ${mundurN} - 1 && ${ex}.val() <= ${hariIni} + ${depan}`;
-const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
+const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
 const KET_IZIN = "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')";
 const nisRe = "/^[0-9]{1,20}$/";
 const KODE_JAM = "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'";
@@ -70,7 +70,7 @@ const isiRecord = () => ({
   sumber: { ".validate": "newData.val() === 'manual' || newData.val() === 'saran' || newData.val() === 'piket'" },
 });
 
-const TIPE_SARAN = "(terlambat|tanpaTapPulang|bolosJam|alfa)";
+const TIPE_SARAN = "(terlambat|tanpaTapPulang|bolosJam|alfa|lupaKtm|ktmHilang)";
 /** Catatan bersumber "saran" HANYA sah bila ada keputusan "diterima" pada update yang sama (id deterministik {tanggal}_{tipe}). */
 const saranSah = () =>
   `$recId.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]_${TIPE_SARAN}$/) && $recId.beginsWith(newData.child('tanggal').val() + '_') && ${dariDisc}.child('suggest').child(newData.child('tanggal').val()).child($recId.replace(newData.child('tanggal').val() + '_', '') + '_' + $nis).child('keputusan').val() === 'diterima'`;
@@ -89,6 +89,14 @@ const ENT = (n) => `${nav(n)}.child('activity').child(${ACT(n)}.child('tgl').val
 const actOk = (n, aksi) => `${ACT(n)}.child('ts').val() === now && ${ENT(n)}.child('ts').val() === now && ${ENT(n)}.child('uid').val() === auth.uid && (${aksi.map((a) => `${ENT(n)}.child('aksi').val() === '${a}'`).join(" || ")})`;
 /** izinMeta baru (ts === now) berkunci "<activityId>_<sufiks>" untuk (tgl, nis) pada update yang sama. */
 const metaBaruPiket = (n, tgl, nis, sufiks) => `${nav(n)}.child('izinMeta').child(${tgl}).child(${nis}).child(${ACT(n)}.child('id').val() + '_' + ${sufiks}).child('ts').val() === now`;
+
+// ---- presensi manual: pasangan manualTap <-> manualTapByStudent (n = tingkat dari node yang ditulis sampai root)
+const waktuRe = "/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/";
+const ALASAN_MANUAL = "newData.val() === 'Lupa KTM' || newData.val() === 'KTM hilang' || newData.val() === 'Kartu rusak' || newData.val() === 'Alat bermasalah' || newData.val() === 'Lainnya'";
+/** Dari manualTap/$tgl/$nis: salinan manualTapByStudent/$nis/$tgl. */
+const MS_COPY = (n) => `${nav(n)}.child('manualTapByStudent').child($nis).child($tgl)`;
+/** Dari manualTapByStudent/$nis/$tgl: entri asli manualTap/$tgl/$nis. */
+const MS_ASLI = (n) => `${nav(n)}.child('manualTap').child($tgl).child($nis)`;
 
 /**
  * Hak tulis piket pada discipline/records/$nis/$recId. HANYA membuat pelanggaran dari master (aktif, kategori Ringan ATAU
@@ -329,6 +337,8 @@ export function buildRules() {
         tanpaTapPulang: { ".validate": str(40) },
         bolosJam: { ".validate": str(40) },
         alfa: { ".validate": str(40) },
+        lupaKtm: { ".validate": str(40) },
+        ktmHilang: { ".validate": str(40) },
         $other: { ".validate": false },
       },
       // PUBLIK (orang tua boleh membaca anak sendiri): hanya isi pelanggaran/remisi. TANPA nama pencatat, TANPA item terhapus.
@@ -612,6 +622,49 @@ export function buildRules() {
 
     // Ringkasan pelanggaran yang dicatat lewat akun piket (agar piket melihat "catatan piket" tanpa membaca discipline/records).
     // Menyimpan salinan yang cukup untuk soft delete (refId, poin, kategori). Piket: buat + tandai dihapus, tidak menghapus fisik.
+    // ------------------------------------------------------------------ PRESENSI MANUAL (siswa lupa/hilang KTM, kartu rusak, alat bermasalah)
+    // Node TERPISAH dari attendance/log milik alat (jalur tulis firmware tidak berubah). Penulis: waka (bebas) dan piket
+    // (jendela N hari, TANPA masa depan, log aktivitas wajib, tidak boleh menimpa entri milik waka, tidak boleh bila Alfa sudah divalidasi).
+    // Hari Minggu ditolak berdasarkan `hariKe` (rules tidak dapat memastikan hariKe cocok dengan kunci tanggal: keterbatasan yang sama dengan izinMeta).
+    // Setiap tulis WAJIB disertai salinan manualTapByStudent yang konsisten pada update yang sama (dibaca orang tua).
+    // Tidak ada yang dapat menulis ke attendance/*/masuk|status|pulang: data ALAT menang saat penggabungan di klien (lib/manual.ts).
+    manualTap: {
+      ".read": pembacaPiket,
+      $tgl: {
+        ".validate": `$tgl.matches(${tglRe})`,
+        $nis: {
+          ".write": `auth != null && (${isWaka} || (${isPiket} && !root.child('validasi').child($tgl).child($nis).exists() && (!data.exists() || root.child('roles').child(data.child('oleh').val()).val() === 'piket') && (newData.exists() ? ${actOk(3, ["presensi-manual"])} : ${actOk(3, ["hapus-manual"])}))) && (newData.exists() ? (${MS_COPY(3)}.child('status').val() === newData.child('status').val() && ${MS_COPY(3)}.child('masuk').val() === newData.child('masuk').val() && ${MS_COPY(3)}.child('pulang').val() === newData.child('pulang').val() && ${MS_COPY(3)}.child('alasan').val() === newData.child('alasan').val()) : !${MS_COPY(3)}.exists())`,
+          ".validate": `$nis.matches(${nisRe}) && newData.hasChildren(['status', 'alasan', 'oleh', 'ts', 'hariKe']) && (newData.child('masuk').exists() || newData.child('pulang').exists()) && (!(${isPiket}) || (newData.child('petugas').exists() && ${hariKeSah("newData.child('hariKe')", 0)})) && newData.child('hariKe').val() <= ${hariIni} && (newData.child('hariKe').val() + 4) % 7 !== 0`,
+          masuk: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
+          pulang: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
+          status: { ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'" },
+          alasan: { ".validate": ALASAN_MANUAL },
+          keterangan: { ".validate": str(200) },
+          oleh: { ".validate": "newData.val() === auth.uid" },
+          petugas: { ".validate": str(60) },
+          ts: { ".validate": "newData.val() === now" },
+          hariKe: { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
+          $other: { ".validate": false },
+        },
+      },
+    },
+    // Salinan per anak untuk portal orang tua (tanpa uid/nama petugas). Hanya sah berpasangan dengan manualTap yang konsisten.
+    manualTapByStudent: {
+      ".read": pembaca,
+      $nis: {
+        ".read": milikAnak,
+        ".validate": `$nis.matches(${nisRe})`,
+        $tgl: {
+          ".write": `auth != null && (${isWaka} || ${isPiket}) && (newData.exists() ? (${MS_ASLI(3)}.child('status').val() === newData.child('status').val() && ${MS_ASLI(3)}.child('masuk').val() === newData.child('masuk').val() && ${MS_ASLI(3)}.child('pulang').val() === newData.child('pulang').val() && ${MS_ASLI(3)}.child('alasan').val() === newData.child('alasan').val()) : !${MS_ASLI(3)}.exists())`,
+          ".validate": `$tgl.matches(${tglRe}) && newData.hasChildren(['status', 'alasan']) && (newData.child('masuk').exists() || newData.child('pulang').exists())`,
+          masuk: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
+          pulang: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
+          status: { ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'" },
+          alasan: { ".validate": ALASAN_MANUAL },
+          $other: { ".validate": false },
+        },
+      },
+    },
     piketHarian: {
       ".read": pembacaPiket,
       $tgl: {

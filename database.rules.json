@@ -291,6 +291,12 @@
         "alfa": {
           ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
         },
+        "lupaKtm": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "ktmHilang": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
         "$other": {
           ".validate": false
         }
@@ -302,7 +308,7 @@
           ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
           "$recId": {
             ".write": "auth != null && ((root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && (newData.exists() || newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').val() === true) || (root.child('roles').child(auth.uid).val() === 'piket' && (newData.exists() ? (!data.exists() && newData.child('jenis').val() === 'pelanggaran' && newData.child('sumber').val() === 'piket' && root.child('discipline').child('rules').child(newData.child('refId').val()).child('aktif').val() === true && (root.child('discipline').child('rules').child(newData.child('refId').val()).child('kategori').val() === 'Ringan' || root.child('discipline').child('rules').child(newData.child('refId').val()).child('takziran').val().length > 0) && newData.child('poin').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('poin').val() && newData.child('nama').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('nama').val() && newData.child('kategori').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('kategori').val() && newData.child('takziran').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('takziran').val() && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('nis').val() === $nis && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').isNumber() && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() % 1 === 0 && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() >= ((now + 25200000) / 86400000) - (root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2) - 1 && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() <= ((now + 25200000) / 86400000) + 0 && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'pelanggaran')) : (data.child('sumber').val() === 'piket' && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').val() === true && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-pelanggaran')))))",
-            ".validate": "$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber']) && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).exists() && !newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').exists() && (newData.child('sumber').val() !== 'saran' || ($recId.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]_(terlambat|tanpaTapPulang|bolosJam|alfa)$/) && $recId.beginsWith(newData.child('tanggal').val() + '_') && newData.parent().parent().parent().child('suggest').child(newData.child('tanggal').val()).child($recId.replace(newData.child('tanggal').val() + '_', '') + '_' + $nis).child('keputusan').val() === 'diterima')) && (newData.child('sumber').val() !== 'piket' || root.child('roles').child(auth.uid).val() === 'piket' || data.exists()) && (!data.exists() || (newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahOleh').val() === auth.uid && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahTs').val() !== root.child('discipline').child('recordMeta').child($nis).child($recId).child('diubahTs').val()))",
+            ".validate": "$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber']) && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).exists() && !newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').exists() && (newData.child('sumber').val() !== 'saran' || ($recId.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]_(terlambat|tanpaTapPulang|bolosJam|alfa|lupaKtm|ktmHilang)$/) && $recId.beginsWith(newData.child('tanggal').val() + '_') && newData.parent().parent().parent().child('suggest').child(newData.child('tanggal').val()).child($recId.replace(newData.child('tanggal').val() + '_', '') + '_' + $nis).child('keputusan').val() === 'diterima')) && (newData.child('sumber').val() !== 'piket' || root.child('roles').child(auth.uid).val() === 'piket' || data.exists()) && (!data.exists() || (newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahOleh').val() === auth.uid && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahTs').val() !== root.child('discipline').child('recordMeta').child($nis).child($recId).child('diubahTs').val()))",
             "jenis": {
               ".validate": "newData.val() === 'pelanggaran' || newData.val() === 'remisi'"
             },
@@ -409,7 +415,7 @@
           ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
           "$key": {
             ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && !data.exists() && newData.exists()",
-            ".validate": "$key.matches(/^(terlambat|tanpaTapPulang|bolosJam|alfa)_[0-9]{1,20}$/) && newData.hasChildren(['keputusan', 'oleh', 'ts', 'nis']) && $key.endsWith('_' + newData.child('nis').val()) && (newData.child('keputusan').val() === 'diterima' ? (newData.child('recId').val() === $tgl + '_' + $key.replace('_' + newData.child('nis').val(), '') && newData.parent().parent().parent().child('records').child(newData.child('nis').val()).child(newData.child('recId').val()).exists()) : !newData.child('recId').exists())",
+            ".validate": "$key.matches(/^(terlambat|tanpaTapPulang|bolosJam|alfa|lupaKtm|ktmHilang)_[0-9]{1,20}$/) && newData.hasChildren(['keputusan', 'oleh', 'ts', 'nis']) && $key.endsWith('_' + newData.child('nis').val()) && (newData.child('keputusan').val() === 'diterima' ? (newData.child('recId').val() === $tgl + '_' + $key.replace('_' + newData.child('nis').val(), '') && newData.parent().parent().parent().child('records').child(newData.child('nis').val()).child(newData.child('recId').val()).exists()) : !newData.child('recId').exists())",
             "keputusan": {
               ".validate": "newData.val() === 'diterima' || newData.val() === 'diabaikan'"
             },
@@ -498,7 +504,7 @@
             ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
           },
           "aksi": {
-            ".validate": "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)"
+            ".validate": "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)"
           },
           "nis": {
             ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"
@@ -756,6 +762,72 @@
             "$other": {
               ".validate": false
             }
+          }
+        }
+      }
+    },
+    "manualTap": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$nis": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || (root.child('roles').child(auth.uid).val() === 'piket' && !root.child('validasi').child($tgl).child($nis).exists() && (!data.exists() || root.child('roles').child(data.child('oleh').val()).val() === 'piket') && (newData.exists() ? newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'presensi-manual') : newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-manual')))) && (newData.exists() ? (newData.parent().parent().parent().child('manualTapByStudent').child($nis).child($tgl).child('status').val() === newData.child('status').val() && newData.parent().parent().parent().child('manualTapByStudent').child($nis).child($tgl).child('masuk').val() === newData.child('masuk').val() && newData.parent().parent().parent().child('manualTapByStudent').child($nis).child($tgl).child('pulang').val() === newData.child('pulang').val() && newData.parent().parent().parent().child('manualTapByStudent').child($nis).child($tgl).child('alasan').val() === newData.child('alasan').val()) : !newData.parent().parent().parent().child('manualTapByStudent').child($nis).child($tgl).exists())",
+          ".validate": "$nis.matches(/^[0-9]{1,20}$/) && newData.hasChildren(['status', 'alasan', 'oleh', 'ts', 'hariKe']) && (newData.child('masuk').exists() || newData.child('pulang').exists()) && (!(root.child('roles').child(auth.uid).val() === 'piket') || (newData.child('petugas').exists() && newData.child('hariKe').isNumber() && newData.child('hariKe').val() % 1 === 0 && newData.child('hariKe').val() >= ((now + 25200000) / 86400000) - (root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2) - 1 && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) + 0)) && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) && (newData.child('hariKe').val() + 4) % 7 !== 0",
+          "masuk": {
+            ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "pulang": {
+            ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "status": {
+            ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'"
+          },
+          "alasan": {
+            ".validate": "newData.val() === 'Lupa KTM' || newData.val() === 'KTM hilang' || newData.val() === 'Kartu rusak' || newData.val() === 'Alat bermasalah' || newData.val() === 'Lainnya'"
+          },
+          "keterangan": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "oleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "petugas": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "ts": {
+            ".validate": "newData.val() === now"
+          },
+          "hariKe": {
+            ".validate": "newData.isNumber() && newData.val() % 1 === 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "manualTapByStudent": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$nis": {
+        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+        "$tgl": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket') && (newData.exists() ? (newData.parent().parent().parent().child('manualTap').child($tgl).child($nis).child('status').val() === newData.child('status').val() && newData.parent().parent().parent().child('manualTap').child($tgl).child($nis).child('masuk').val() === newData.child('masuk').val() && newData.parent().parent().parent().child('manualTap').child($tgl).child($nis).child('pulang').val() === newData.child('pulang').val() && newData.parent().parent().parent().child('manualTap').child($tgl).child($nis).child('alasan').val() === newData.child('alasan').val()) : !newData.parent().parent().parent().child('manualTap').child($tgl).child($nis).exists())",
+          ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/) && newData.hasChildren(['status', 'alasan']) && (newData.child('masuk').exists() || newData.child('pulang').exists())",
+          "masuk": {
+            ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "pulang": {
+            ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "status": {
+            ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'"
+          },
+          "alasan": {
+            ".validate": "newData.val() === 'Lupa KTM' || newData.val() === 'KTM hilang' || newData.val() === 'Kartu rusak' || newData.val() === 'Alat bermasalah' || newData.val() === 'Lainnya'"
+          },
+          "$other": {
+            ".validate": false
           }
         }
       }

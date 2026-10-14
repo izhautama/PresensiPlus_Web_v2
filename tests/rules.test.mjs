@@ -949,6 +949,140 @@ await tolak("piket TIDAK bisa menulis notes", piket, "PUT", "discipline/notes/11
 await tolak("piket TIDAK bisa menulis piketAkun", piket, "PUT", `piketAkun/${piket.uid}`, { email: "a@b.c", nama: "X" });
 await tolak("piket TIDAK bisa menulis sistem/backupTerakhir", piket, "PUT", "sistem/backupTerakhir", SV);
 
+seksi("PRESENSI MANUAL — manualTap + manualTapByStudent (waka & piket; alat tidak tersentuh)");
+// hari kerja (bukan Minggu) dalam jendela piket: hari ini, atau Sabtu bila hari ini Minggu
+const HKM = (HK + 4) % 7 === 0 ? HK - 1 : HK;
+const TM = new Date(HKM * 86400000).toISOString().slice(0, 10);
+const MINGGU_HK = HK - ((HK + 4) % 7); // Minggu terakhir <= hari ini (epoch-day; (hk+4)%7 === 0 -> Minggu)
+const MT = (t, n) => `manualTap/${t}/${n}`;
+const MS = (n, t) => `manualTapByStudent/${n}/${t}`;
+const salinanDari = (x) => ({ status: x.status, masuk: x.masuk, pulang: x.pulang, alasan: x.alasan });
+/** Satu update: log + manualTap + salinan. o.tap menimpa isi; o.salinan menimpa salinan; o.tanpaSalinan/o.tanpaAsli; o.act untuk log. */
+const manualBody = (u, t, n, o = {}) => {
+  const A = act(u, o.aksi ?? "presensi-manual", o.act ?? {});
+  const tap = { masuk: "07:10:00", status: "Hadir", alasan: "Lupa KTM", oleh: u.uid, ts: SV, hariKe: HKM, ...(PERAN.get(u.uid) === "piket" ? { petugas: "Bu Rina" } : {}), ...(o.tap ?? {}) };
+  const body = { ...A.body };
+  if (!o.tanpaAsli) body[MT(t, n)] = tap;
+  if (!o.tanpaSalinan) body[MS(n, t)] = o.salinan ?? salinanDari(tap);
+  return body;
+};
+const manual = (nama, who, t, n, harap, o) => uji(nama, who, "PATCH", "", manualBody(who, t, n, o), harap);
+
+await manual("piket: catat hadir manual (Lupa KTM) + salinan + log", piket, TM, "555", "izin");
+await cek("manual: waka membaca entri piket (petugas & alasan)", waka, MT(TM, "555"), (j) => j?.alasan === "Lupa KTM" && j.petugas === "Bu Rina" && j.oleh === piket.uid && j.status === "Hadir");
+await cek("manual: log aktivitas 'presensi-manual' tercatat", waka, `activity/${TGLN}`, (j) => Object.values(j ?? {}).some((x) => x.aksi === "presensi-manual" && x.uid === piket.uid));
+await izin("manual: orang tua membaca salinan anak sendiri", ortu1, "GET", MS("111", TM));
+await manual("manual: piket catat siswa lain (Alat bermasalah, masuk+pulang)", piket, TM, "666", "izin", { tap: { alasan: "Alat bermasalah", pulang: "15:05:00" } });
+await manual("manual: piket catat Terlambat + keterangan", piket, TM, "777", "izin", { tap: { status: "Terlambat", masuk: "08:20:00", keterangan: "KTM tertinggal di rumah" } });
+await manual("manual: piket catat hanya pulang (KTM hilang)", piket, TM, "888", "izin", { tap: { masuk: undefined, pulang: "15:02:00", alasan: "KTM hilang" } });
+await manual("manual: waka catat (tanpa batas jendela, hari lampau 30 hari)", waka, "2026-09-10", "444", "izin", { tap: { hariKe: HKM - 35 } });
+await manual("manual: waka catat tanpa log aktivitas", waka, TM, "999", "izin", { act: { tanpa: true } });
+
+// ---- penegakan log (piket)
+await manual("manual: piket TANPA log DITOLAK", piket, TM, "321", "tolak", { act: { tanpa: true } });
+await manual("manual: piket log aksi salah ('izin-harian') DITOLAK", piket, TM, "321", "tolak", { aksi: "izin-harian" });
+await manual("manual: piket log aksi 'hapus-manual' untuk tulis DITOLAK", piket, TM, "321", "tolak", { aksi: "hapus-manual" });
+await manual("manual: piket penanda log tanpa ENTRI DITOLAK", piket, TM, "321", "tolak", { act: { tanpaEntri: true } });
+await manual("manual: piket activityLast.ts basi DITOLAK", piket, TM, "321", "tolak", { act: { last: { ts: 1000 } } });
+{
+  const lama = await http("GET", `activity/${TGLN}`, { token: waka.token });
+  const [idLama] = Object.entries(lama.json ?? {}).find(([, x]) => x.uid === piket.uid && x.aksi === "presensi-manual") ?? [];
+  await uji("manual: piket pakai ulang entri log LAMA DITOLAK", piket, "PATCH", "", { ...manualBody(piket, TM, "321", { act: { tanpa: true } }), [`activityLast/${piket.uid}`]: { id: idLama, ts: SV, tgl: TGLN } }, "tolak");
+}
+
+// ---- pasangan manualTap <-> salinan
+await manual("manual: TANPA salinan DITOLAK", piket, TM, "321", "tolak", { tanpaSalinan: true });
+await manual("manual: HANYA salinan (tanpa entri asli) DITOLAK", piket, TM, "321", "tolak", { tanpaAsli: true });
+await manual("manual: salinan status berbeda DITOLAK", piket, TM, "321", "tolak", { salinan: { status: "Terlambat", masuk: "07:10:00", alasan: "Lupa KTM" } });
+await manual("manual: salinan alasan berbeda DITOLAK", piket, TM, "321", "tolak", { salinan: { status: "Hadir", masuk: "07:10:00", alasan: "Lainnya" } });
+await manual("manual: salinan jam masuk berbeda DITOLAK", piket, TM, "321", "tolak", { salinan: { status: "Hadir", masuk: "07:00:00", alasan: "Lupa KTM" } });
+await manual("manual: salinan memuat pulang yang tidak ada di asli DITOLAK", piket, TM, "321", "tolak", { salinan: { status: "Hadir", masuk: "07:10:00", pulang: "15:00:00", alasan: "Lupa KTM" } });
+await manual("manual: salinan membawa field asing (petugas) DITOLAK", piket, TM, "321", "tolak", { salinan: { status: "Hadir", masuk: "07:10:00", alasan: "Lupa KTM", petugas: "Bu Rina" } });
+await uji("manual: piket menulis salinan sendirian untuk entri yang tidak ada DITOLAK", piket, "PUT", MS("321", TM), { status: "Hadir", masuk: "07:10:00", alasan: "Lupa KTM" }, "tolak");
+await uji("manual: piket menulis entri asli sendirian (tanpa salinan, log valid) DITOLAK", piket, "PATCH", "", { ...act(piket, "presensi-manual").body, [MT(TM, "321")]: { masuk: "07:10:00", status: "Hadir", alasan: "Lupa KTM", oleh: piket.uid, ts: SV, hariKe: HKM, petugas: "Bu Rina" } }, "tolak");
+
+// ---- validasi isi
+await manual("manual: tanpa masuk DAN pulang DITOLAK", piket, TM, "321", "tolak", { tap: { masuk: undefined }, salinan: { status: "Hadir", alasan: "Lupa KTM" } });
+await manual("manual: status 'Alfa' DITOLAK", piket, TM, "321", "tolak", { tap: { status: "Alfa" }, salinan: { status: "Alfa", masuk: "07:10:00", alasan: "Lupa KTM" } });
+await manual("manual: status 'Izin' DITOLAK", piket, TM, "321", "tolak", { tap: { status: "Izin" }, salinan: { status: "Izin", masuk: "07:10:00", alasan: "Lupa KTM" } });
+await manual("manual: alasan di luar daftar DITOLAK", piket, TM, "321", "tolak", { tap: { alasan: "Malas" }, salinan: { status: "Hadir", masuk: "07:10:00", alasan: "Malas" } });
+for (const jamBuruk of ["7:10:00", "07:10", "24:00:00", "07:60:00", "07:10:61", "abc"]) {
+  await manual(`manual: jam masuk '${jamBuruk}' DITOLAK`, piket, TM, "321", "tolak", { tap: { masuk: jamBuruk }, salinan: { status: "Hadir", masuk: jamBuruk, alasan: "Lupa KTM" } });
+}
+await manual("manual: jam pulang salah format DITOLAK", piket, TM, "321", "tolak", { tap: { pulang: "3pm" }, salinan: { status: "Hadir", masuk: "07:10:00", pulang: "3pm", alasan: "Lupa KTM" } });
+await manual("manual: keterangan > 200 karakter DITOLAK", piket, TM, "321", "tolak", { tap: { keterangan: "x".repeat(201) } });
+await manual("manual: oleh bukan pengguna DITOLAK", piket, TM, "321", "tolak", { tap: { oleh: waka.uid } });
+await manual("manual: ts basi DITOLAK", piket, TM, "321", "tolak", { tap: { ts: 1000 } });
+await manual("manual: piket tanpa nama petugas DITOLAK", piket, TM, "321", "tolak", { tap: { petugas: undefined } });
+await manual("manual: field asing pada entri DITOLAK", piket, TM, "321", "tolak", { tap: { rahasia: 1 } });
+await manual("manual: hariKe pecahan DITOLAK", piket, TM, "321", "tolak", { tap: { hariKe: HKM + 0.5 } });
+await manual("manual: kunci nis bukan angka DITOLAK", piket, TM, "abc", "tolak");
+await uji("manual: kunci tanggal salah DITOLAK", piket, "PATCH", "", manualBody(piket, "14-10-2026", "321"), "tolak");
+
+// ---- jendela & masa depan & Minggu
+await manual("manual: piket hariKe BESOK DITOLAK (tanpa masa depan)", piket, TM, "321", "tolak", { tap: { hariKe: HK + 1 } });
+await manual("manual: waka hariKe BESOK DITOLAK (tanpa masa depan)", waka, TM, "321", "tolak", { tap: { hariKe: HK + 1 } });
+await manual("manual: piket hariKe tepat N=2 hari lalu (DITERIMA; DITOLAK bila hari itu Minggu)", piket, TM, "322", (HK - 2 + 4) % 7 === 0 ? "tolak" : "izin", { tap: { hariKe: HK - 2 } });
+await manual("manual: piket hariKe 3 hari lalu DITOLAK (jendela)", piket, TM, "323", "tolak", { tap: { hariKe: HK - 3 } });
+await manual("manual: piket hariKe jauh lampau DITOLAK", piket, TM, "323", "tolak", { tap: { hariKe: HK - 40 } });
+await manual("manual: WAKA hariKe hari MINGGU DITOLAK (rules menolak Minggu)", waka, "2026-10-04", "324", "tolak", { tap: { hariKe: MINGGU_HK } });
+await manual("manual: PIKET hariKe hari MINGGU DITOLAK", piket, TM, "324", "tolak", { tap: { hariKe: MINGGU_HK } });
+await manual("manual: waka hariKe Senin setelah Minggu DITERIMA (kontrol Minggu)", waka, "2026-10-05", "324", "izin", { tap: { hariKe: MINGGU_HK - 6 } });
+
+// ---- kepemilikan & validasi Alfa
+await manual("manual: piket DITOLAK bila Alfa sudah divalidasi waka (111)", piket, TGL, "111", "tolak");
+await manual("manual: waka tetap boleh walau Alfa tervalidasi (111)", waka, TGL, "111", "izin");
+await manual("manual: waka menulis entri untuk nis 331", waka, TM, "331", "izin");
+await manual("manual: piket TIDAK bisa menimpa entri milik waka", piket, TM, "331", "tolak", { tap: { masuk: "07:00:00" } });
+await manual("manual: piket menimpa entri milik piket (koreksi) DITERIMA", piket, TM, "555", "izin", { tap: { masuk: "07:12:00", alasan: "Kartu rusak" } });
+await manual("manual: piket LAIN (akun piket kedua) menimpa entri piket DITERIMA", piket2, TM, "555", "izin", { tap: { masuk: "07:14:00" } });
+await manual("manual: waka menimpa entri piket DITERIMA", waka, TM, "555", "izin", { tap: { masuk: "07:13:00" } });
+await manual("manual: setelah ditimpa waka, piket tidak dapat menimpa lagi", piket, TM, "555", "tolak");
+
+// ---- hapus
+const hapusMan = (u, t, n, o = {}) => ({ ...act(u, o.aksi ?? "hapus-manual", o.act ?? {}).body, [MT(t, n)]: null, ...(o.tanpaSalinan ? {} : { [MS(n, t)]: null }) });
+await manual("manual: siapkan entri piket untuk dihapus (nis 341)", piket, TM, "341", "izin");
+await uji("manual: piket hapus TANPA log DITOLAK", piket, "PATCH", "", { [MT(TM, "341")]: null, [MS("341", TM)]: null }, "tolak");
+await uji("manual: piket hapus dengan log aksi 'presensi-manual' DITOLAK", piket, "PATCH", "", hapusMan(piket, TM, "341", { aksi: "presensi-manual" }), "tolak");
+await uji("manual: piket hapus entri tetapi SALINAN tertinggal DITOLAK", piket, "PATCH", "", hapusMan(piket, TM, "341", { tanpaSalinan: true }), "tolak");
+await uji("manual: piket hapus HANYA salinan (entri tetap) DITOLAK", piket, "PATCH", "", { ...act(piket, "hapus-manual").body, [MS("341", TM)]: null }, "tolak");
+await uji("manual: piket TIDAK bisa menghapus entri waka (331)", piket, "PATCH", "", hapusMan(piket, TM, "331"), "tolak");
+await uji("manual: piket hapus entri piket + salinan + log 'hapus-manual' DITERIMA", piket, "PATCH", "", hapusMan(piket, TM, "341"), "izin");
+await cek("manual: entri & salinan hilang setelah dihapus", waka, MT(TM, "341"), (j) => j === null);
+await uji("manual: waka hapus entri (331) + salinan DITERIMA", waka, "PATCH", "", hapusMan(waka, TM, "331", { act: { tanpa: true } }), "izin");
+await tolak("manual: waka TIDAK bisa menghapus salinan sendirian", waka, "DELETE", MS("555", TM));
+
+// ---- peran lain & baca
+await tolak("manual: kepala TIDAK bisa menulis", kepala, "PATCH", "", manualBody(kepala, TM, "321"));
+await tolak("manual: admin TIDAK bisa menulis", admin, "PATCH", "", manualBody(admin, TM, "321"));
+await tolak("manual: ortu TIDAK bisa menulis (salinan anak sendiri)", ortu1, "PUT", MS("111", "2026-10-06"), { status: "Hadir", masuk: "07:00:00", alasan: "Lainnya" });
+await tolak("manual: alat TIDAK bisa menulis", dev, "PATCH", "", manualBody(dev, TM, "321", { act: { tanpa: true } }));
+await tolak("manual: anonim TIDAK bisa menulis", null, "PUT", MT(TM, "321"), { masuk: "07:10:00", status: "Hadir", alasan: "Lupa KTM", oleh: "x", ts: SV, hariKe: HKM });
+await tolak("manual: orang tanpa peran TIDAK bisa menulis", orang, "PATCH", "", manualBody(orang, TM, "321", { act: { tanpa: true } }));
+for (const [nama, who] of [["admin", admin], ["kepala", kepala], ["waka", waka], ["piket", piket]]) await izin(`manual: ${nama} membaca manualTap`, who, "GET", `manualTap/${TM}`);
+await tolak("manual: ortu TIDAK bisa membaca manualTap", ortu1, "GET", `manualTap/${TM}`);
+await tolak("manual: alat TIDAK bisa membaca manualTap", dev, "GET", `manualTap/${TM}`);
+await tolak("manual: anonim TIDAK bisa membaca manualTap", null, "GET", "manualTap");
+await tolak("manual: ortu TIDAK bisa membaca seluruh manualTapByStudent", ortu1, "GET", "manualTapByStudent");
+await tolak("manual: ortu TIDAK bisa membaca salinan anak orang lain", ortu1, "GET", MS("222", TM));
+await izin("manual: ortu 2 membaca salinan anaknya sendiri bila ada / kosong", ortu2, "GET", MS("222", TM));
+await tolak("manual: piket TIDAK bisa membaca manualTapByStudent", piket, "GET", MS("555", TM));
+await izin("manual: admin/kepala membaca manualTapByStudent", kepala, "GET", MS("555", TM));
+
+// ---- jalur alat TIDAK tersentuh: manual tidak dapat menulis ke attendance milik alat
+await uji("manual: piket TIDAK bisa menyertakan attendance/status pada update manual", piket, "PATCH", "", { ...manualBody(piket, TM, "321"), [`attendance/321/${TM}/status`]: "Hadir" }, "tolak");
+await uji("manual: piket TIDAK bisa menyertakan attendance/masuk pada update manual", piket, "PATCH", "", { ...manualBody(piket, TM, "321"), [`attendance/321/${TM}/masuk`]: "07:10:00" }, "tolak");
+await uji("manual: piket TIDAK bisa menyertakan log/ pada update manual", piket, "PATCH", "", { ...manualBody(piket, TM, "321"), [`log/${TM}/XXXX_M`]: { jam: "07:10:00", nis: "321", status: "Hadir" } }, "tolak");
+await tolak("manual: waka TIDAK bisa menulis attendance/status (tetap hanya alat)", waka, "PUT", `attendance/321/${TM}/status`, "Hadir");
+
+// ---- saran baru: lupaKtm / ktmHilang (id deterministik {tgl}_{tipe})
+await saran("saran: waka menyetujui 'lupaKtm'", waka, "555", TM, "lupaKtm", "izin");
+await saran("saran: waka menyetujui 'ktmHilang'", waka, "666", TM, "ktmHilang", "izin");
+await saran("saran: tipe tak dikenal ('bebas') DITOLAK", waka, "777", TM, "bebas", "tolak");
+await izin("autoMap: waka memetakan lupaKtm", waka, "PUT", "discipline/autoMap/lupaKtm", "rg14");
+await izin("autoMap: waka memetakan ktmHilang", waka, "PUT", "discipline/autoMap/ktmHilang", "rg15");
+await tolak("autoMap: kunci tak dikenal DITOLAK", waka, "PUT", "discipline/autoMap/bebas", "rg14");
+
 seksi("PERANGKAT PIKET — piketPerangkat (create-only)");
 {
   const dev1 = `perangkat-${Date.now().toString(36)}-01`;

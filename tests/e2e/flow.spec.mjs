@@ -2,6 +2,7 @@
 // Dalam satu project tes berjalan berurutan (serial) dan saling melanjutkan data.
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { PROJECTS } from "./setup.mjs";
 import { hariNyata, hitungTanggal } from "./tanggal.mjs";
 
 const T = hitungTanggal(); // sama dengan setup.mjs: tanggal relatif hari nyata
@@ -1006,4 +1007,187 @@ test("admin: kesiswaan hanya lihat, tidak ada error permission", async ({ page }
   await expect(page.getByText("Akun Pimpinan & Staf", { exact: true })).toBeVisible();
   await expect(page.getByText("Waka Uji")).toBeVisible();
   bersih(lap, "admin");
+});
+
+// ===================================================================== PRESENSI MANUAL
+// Siswa uji dibuat lewat REST pemilik emulator DI DALAM uji (tidak ada di seed) agar hitungan uji-uji lain tidak berubah.
+const DB_URL = "http://127.0.0.1:9000";
+const AUTH_URL = "http://127.0.0.1:9099";
+const OWNER = { Authorization: "Bearer owner", "Content-Type": "application/json" };
+const dbPut = async (path, body) => {
+  const res = await fetch(`${DB_URL}/${path}.json?ns=${PROJECTS[proyek()].ns}`, { method: "PUT", headers: OWNER, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`REST ${path}: ${res.status} ${await res.text()}`);
+};
+const SISWA_MANUAL = [
+  { uid: "MNL00801", nis: "801", nama: "GANI LUPA", kelas: "XII IPS" },
+  { uid: "MNL00802", nis: "802", nama: "HANI HILANG", kelas: "XII IPS" },
+  { uid: "MNL00803", nis: "803", nama: "INDRA ALAT", kelas: "XII IPS" },
+  { uid: "MNL00804", nis: "804", nama: "JONI ALAT", kelas: "XII IPS" },
+  { uid: "MNL00805", nis: "805", nama: "KIKI ALAT", kelas: "XII IPS" },
+];
+const PIN_801 = "246810";
+
+test("presensi manual — piket: lupa KTM & KTM hilang (status dari jadwal), tidak jadi Alfa, mode alat bermasalah", async ({ page }) => {
+  for (const s of SISWA_MANUAL) {
+    await dbPut(`config/students/${s.uid}`, { nis: s.nis, nama: s.nama, kelas: s.kelas });
+    await dbPut(`profiles/${s.nis}`, { nama: s.nama, kelas: s.kelas });
+  }
+  // akun orang tua GANI (untuk uji portal)
+  const ver = PROJECTS[proyek()].ver;
+  const r1 = await fetch(`${AUTH_URL}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: `801.${ver}@ortu.presensi-ma.local`, password: PIN_801, returnSecureToken: true }) });
+  const ortu = await r1.json();
+  expect(ortu.localId).toBeTruthy();
+  await dbPut("parents/801", { ver, uid: ortu.localId });
+
+  const lap = await siapkan(page);
+  await masukPiket(page);
+  await expect(page.locator(".piket-grid[data-nis='801']")).toBeVisible();
+  const sebelum = Number(await page.getByTestId("belum-tap").innerText());
+
+  // (a) per siswa dari daftar belum tap: GANI lupa KTM, 07:05 -> Hadir (dari jadwal)
+  await page.locator(".piket-grid[data-nis='801']").getByRole("button", { name: "Hadir manual" }).click();
+  let dlg = page.getByRole("dialog", { name: "Hadir manual" });
+  await expect(dlg.getByLabel("Alasan")).toHaveValue("Lupa KTM");
+  await dlg.getByLabel("Jam masuk").fill("07:05");
+  await expect(dlg.getByText("Status dihitung dari jadwal kelas: Hadir")).toBeVisible();
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("GANI LUPA: hadir manual (Hadir) tercatat");
+  await expect(page.locator(".piket-grid[data-nis='801']")).toHaveCount(0); // tidak lagi "belum tap" dan tidak jadi Alfa
+  await expect(page.getByTestId("belum-tap")).toHaveText(String(sebelum - 1));
+
+  // HANI: KTM hilang, 07:20 -> Terlambat (jam dihitung terhadap jadwal, bukan diketik)
+  await page.locator(".piket-grid[data-nis='802']").getByRole("button", { name: "Hadir manual" }).click();
+  dlg = page.getByRole("dialog", { name: "Hadir manual" });
+  await dlg.getByLabel("Alasan").selectOption("KTM hilang");
+  await dlg.getByLabel("Jam masuk").fill("07:20");
+  await expect(dlg.getByText("Status dihitung dari jadwal kelas: Terlambat")).toBeVisible();
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("HANI HILANG: hadir manual (Terlambat) tercatat");
+  await expect(page.getByTestId("belum-tap")).toHaveText(String(sebelum - 2));
+
+  // alasan 'Lainnya' wajib dijelaskan
+  await page.locator(".piket-grid[data-nis='803']").getByRole("button", { name: "Hadir manual" }).click();
+  dlg = page.getByRole("dialog", { name: "Hadir manual" });
+  await dlg.getByLabel("Alasan").selectOption("Lainnya");
+  await dlg.getByLabel("Jam masuk").fill("07:00");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(dlg.getByRole("alert")).toContainText("wajib dijelaskan");
+  await dlg.getByRole("button", { name: "Batal" }).click();
+
+  // ---- halaman Presensi manual + mode alat bermasalah
+  await menu(page, "Presensi manual");
+  await expect(judul(page)).toHaveText("Presensi manual");
+  const tgl = page.locator("input[type=date]");
+  await expect(tgl).toHaveAttribute("max", T.hariIni);
+  await expect(tgl).toHaveAttribute("min", T.min); // piket dibatasi jendela N hari
+  const tercatat = page.getByTestId("manual-tercatat");
+  await expect(tercatat).toContainText("GANI LUPA");
+  await expect(tercatat).toContainText("Lupa KTM");
+  await expect(tercatat).toContainText("HANI HILANG");
+  await expect(tercatat.locator("[data-nis='801'] .badge", { hasText: "Manual" })).toBeVisible();
+
+  const massal = page.getByTestId("massal-panel");
+  await massal.getByLabel("Kelas alat bermasalah").selectOption("XII IPS");
+  // GANI & HANI sudah tercatat -> hanya 803, 804, 805 yang menjadi kandidat
+  await expect(massal.getByLabel(/Tidak hadir: /)).toHaveCount(3);
+  await massal.getByLabel("Tidak hadir: KIKI ALAT").check(); // KIKI tidak hadir
+  await expect(massal.getByRole("button", { name: "Tandai hadir (2 siswa)" })).toBeVisible();
+  await massal.getByRole("button", { name: "Tandai hadir (2 siswa)" }).click();
+  await expect(toast(page)).toContainText("2 siswa kelas XII IPS ditandai hadir");
+  await expect(tercatat).toContainText("INDRA ALAT");
+  await expect(tercatat).toContainText("JONI ALAT");
+  await expect(tercatat.locator("[data-nis='803']")).toContainText("Alat bermasalah");
+  await expect(tercatat).not.toContainText("KIKI ALAT");
+  await expect(page.locator(".piket-grid[data-nis='805']")).toBeVisible(); // KIKI tetap "belum tercatat hadir"
+
+  // koreksi: hapus entri manual milik piket
+  await tercatat.getByRole("button", { name: "Hapus presensi manual JONI ALAT" }).click();
+  await expect(toast(page)).toContainText("Presensi manual JONI ALAT dihapus");
+  await expect(tercatat).not.toContainText("JONI ALAT");
+  await expect(page.locator(".piket-grid[data-nis='804']")).toBeVisible();
+  await sehat(page);
+  bersih(lap, "piket (presensi manual)");
+});
+
+test("presensi manual — waka: tidak ada di validasi, saran 'Lupa membawa KTM' / 'Menghilangkan KTM', alat menang", async ({ page }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+
+  // Validasi harian: yang dicatat manual TIDAK menjadi kandidat Alfa; yang belum tercatat (804, 805) masih ada
+  await menu(page, "Validasi harian");
+  await expect(page.locator(".table-row", { hasText: "GANI LUPA" })).toHaveCount(0);
+  await expect(page.locator(".table-row", { hasText: "HANI HILANG" })).toHaveCount(0);
+  await expect(page.locator(".table-row", { hasText: "INDRA ALAT" })).toHaveCount(0);
+  await expect(page.locator(".table-row", { hasText: "KIKI ALAT" })).toHaveCount(1);
+  await expect(page.locator(".table-row", { hasText: "JONI ALAT" })).toHaveCount(1); // entri dihapus piket -> kembali belum tap
+
+  // Perlu ditinjau: saran dari alasan manual
+  await menu(page, "Perlu ditinjau");
+  const lupa = page.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: "GANI LUPA" });
+  const hilang = page.locator('.saran-row[data-tipe="ktmHilang"]', { hasText: "HANI HILANG" });
+  await expect(lupa).toHaveCount(1);
+  await expect(lupa).toContainText("Lupa membawa KTM");
+  await expect(hilang).toHaveCount(1);
+  await expect(hilang).toContainText("Menghilangkan KTM");
+  // siswa alat bermasalah TIDAK memicu saran KTM maupun "tidak tap pulang"
+  await expect(page.locator(".saran-row", { hasText: "INDRA ALAT" })).toHaveCount(0);
+  // HANI terlambat (manual 07:20) -> juga saran Terlambat; GANI tidak
+  await expect(page.locator('.saran-row[data-tipe="terlambat"]', { hasText: "HANI HILANG" })).toHaveCount(1);
+  await expect(page.locator('.saran-row[data-tipe="tanpaTapPulang"]', { hasText: /GANI LUPA|HANI HILANG/ })).toHaveCount(0);
+
+  // Presensi manual (waka): halaman yang sama, dapat menulis
+  await menu(page, "Presensi manual");
+  await expect(page.getByTestId("manual-tercatat")).toContainText("HANI HILANG");
+  await expect(page.getByRole("button", { name: "Hadir manual" }).first()).toBeVisible();
+
+  // ALAT MENANG: HANI ternyata sempat tap di alat (07:01, Hadir) -> manual diabaikan, saran KTM hilang & terlambat hilang
+  await dbPut(`log/${T.hariIni}/ALAT0802_M`, { jam: "07:01:00", nis: "802", status: "Hadir", nama: "HANI HILANG", kelas: "XII IPS" });
+  await expect(page.getByTestId("manual-tercatat").locator("[data-nis='802']")).toContainText("diabaikan (ada tap alat)");
+  await menu(page, "Perlu ditinjau");
+  await expect(page.locator('.saran-row[data-tipe="ktmHilang"]', { hasText: "HANI HILANG" })).toHaveCount(0);
+  await expect(page.locator('.saran-row[data-tipe="terlambat"]', { hasText: "HANI HILANG" })).toHaveCount(0);
+  await expect(page.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: "GANI LUPA" })).toHaveCount(1); // tidak terpengaruh
+
+  // setujui saran Lupa membawa KTM -> tercatat sebagai pelanggaran
+  await lupa.getByRole("checkbox").check();
+  await page.getByRole("button", { name: /^Setujui/ }).first().click();
+  await expect(toast(page)).toContainText("disetujui");
+  await expect(page.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: "GANI LUPA" })).toHaveCount(0);
+  await sehat(page);
+  bersih(lap, "waka (presensi manual)");
+});
+
+test("presensi manual — orang tua melihat 'Hadir (dicatat manual: Lupa KTM)'; kepala hanya melihat; Minggu ditolak", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginOrtu(page, "801", PIN_801);
+  await expect(page.locator(".student-chip").first()).toContainText("GANI LUPA");
+  await expect(page.getByTestId("ortu-manual-hari-ini")).toHaveText("Hadir (dicatat manual: Lupa KTM)");
+  await expect(page.locator(".today-card").first()).toContainText("Dicatat manual");
+  // portal ortu tetap tidak menahan koneksi realtime
+  await expect.poll(() => lap.sockets.filter((s) => !s.isClosed()).length, { timeout: 15_000 }).toBe(0);
+  bersih(lap, "ortu (presensi manual)");
+
+  // kepala: hanya melihat
+  const kK = await browser.newContext(opsiKonteks());
+  const pk = await kK.newPage();
+  const lapK = await siapkan(pk);
+  await loginStaf(pk, "kepala");
+  await menu(pk, "Presensi manual");
+  await expect(pk.getByText("Hanya piket dan waka yang dapat mencatat")).toBeVisible();
+  await expect(pk.getByTestId("manual-tercatat")).toContainText("GANI LUPA");
+  await expect(pk.getByRole("button", { name: "Hadir manual" })).toHaveCount(0);
+  await expect(pk.getByTestId("massal-panel")).toHaveCount(0);
+  bersih(lapK, "kepala (presensi manual)");
+  await kK.close();
+
+  // hari Minggu: tidak dapat dicatat
+  const kM = await browser.newContext(opsiKonteks());
+  const pm = await kM.newPage();
+  const lapM = await siapkan(pm, MINGGU);
+  await masukPiket(pm);
+  await menu(pm, "Presensi manual");
+  await expect(pm.getByText("Hari Minggu — libur").first()).toBeVisible();
+  await expect(pm.getByRole("button", { name: "Hadir manual" })).toHaveCount(0);
+  bersih(lapM, "piket (Minggu, presensi manual)");
+  await kM.close();
 });

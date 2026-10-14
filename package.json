@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "rules": "node scripts/build-rules.mjs",
-    "test:unit": "node tests/perjam.test.mjs && node tests/saran.test.mjs && node tests/attendance.test.mjs && node tests/piket.test.mjs && node tests/perangkat.test.mjs && node tests/rekapjam.test.mjs && node tests/tanggal.test.mjs",
+    "test:unit": "node tests/perjam.test.mjs && node tests/saran.test.mjs && node tests/attendance.test.mjs && node tests/piket.test.mjs && node tests/perangkat.test.mjs && node tests/rekapjam.test.mjs && node tests/tanggal.test.mjs && node tests/manual.test.mjs",
     "test:mutation": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs\"",
     "test:e2e": "npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"npx playwright test\"",
     "test:rules": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/rules.test.mjs\"",

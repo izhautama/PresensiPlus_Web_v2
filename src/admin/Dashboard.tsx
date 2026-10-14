@@ -29,11 +29,12 @@ export default function Dashboard() {
   }, [students, byNis]);
 
   const feed = useMemo(
-    () => Object.entries(log)
-      .map(([key, e]) => ({ key, ...e }))
-      .sort((a, b) => b.jam.localeCompare(a.jam))
-      .slice(0, 8),
-    [log],
+    () => [
+      ...Object.entries(log).map(([key, e]) => ({ key, ...e })),
+      // presensi manual hari ini (tanpa tap alat) ikut tampil dengan penanda "Manual"
+      ...students.filter((st) => byNis[st.nis]?.masuk?.manual).map((st) => ({ key: `${st.nis}_manual`, ...byNis[st.nis].masuk!, nama: st.nama, kelas: st.kelas })),
+    ].sort((a, b) => b.jam.localeCompare(a.jam)).slice(0, 8),
+    [log, students, byNis],
   );
 
   const pct = (n: number) => (s.total ? Math.round((n / s.total) * 1000) / 10 : 0);
@@ -100,7 +101,7 @@ export default function Dashboard() {
                 <div className="activity-row" key={e.key}>
                   <span className={`avatar ${toneOf(e.nis)}`}>{initials(e.nama ?? e.nis)}</span>
                   <div><b>{e.nama ?? "—"}</b><span>{e.kelas ?? "-"} · NIS {e.nis}</span></div>
-                  <div className="activity-status"><StatusBadge status={e.status} /><time>{e.jam.slice(0, 5)}</time></div>
+                  <div className="activity-status"><StatusBadge status={e.status} />{e.manual && <span className="badge badge-ubah" title={`Dicatat manual: ${e.manual}`}>Manual · {e.manual}</span>}<time>{e.jam.slice(0, 5)}</time></div>
                 </div>
               ))}
             </div>

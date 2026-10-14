@@ -9,7 +9,7 @@ export const FILTER_KOSONG: Filter = { peran: "", akun: "", petugas: "", perangk
 export const NAMA_AKSI: Record<string, string> = {
   login: "Masuk", logout: "Keluar", "pilih-petugas": "Pilih petugas", "izin-harian": "Izin harian", "izin-jam": "Izin per jam",
   "hapus-izin": "Hapus izin", pelanggaran: "Pelanggaran", "hapus-pelanggaran": "Hapus pelanggaran", remisi: "Remisi",
-  "ubah-pelanggaran": "Ubah pelanggaran", "pulihkan-pelanggaran": "Pulihkan pelanggaran", "presensi-jam": "Presensi per jam",
+  "ubah-pelanggaran": "Ubah pelanggaran", "pulihkan-pelanggaran": "Pulihkan pelanggaran", "presensi-jam": "Presensi per jam", "presensi-manual": "Presensi manual", "hapus-manual": "Hapus presensi manual",
   "validasi-alfa": "Validasi Alfa", "batal-alfa": "Batal Alfa", "saran-setuju": "Setujui saran", "saran-abaikan": "Abaikan saran",
   "kunci-akun": "Kunci akun", "buka-kunci": "Buka kunci akun",
 };

@@ -10,15 +10,17 @@ import { opsiKet, rentangPiket, tanggalDiJendela, type KetPiket } from "../lib/p
 import { formatTanggal, weekday } from "../lib/time";
 import type { StudentRow } from "../lib/types";
 import { r } from "../services/db";
+import { catatManual } from "../services/manual";
 import { hapusIzinHarianPiket, izinHarianPiket, pesanPiket } from "../services/piket";
 import KeteranganDialog from "./KeteranganDialog";
+import { ManualDialog } from "./PresensiManual";
 import { usePiketCtx, usePiketMundur } from "./useJendela";
 
 type Aksi = { siswa?: StudentRow; ket: KetPiket; bebas: boolean };
 
 /** Beranda piket: siswa belum tap hari ini + aksi cepat Izin / Sakit / Dispensasi seharian. */
 export default function Beranda() {
-  const { students, byNis, kelasList, today, ready } = useAdminData();
+  const { students, byNis, kelasList, today, now, schedule, ready } = useAdminData();
   const mundur = usePiketMundur();
   const ctx = usePiketCtx();
   const notify = useToast();
@@ -26,6 +28,7 @@ export default function Beranda() {
   const [kelas, setKelas] = useState("");
   const [q, setQ] = useState("");
   const [aksi, setAksi] = useState<Aksi | null>(null);
+  const [manual, setManual] = useState<StudentRow | null>(null);
 
   const bukanMasuk = useMemo(() => students.filter((s) => !byNis[s.nis]?.masuk), [students, byNis]);
   const belumTap = useMemo(() => bukanMasuk.filter((s) => !byNis[s.nis]?.ket), [bukanMasuk, byNis]);
@@ -75,6 +78,7 @@ export default function Beranda() {
               <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Izin", bebas: false })}>Izin</button>
               <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Sakit", bebas: false })}>Sakit</button>
               <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Dispensasi", bebas: false })}>Dispensasi</button>
+              <button className="secondary-button sm" title="Siswa hadir tetapi tap alat tidak ada (KTM lupa/hilang, dsb.)" onClick={() => setManual(s)}>Hadir manual</button>
             </span>
           </div>
         ))}
@@ -90,6 +94,15 @@ export default function Beranda() {
             ))}
           </div>
         </article>
+      )}
+
+      {manual && (
+        <ManualDialog dialog={{ s: manual, mode: "masuk" }} tanggal={today} today={today} now={now} schedule={schedule} onClose={() => setManual(null)}
+          onOk={async (a) => {
+            const status = await catatManual({ tanggal: today, nis: manual.nis, kelas: manual.kelas, ...a }, ctx, schedule);
+            notify(`${manual.nama}: hadir manual (${status}) tercatat`);
+            setManual(null);
+          }} />
       )}
 
       {aksi && <IzinHarianDialog aksi={aksi} mundur={mundur} onClose={() => setAksi(null)} onOk={async (a) => {

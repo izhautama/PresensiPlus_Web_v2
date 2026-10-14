@@ -285,6 +285,118 @@ const mutasi = [
   { nama: "piketPerangkat: pendaftaran boleh ditimpa", ubah: (r) => { const n = r.piketPerangkat.$id; n[".write"] = ganti(n[".write"], " && !data.exists()", ""); } },
   { nama: "piketPerangkat: dapat dibaca kepala", ubah: (r) => { r.piketPerangkat[".read"] = `(${r.piketPerangkat[".read"]}) || (auth != null && ${KEPALA})`; } },
   { nama: "piketPerangkat: uid tidak wajib pengguna sendiri", ubah: (r) => { r.piketPerangkat.$id.uid[".validate"] = "newData.isString()"; } },
+  // ---------------------------------------------------------------- PRESENSI MANUAL (manualTap + manualTapByStudent)
+  // Pasangan asli<->salinan memvalidasi isi yang sama di DUA lapisan; mutasi yang merusak satu lapisan saja ekuivalen, jadi lapisan dirusak bersamaan.
+  { nama: "manual: piket menulis TANPA log aktivitas (tulis)", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], `(newData.exists() ? ${actOk(3, ["presensi-manual"])} : `, "(newData.exists() ? true : ");
+  } },
+  { nama: "manual: aksi log bebas pada tulis (bukan 'presensi-manual')", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], `(${ENT(3)}.child('aksi').val() === 'presensi-manual')`, `(${ENT(3)}.child('aksi').exists())`);
+  } },
+  { nama: "manual: piket menghapus TANPA log aktivitas", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], ` : ${actOk(3, ["hapus-manual"])})`, " : true)");
+  } },
+  { nama: "manual: aksi log bebas pada hapus (bukan 'hapus-manual')", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], `(${ENT(3)}.child('aksi').val() === 'hapus-manual')`, `(${ENT(3)}.child('aksi').exists())`);
+  } },
+  { nama: "manual: piket boleh menimpa entri milik waka", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], " && (!data.exists() || root.child('roles').child(data.child('oleh').val()).val() === 'piket')", "");
+  } },
+  { nama: "manual: piket boleh menulis walau Alfa sudah divalidasi", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".write"] = ganti(n[".write"], " && !root.child('validasi').child($tgl).child($nis).exists()", "");
+  } },
+  { nama: "manual: status 'Alfa'/bebas diterima (asli + salinan)", ubah: (r) => {
+    r.manualTap.$tgl.$nis.status[".validate"] = "newData.isString()";
+    r.manualTapByStudent.$nis.$tgl.status[".validate"] = "newData.isString()";
+  } },
+  { nama: "manual: alasan bebas diterima (asli + salinan)", ubah: (r) => {
+    r.manualTap.$tgl.$nis.alasan[".validate"] = "newData.isString()";
+    r.manualTapByStudent.$nis.$tgl.alasan[".validate"] = "newData.isString()";
+  } },
+  { nama: "manual: format jam masuk tidak diperiksa (asli + salinan)", ubah: (r) => {
+    r.manualTap.$tgl.$nis.masuk[".validate"] = "newData.isString()";
+    r.manualTapByStudent.$nis.$tgl.masuk[".validate"] = "newData.isString()";
+  } },
+  { nama: "manual: format jam pulang tidak diperiksa (asli + salinan)", ubah: (r) => {
+    r.manualTap.$tgl.$nis.pulang[".validate"] = "newData.isString()";
+    r.manualTapByStudent.$nis.$tgl.pulang[".validate"] = "newData.isString()";
+  } },
+  { nama: "manual: masa depan diterima (waka; hariKe <= hari ini dilepas)", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".validate"] = ganti(n[".validate"], " && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) && (newData", " && (newData");
+  } },
+  { nama: "manual: jendela mundur piket tidak ditegakkan", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    const baru = n[".validate"].replace(/ && newData\.child\('hariKe'\)\.val\(\) >= [^]*? - 1 && newData\.child\('hariKe'\)\.val\(\) <= \(\(now \+ 25200000\) \/ 86400000\) \+ 0/, " && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) + 0");
+    if (baru === n[".validate"]) throw new Error("pola jendela manual tidak ditemukan");
+    n[".validate"] = baru;
+  } },
+  { nama: "manual: hari Minggu diterima", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".validate"] = ganti(n[".validate"], " && (newData.child('hariKe').val() + 4) % 7 !== 0", "");
+  } },
+  { nama: "manual: pasangan salinan TIDAK diwajibkan pada tulis entri asli", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    const i = n[".write"].indexOf(" && (newData.exists() ? (" + nav(3) + ".child('manualTapByStudent')");
+    if (i < 0) throw new Error("pola pasangan tidak ditemukan");
+    n[".write"] = n[".write"].slice(0, i);
+  } },
+  { nama: "manual: salinan boleh ditulis tanpa entri asli yang cocok", ubah: (r) => {
+    const n = r.manualTapByStudent.$nis.$tgl;
+    const i = n[".write"].indexOf(" && (newData.exists() ? (");
+    if (i < 0) throw new Error("pola pasangan salinan tidak ditemukan");
+    n[".write"] = n[".write"].slice(0, i);
+  } },
+  { nama: "manual: jam masuk salinan tidak dibandingkan dengan entri asli (kedua lapisan)", ubah: (r) => {
+    const a = r.manualTap.$tgl.$nis;
+    a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('manualTapByStudent').child($nis).child($tgl).child('masuk').val() === newData.child('masuk').val()`, "");
+    const b = r.manualTapByStudent.$nis.$tgl;
+    b[".write"] = ganti(b[".write"], ` && ${nav(3)}.child('manualTap').child($tgl).child($nis).child('masuk').val() === newData.child('masuk').val()`, "");
+  } },
+  { nama: "manual: alasan salinan tidak dibandingkan dengan entri asli (kedua lapisan)", ubah: (r) => {
+    const a = r.manualTap.$tgl.$nis;
+    a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('manualTapByStudent').child($nis).child($tgl).child('alasan').val() === newData.child('alasan').val()`, "");
+    const b = r.manualTapByStudent.$nis.$tgl;
+    b[".write"] = ganti(b[".write"], ` && ${nav(3)}.child('manualTap').child($tgl).child($nis).child('alasan').val() === newData.child('alasan').val()`, "");
+  } },
+  { nama: "manual: ortu boleh membaca manualTap", ubah: (r) => { r.manualTap[".read"] = "auth != null"; } },
+  { nama: "manual: ortu boleh membaca seluruh manualTapByStudent", ubah: (r) => { r.manualTapByStudent[".read"] = "auth != null"; } },
+  { nama: "manual: ortu boleh membaca salinan anak orang lain", ubah: (r) => { r.manualTapByStudent.$nis[".read"] = "auth != null"; } },
+  { nama: "manual: piket boleh membaca manualTapByStudent", ubah: (r) => { r.manualTapByStudent[".read"] = `(${r.manualTapByStudent[".read"]}) || (auth != null && ${PIKET})`; } },
+  { nama: "manual: kepala boleh menulis (asli + salinan)", ubah: (r) => {
+    const a = r.manualTap.$tgl.$nis; a[".write"] = ganti(a[".write"], `(${WAKA} || (`, `(${WAKA} || ${KEPALA} || (`);
+    const b = r.manualTapByStudent.$nis.$tgl; b[".write"] = ganti(b[".write"], `(${WAKA} || ${PIKET})`, `(${WAKA} || ${PIKET} || ${KEPALA})`);
+  } },
+  { nama: "manual: admin boleh menulis (asli + salinan)", ubah: (r) => {
+    const a = r.manualTap.$tgl.$nis; a[".write"] = ganti(a[".write"], `(${WAKA} || (`, `(${WAKA} || ${ADMIN} || (`);
+    const b = r.manualTapByStudent.$nis.$tgl; b[".write"] = ganti(b[".write"], `(${WAKA} || ${PIKET})`, `(${WAKA} || ${PIKET} || ${ADMIN})`);
+  } },
+  { nama: "manual: 'oleh' bukan pengguna sendiri diterima", ubah: (r) => { r.manualTap.$tgl.$nis.oleh[".validate"] = "newData.isString()"; } },
+  { nama: "manual: ts bukan 'sekarang' diterima", ubah: (r) => { r.manualTap.$tgl.$nis.ts[".validate"] = "newData.isNumber()"; } },
+  { nama: "manual: piket tanpa nama petugas diterima", ubah: (r) => {
+    const n = r.manualTap.$tgl.$nis;
+    n[".validate"] = ganti(n[".validate"], "(newData.child('petugas').exists() && ", "(");
+  } },
+  { nama: "manual: entri tanpa masuk DAN pulang diterima (asli + salinan)", ubah: (r) => {
+    const a = r.manualTap.$tgl.$nis; a[".validate"] = ganti(a[".validate"], " && (newData.child('masuk').exists() || newData.child('pulang').exists())", "");
+    const b = r.manualTapByStudent.$nis.$tgl; b[".validate"] = ganti(b[".validate"], " && (newData.child('masuk').exists() || newData.child('pulang').exists())", "");
+  } },
+  { nama: "manual: field asing pada entri asli diterima", ubah: (r) => { delete r.manualTap.$tgl.$nis.$other; } },
+  { nama: "manual: field asing pada salinan diterima", ubah: (r) => { delete r.manualTapByStudent.$nis.$tgl.$other; } },
+  { nama: "saran: tipe 'lupaKtm'/'ktmHilang' tidak dikenal rules", ubah: (r) => {
+    const s = JSON.stringify(r);
+    const baru = s.split("|lupaKtm|ktmHilang").join("");
+    if (baru === s) throw new Error("pola tipe saran tidak ditemukan");
+    Object.keys(r).forEach((k) => delete r[k]); Object.assign(r, JSON.parse(baru));
+  } },
+  { nama: "autoMap: kunci 'lupaKtm' tidak diizinkan", ubah: (r) => { delete r.discipline.autoMap.lupaKtm; } },
+  { nama: "autoMap: kunci asing diterima", ubah: (r) => { delete r.discipline.autoMap.$other; } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
 
@@ -295,6 +407,7 @@ function ganti(teks, dari, ke) {
 
 const dir = mkdtempSync(join(tmpdir(), "mutasi-"));
 let selamat = 0;
+const tidakTerverifikasi = [];
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 console.log(`Uji mutasi (${mutasi.length} mutasi)\n`);
 for (const [i, m] of mutasi.entries()) {
@@ -309,6 +422,9 @@ for (const [i, m] of mutasi.entries()) {
   const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file }, encoding: "utf8" });
   const gagal = r.stdout.split("\n").filter((l) => l.startsWith("  ✗")).map((l) => l.replace("  ✗ ", ""));
   const tertangkap = r.status === 1 && gagal.length > 0;
+  // suite yang MATI (emulator kelebihan beban/timeout) bukan bukti mutasi lolos maupun tertangkap: laporkan terpisah agar tidak salah tafsir
+  const infra = !tertangkap && r.status !== 0 && gagal.length === 0 && /fetch failed|Timeout|ECONNREFUSED|ECONNRESET/i.test(`${r.stderr}${r.stdout.slice(-400)}`);
+  if (infra) { tidakTerverifikasi.push(`[${i + 1}] ${m.nama}`); console.log(`? TIDAK TERVERIFIKASI (emulator macet, jalankan ulang dengan MUTASI_HANYA=${i + 1})  [${i + 1}] ${m.nama}`); continue; }
   if (!tertangkap && !m.ekuivalen) selamat++;
   const label = tertangkap ? "✓ TERTANGKAP" : m.ekuivalen ? "≈ EKUIVALEN (tidak dapat dieksploitasi; lapisan kedua menahan)" : "✗ LOLOS (suite TIDAK mendeteksi!)";
   console.log(`${label}  [${i + 1}] ${m.nama}`);
@@ -317,4 +433,6 @@ for (const [i, m] of mutasi.entries()) {
 }
 const ekuivalen = mutasi.filter((m) => m.ekuivalen).length;
 console.log(`\n${mutasi.length - ekuivalen - selamat}/${mutasi.length - ekuivalen} mutasi non-ekuivalen tertangkap (${ekuivalen} ekuivalen terdokumentasi)`);
-process.exit(selamat ? 1 : 0);
+if (tidakTerverifikasi.length) console.log(`
+${tidakTerverifikasi.length} mutasi TIDAK TERVERIFIKASI (emulator macet): jalankan ulang dalam kelompok lebih kecil, mis. MUTASI_HANYA=${tidakTerverifikasi.map((x) => x.match(/\d+/)[0]).join(",")}`);
+process.exit(selamat ? 1 : tidakTerverifikasi.length ? 2 : 0);

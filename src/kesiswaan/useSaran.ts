@@ -32,7 +32,7 @@ export function useSaran(tanggal: string[]) {
   useEffect(() => {
     setSiap(false); setError(null); setData({}); setPutusan({});
     const stops: (() => void)[] = [];
-    const total = tanggal.length * 5;
+    const total = tanggal.length * 6;
     let masuk = 0;
     const hitung = () => { masuk++; if (masuk >= total) setSiap(true); };
     const sekali = new Set<string>();
@@ -45,6 +45,7 @@ export function useSaran(tanggal: string[]) {
     for (const t of tanggal) {
       dengar(`log/${t}`, (v) => setData((x) => ({ ...x, [t]: { ...x[t], log: v as DataHari["log"] } })));
       dengar(`izin/${t}`, (v) => setData((x) => ({ ...x, [t]: { ...x[t], izin: v as DataHari["izin"] } })));
+      dengar(`manualTap/${t}`, (v) => setData((x) => ({ ...x, [t]: { ...x[t], manual: v as DataHari["manual"] } })));
       dengar(`validasi/${t}`, (v) => setData((x) => ({ ...x, [t]: { ...x[t], validasi: v as DataHari["validasi"] } })));
       dengar(`lessons/${t}`, (v) => setData((x) => ({ ...x, [t]: { ...x[t], lessons: v as DataHari["lessons"] } })));
       dengar(`discipline/suggest/${t}`, (v) => setPutusan((x) => ({ ...x, [t]: v as Record<string, unknown> | null })));
