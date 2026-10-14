@@ -23,6 +23,7 @@ const Pelanggaran = lazy(() => import("../kesiswaan/Pelanggaran"));
 const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
+const Panduan = lazy(() => import("../pages/Panduan"));
 const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 
 export type PanelMode = "admin" | "kepala" | "waka" | "piket";
@@ -59,6 +60,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/admin/laporan", label: "Laporan", icon: "file", title: "Laporan kehadiran" },
       { to: "/admin/perangkat", label: "Perangkat", icon: "device", title: "Perangkat" },
       ...kesiswaan("/admin", true),
+      { to: "/admin/panduan", label: "Panduan", icon: "file", title: "Panduan" },
     ],
   },
   kepala: {
@@ -69,6 +71,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/kepala/laporan", label: "Laporan", icon: "file", title: "Laporan kehadiran" },
       { to: "/kepala/alat", label: "Status alat", icon: "device", title: "Status alat" },
       ...kesiswaan("/kepala", true),
+      { to: "/kepala/panduan", label: "Panduan", icon: "file", title: "Panduan" },
     ],
   },
   piket: {
@@ -78,6 +81,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/piket/presensi-manual", label: "Presensi manual", icon: "check", title: "Presensi manual" },
       { to: "/piket/per-jam", label: "Izin per jam", icon: "clock", title: "Izin per jam" },
       { to: "/piket/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
+      { to: "/piket/panduan", label: "Panduan", icon: "file", title: "Panduan" },
     ],
   },
   waka: {
@@ -89,6 +93,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/waka/petugas-piket", label: "Petugas piket", icon: "users", title: "Petugas piket" },
       ...kesiswaan("/waka", false).filter((x) => x.to !== "/waka/laporan-kesiswaan"),
       { to: "/waka/log-aktivitas", label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" },
+      { to: "/waka/panduan", label: "Panduan", icon: "file", title: "Panduan" },
     ],
   },
 };
@@ -124,6 +129,7 @@ export default function AdminLayout() {
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="panduan" element={<Panduan peran="admin" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />
           <Route path="petugas-piket" element={<PetugasPiket />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

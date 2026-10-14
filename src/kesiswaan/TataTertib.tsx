@@ -3,10 +3,11 @@ import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner, StatusBadge } from "../components/ui";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
 import { KATEGORI_LIST, type KategoriPelanggaran, type Kelompok, type Level, type Remisi, type Rule } from "../lib/discipline";
-import { hapusLevel, isiDataAwal, simpanMaster, type Actor, type MasterJenis } from "../services/discipline";
+import { SEMUA_TIPE_SARAN, TIPE_LABEL, cariAturanBawaan } from "../lib/saran";
+import { hapusLevel, isiDataAwal, simpanAutoMap, simpanMaster, type Actor, type MasterJenis } from "../services/discipline";
 import { useActor, useDiscipline } from "./useDiscipline";
 
-type Tab = "rules" | "remisi" | "levels";
+type Tab = "rules" | "remisi" | "levels" | "map";
 type Edit = { jenis: MasterJenis; id: string | null } | null;
 
 export default function TataTertib() {
@@ -39,7 +40,7 @@ export default function TataTertib() {
     <section className="data-page">
       <div className="section-heading">
         <div><p>Tata tertib</p><span>Daftar pelanggaran, remisi, dan ambang pembinaan{bisaTulis ? "" : " · hanya lihat"}</span></div>
-        {bisaTulis && !d.masterKosong && tab !== "levels" && <button className="primary-button" onClick={() => setEdit({ jenis: tab, id: null })}><Icon name="plus" size={17} />Tambah</button>}
+        {bisaTulis && !d.masterKosong && (tab === "rules" || tab === "remisi") && <button className="primary-button" onClick={() => setEdit({ jenis: tab, id: null })}><Icon name="plus" size={17} />Tambah</button>}
         {bisaTulis && !d.masterKosong && tab === "levels" && <button className="primary-button" onClick={() => setEdit({ jenis: "levels", id: null })}><Icon name="plus" size={17} />Tambah ambang</button>}
       </div>
 
@@ -56,8 +57,9 @@ export default function TataTertib() {
             <button role="tab" aria-selected={tab === "rules"} className={tab === "rules" ? "active" : ""} onClick={() => setTab("rules")}>Pelanggaran</button>
             <button role="tab" aria-selected={tab === "remisi"} className={tab === "remisi" ? "active" : ""} onClick={() => setTab("remisi")}>Remisi</button>
             <button role="tab" aria-selected={tab === "levels"} className={tab === "levels" ? "active" : ""} onClick={() => setTab("levels")}>Ambang pembinaan</button>
+            <button role="tab" aria-selected={tab === "map"} className={tab === "map" ? "active" : ""} onClick={() => setTab("map")}>Pemetaan saran</button>
           </div>
-          {tab !== "levels" && <label className="check-inline tab-opt"><input type="checkbox" checked={ambilNonaktif} onChange={(e) => setAmbilNonaktif(e.target.checked)} />Tampilkan yang nonaktif</label>}
+          {(tab === "rules" || tab === "remisi") && <label className="check-inline tab-opt"><input type="checkbox" checked={ambilNonaktif} onChange={(e) => setAmbilNonaktif(e.target.checked)} />Tampilkan yang nonaktif</label>}
 
           {tab === "rules" && KATEGORI_LIST.map((k) => {
             const items = Object.entries(d.rules).filter(([, x]) => x.kategori === k && (ambilNonaktif || x.aktif)).sort((a, b) => b[1].poin - a[1].poin || a[1].nama.localeCompare(b[1].nama));
@@ -84,6 +86,34 @@ export default function TataTertib() {
               </article>
             );
           })}
+
+          {tab === "map" && (
+            <article className="panel master-group" data-testid="pemetaan-saran">
+              <div className="panel-header"><div><p className="panel-title">Pemetaan jenis saran → aturan pelanggaran</p><span>Saran otomatis memakai aturan yang dipilih di sini. Kosong = jenis saran itu tidak dibuat.</span></div></div>
+              {SEMUA_TIPE_SARAN.map((tipe) => {
+                const dipilih = d.autoMap[tipe] ?? "";
+                const usulan = !dipilih ? cariAturanBawaan(tipe, d.rules) : undefined;
+                const opsi = Object.entries(d.rules).filter(([, x]) => x.aktif || false).sort((a, b) => a[1].nama.localeCompare(b[1].nama));
+                const adaTidakAktif = dipilih && !d.rules[dipilih]?.aktif;
+                return (
+                  <div className="master-row" key={tipe} data-tipe={tipe}>
+                    <span className="master-text"><b>{TIPE_LABEL[tipe]}</b>
+                      {usulan && <small className="muted block">Belum dipetakan; cadangan berdasarkan nama: {d.rules[usulan].nama}</small>}
+                      {adaTidakAktif && <small className="muted block">Aturan terpilih sudah nonaktif/tidak ada: saran tidak dibuat.</small>}</span>
+                    <select className="text-input auto" aria-label={`Aturan untuk saran ${TIPE_LABEL[tipe]}`} value={dipilih} disabled={!bisaTulis}
+                      onChange={async (e) => {
+                        try { await simpanAutoMap(tipe, e.target.value || null, dipilih || undefined, actor); notify("Pemetaan saran disimpan"); }
+                        catch (ex) { notify((ex as Error).message, "err"); }
+                      }}>
+                      <option value="">(belum dipetakan)</option>
+                      {opsi.map(([id, x]) => <option key={id} value={id}>{x.nama} ({x.poin} poin)</option>)}
+                      {dipilih && !opsi.some(([id]) => id === dipilih) && <option value={dipilih}>{d.rules[dipilih]?.nama ?? dipilih} (nonaktif)</option>}
+                    </select>
+                  </div>
+                );
+              })}
+            </article>
+          )}
 
           {tab === "levels" && (
             <article className="panel master-group">

@@ -161,6 +161,15 @@ export async function hapusLevel(id: string, sebelum: unknown, a: Actor) {
   await update(r("/"), u);
 }
 
+/** Pemetaan jenis saran -> id aturan (autoMap). `ruleId` null = hapus pemetaan. Tercatat di audit. */
+export async function simpanAutoMap(tipe: string, ruleId: string | null, sebelum: string | undefined, a: Actor) {
+  const u: Updates = {};
+  const path = `${DB}/autoMap/${tipe}`;
+  u[path] = ruleId;
+  tambahAudit(u, a, "ubah-master", path, sebelum ?? null, ruleId);
+  await update(r("/"), u);
+}
+
 /** Isi data tata tertib awal (hanya dipanggil saat master masih kosong). */
 export async function isiDataAwal(a: Actor) {
   const u: Updates = {};

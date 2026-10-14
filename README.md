@@ -69,6 +69,9 @@ Butuh Java (emulator Database) dan, untuk E2E, `npx playwright install chromium`
 | `npm run test:unit` | Logika murni: per jam, saran otomatis, kehadiran (Dispensasi), aturan piket, label perangkat, rekap per jam (Minggu diabaikan), jangkar tanggal E2E |
 | `npm run test:rules` | Security Rules di Emulator (semua peran + jalur firmware alat) |
 | `npm run test:mutation` | Merusak rules satu per satu; suite WAJIB gagal (mutasi ekuivalen terdokumentasi) |
+| `npm run test:mutation:manual` / `:piket` / `:saran` / `:dasar` | Mutasi per kelompok (juga `npm run test:mutation --grup=manual`). Gunakan ini saat iterasi. |
+
+**Catatan mutasi:** satu putaran penuh (+-120 kasus) memakan **+-90 menit** dan, karena emulator terus menggembung, dapat macet (timeout) di akhir; kasus macet dilaporkan sebagai "TIDAK TERVERIFIKASI" (bukan lolos) dan dijalankan ulang dengan `MUTASI_HANYA=nomor,nomor` di emulator baru. Mutasi penuh cukup dijalankan sebelum rilis, kelompok yang relevan saat bekerja.
 | `npm run test:e2e` | Playwright terhadap emulator, viewport desktop **dan** HP. Tidak menyentuh produksi. |
 
 ## Rollback
@@ -80,3 +83,10 @@ Butuh Java (emulator Database) dan, untuk E2E, `npx playwright install chromium`
 | **Data** | Ekspor JSON manual dari Console (lihat pengingat "Backup terakhir" di Pengaturan admin). Rollback rules/hosting tidak mengembalikan data. |
 
 Catatan: `releases/` (snapshot dist + rules) tidak ikut Git. Source selalu dipulihkan dari tag Git; build ulang dengan `npm ci && npm run build`.
+
+## Panduan pengguna
+Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.
+Isinya dibuat dari satu sumber, `src/lib/panduan.ts`, yang juga dipakai menu **Panduan** di aplikasi (halaman statis tanpa data). Setelah mengubah isi, jalankan `node scripts/buat-panduan.mjs`; `tests/panduan.test.mjs` memastikan docs dan aplikasi selalu sama.
+
+## Migrasi dari Google Sheet
+`Setup_Migrasi_Firebase.ipynb` memakai Admin SDK yang **melewati Security Rules**. Kodenya bersumber di `scripts/migrasi_firebase.py` (disalin ke notebook oleh `python scripts/sync_notebook.py`). Skrip: berjalan **DRY-RUN** secara bawaan; hanya menulis ke `config/`, `profiles/`, `parents/`, `attendance/`, `log/`, `izin/` (jalur lain, termasuk peran staf, kesiswaan, piket, presensi manual, ditolak); memvalidasi data seperti rules; tidak menimpa presensi alat atau izin yang sudah ada; merotasi password alat hanya bila Anda mengetik `YA` (firmware wajib di-flash ulang). Uji: `npm run test:migrasi` (emulator + `pip install firebase-admin`).

@@ -16,6 +16,12 @@ export const TIPE_LABEL: Record<TipeSaran, string> = {
 
 /** Bila autoMap belum memetakan tipe ini (data lama), cari aturan aktif berdasarkan namanya di master. */
 const NAMA_BAWAAN: Partial<Record<TipeSaran, string>> = { lupaKtm: "lupa membawa ktm", ktmHilang: "menghilangkan ktm" };
+export const SEMUA_TIPE_SARAN: TipeSaran[] = ["terlambat", "tanpaTapPulang", "bolosJam", "alfa", "lupaKtm", "ktmHilang"];
+/** Cadangan SEKALI-JALAN: id aturan aktif yang namanya cocok dengan bawaan; hasilnya ditulis ke autoMap agar tidak bergantung nama lagi. */
+export function cariAturanBawaan(tipe: TipeSaran, rules: Record<string, Rule>): string | undefined {
+  const nama = NAMA_BAWAAN[tipe];
+  return nama ? Object.entries(rules).find(([, r]) => r.aktif && r.nama.trim().toLowerCase() === nama)?.[0] : undefined;
+}
 
 type KodeJam = "S" | "I" | "D" | "A";
 type Lessons = Record<string, { meta?: Record<string, { mapel?: string }>; absen?: Record<string, Record<string, KodeJam>> }>;
@@ -60,7 +66,7 @@ export function hitungSaran(a: {
   const out: Saran[] = [];
   const aturan = (tipe: TipeSaran): string | null => {
     let id: string | undefined = a.autoMap[tipe];
-    if (!id && NAMA_BAWAAN[tipe]) id = Object.entries(a.rules).find(([, r]) => r.aktif && r.nama.trim().toLowerCase() === NAMA_BAWAAN[tipe])?.[0];
+    if (!id) id = cariAturanBawaan(tipe, a.rules);
     return id && a.rules[id]?.aktif ? id : null; // autoMap kosong / aturan nonaktif -> tidak ada saran
   };
 
@@ -101,7 +107,9 @@ export function hitungSaran(a: {
         out.push({ key, tanggal: tgl, tipe, nis: s.nis, nama: s.nama, kelas: s.kelas, ruleId, recId, detail });
       };
 
-      if (m?.status === "Terlambat") tambah("terlambat", `Tap masuk ${m.jam.slice(0, 5)} (Terlambat)`);
+      // Terlambat dari presensi manual juga disarankan seperti tap alat, KECUALI alasan "Alat bermasalah" (bukan salah siswa)
+      const manualAlatRusak = Boolean(gb.manual?.dipakai.includes("masuk") && gb.manual.tap.alasan === "Alat bermasalah");
+      if (m?.status === "Terlambat" && !manualAlatRusak) tambah("terlambat", `Tap masuk ${m.jam.slice(0, 5)} (Terlambat)`);
 
       // Tanpa tap pulang: tidak disarankan bila ada izin pulang awal (sel S/I/D di jam mana pun) atau keterangan harian Izin/Sakit/Dispensasi
       // siswa yang presensinya dicatat manual (KTM lupa/hilang, kartu rusak, alat mati) tidak dapat tap pulang: tidak disarankan

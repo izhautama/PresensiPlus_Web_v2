@@ -49,7 +49,10 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
   const logLive = useLive<Record<string, LogEntry>>(`log/${tanggal}`);
   const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const izinLive = useLive<Record<string, KetHarian>>(`izin/${tanggal}`);
-  const loading = !ready || logLive.loading || manualLive.loading || izinLive.loading;
+  // hanya waka yang dapat membaca (dan membatalkan) validasi Alfa; piket ditolak rules bila Alfa sudah divalidasi
+  const valLive = useLive<Record<string, unknown>>(mode === "waka" ? `validasi/${tanggal}` : null);
+  const alfaSet = new Set(Object.keys(valLive.data ?? {}));
+  const loading = !ready || logLive.loading || manualLive.loading || izinLive.loading || valLive.loading;
   const galat = logLive.error ?? manualLive.error ?? izinLive.error;
 
   /** Per siswa: tap alat + entri manual digabung (alat menang). */
@@ -98,9 +101,9 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
         <>
           {bisaTulis && (
             <MassalPanel tanggal={tanggal} kelasList={kelasList} baris={baris} kelas={kelasAktif} setKelas={setKelasMassal}
-              schedule={schedule}
-              onOk={async (masuk, siswa, ket) => {
-                await catatManualMassal({ tanggal, masuk, kelas: kelasAktif, siswa, alasan: "Alat bermasalah", keterangan: ket }, pencatat, schedule);
+              schedule={schedule} alfaSet={alfaSet}
+              onOk={async (masuk, siswa, ket, batalAlfa) => {
+                await catatManualMassal({ tanggal, masuk, kelas: kelasAktif, siswa, alasan: "Alat bermasalah", keterangan: ket, batalAlfa }, pencatat, schedule);
                 notify(`${siswa.length} siswa kelas ${kelasAktif} ditandai hadir`);
               }} />
           )}
@@ -109,7 +112,7 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
             <div className="table-head piket-grid"><span>Belum tercatat hadir</span><span>Kelas</span><span className="ta-right">Aksi</span></div>
             {belumHadir.length === 0 ? <Empty icon="check" title="Semua siswa sudah tercatat hadir" text="Tidak ada siswa tanpa tap masuk (alat atau manual)." /> : belumHadir.map(({ s, ket }) => (
               <div className="table-row piket-grid" key={s.nis} data-nis={s.nis}>
-                <span className="student-cell"><i className={`avatar ${toneOf(s.nis)}`}>{initials(s.nama)}</i><span><b>{s.nama}</b><small>NIS {s.nis}{ket ? ` · ${ket}` : ""}</small></span></span>
+                <span className="student-cell"><i className={`avatar ${toneOf(s.nis)}`}>{initials(s.nama)}</i><span><b>{s.nama}</b><small>NIS {s.nis}{ket ? ` · ${ket}` : ""}{alfaSet.has(s.nis) ? " · Alfa terverifikasi" : ""}</small></span></span>
                 <span>{s.kelas}</span>
                 <span className="aksi-cell">{bisaTulis && <button className="secondary-button sm" onClick={() => setDialog({ s, mode: "masuk" })}>Hadir manual</button>}</span>
               </div>
@@ -148,9 +151,9 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
       )}
 
       {dialog && (
-        <ManualDialog dialog={dialog} tanggal={tanggal} today={today} now={now} schedule={schedule} onClose={() => setDialog(null)}
+        <ManualDialog dialog={dialog} tanggal={tanggal} today={today} now={now} schedule={schedule} alfa={alfaSet.has(dialog.s.nis)} onClose={() => setDialog(null)}
           onOk={async (a) => {
-            const status = await catatManual({ tanggal, nis: dialog.s.nis, kelas: dialog.s.kelas, ...a }, pencatat, schedule);
+            const status = await catatManual({ tanggal, nis: dialog.s.nis, kelas: dialog.s.kelas, ...a }, pencatat, schedule, { batalAlfa: alfaSet.has(dialog.s.nis) });
             notify(`${dialog.s.nama}: ${a.masuk ? `hadir manual (${status})` : "pulang manual"} tercatat`);
             setDialog(null);
           }} />
@@ -165,8 +168,8 @@ function jamAwal(tanggal: string, today: string, now: Date, schedule: Parameters
   return batasJam(schedule, kelas, namaHari(tanggal))[jenis][0];
 }
 
-export function ManualDialog({ dialog, tanggal, today, now, schedule, onClose, onOk }: {
-  dialog: NonNullable<Dialog>; tanggal: string; today: string; now: Date; schedule: Parameters<typeof batasJam>[0]; onClose: () => void;
+export function ManualDialog({ dialog, tanggal, today, now, schedule, alfa = false, onClose, onOk }: {
+  dialog: NonNullable<Dialog>; tanggal: string; today: string; now: Date; schedule: Parameters<typeof batasJam>[0]; alfa?: boolean; onClose: () => void;
   onOk: (a: { masuk?: string; pulang?: string; alasan: AlasanManual; keterangan?: string }) => Promise<void>;
 }) {
   const { s, mode, awal } = dialog;
@@ -208,10 +211,11 @@ export function ManualDialog({ dialog, tanggal, today, now, schedule, onClose, o
         )}
         {alasan === "Lupa KTM" && mode === "masuk" && <p className="modal-note">Waka akan menerima saran pelanggaran "Lupa membawa KTM" untuk ditinjau.</p>}
         {alasan === "KTM hilang" && mode === "masuk" && <p className="modal-note">Waka akan menerima saran pelanggaran "Menghilangkan KTM" untuk ditinjau.</p>}
+        {alfa && <div className="notice warn" role="status"><Icon name="warning" size={17} /><span>Alfa terverifikasi akan dibatalkan: validasi Alfa siswa ini dihapus bersamaan dengan presensi manual dan tercatat di jejak audit.</span></div>}
         {err && <div className="login-error-box" role="alert"><Icon name="warning" size={17} /><div><span>{err}</span></div></div>}
         <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={onClose}>Batal</button>
-          <button className="primary-button" disabled={busy}>{busy ? <Spinner /> : null}Simpan</button>
+          <button className="primary-button" disabled={busy}>{busy ? <Spinner /> : null}{alfa ? "Simpan & batalkan Alfa" : "Simpan"}</button>
         </div>
       </form>
     </Modal>
@@ -219,10 +223,10 @@ export function ManualDialog({ dialog, tanggal, today, now, schedule, onClose, o
 }
 
 /** Mode "alat bermasalah": semua siswa kelas yang belum tercatat ditandai hadir sekaligus, kecuali yang tidak dicentang. */
-function MassalPanel({ tanggal, kelasList, baris, kelas, setKelas, schedule, onOk }: {
+function MassalPanel({ tanggal, kelasList, baris, kelas, setKelas, schedule, alfaSet, onOk }: {
   tanggal: string; kelasList: string[]; baris: { s: StudentRow; g: ReturnType<typeof gabungTap>; ket?: KetHarian }[];
-  kelas: string; setKelas: (k: string) => void; schedule: Parameters<typeof batasJam>[0];
-  onOk: (masuk: string, siswa: { nis: string }[], ket?: string) => Promise<void>;
+  kelas: string; setKelas: (k: string) => void; schedule: Parameters<typeof batasJam>[0]; alfaSet: Set<string>;
+  onOk: (masuk: string, siswa: { nis: string }[], ket: string | undefined, batalAlfa: string[]) => Promise<void>;
 }) {
   const [tidakHadir, setTidakHadir] = useState<Set<string>>(new Set());
   const [jam, setJam] = useState("");
@@ -237,7 +241,7 @@ function MassalPanel({ tanggal, kelasList, baris, kelas, setKelas, schedule, onO
   const toggle = (nis: string) => setTidakHadir((x) => { const n = new Set(x); if (n.has(nis)) n.delete(nis); else n.add(nis); return n; });
   const kirim = async () => {
     setBusy(true); setErr("");
-    try { await onOk(jamPenuh(jamEfektif), hadir.map((b) => ({ nis: b.s.nis })), ket.trim() || undefined); setTidakHadir(new Set()); setKet(""); }
+    try { await onOk(jamPenuh(jamEfektif), hadir.map((b) => ({ nis: b.s.nis })), ket.trim() || undefined, hadir.filter((b) => alfaSet.has(b.s.nis)).map((b) => b.s.nis)); setTidakHadir(new Set()); setKet(""); }
     catch (e) { setErr(pesanPiket(e)); }
     finally { setBusy(false); }
   };
@@ -259,6 +263,7 @@ function MassalPanel({ tanggal, kelasList, baris, kelas, setKelas, schedule, onO
               </label>
             ))}
           </div>
+          {hadir.some((b) => alfaSet.has(b.s.nis)) && <div className="notice warn" role="status"><Icon name="warning" size={17} /><span>Alfa terverifikasi akan dibatalkan untuk {hadir.filter((b) => alfaSet.has(b.s.nis)).length} siswa yang ditandai hadir (tercatat di jejak audit).</span></div>}
           <p className="modal-note">Centang = <b>tidak hadir</b> (tidak ditandai). Yang tidak dicentang akan ditandai hadir pukul {jamEfektif}; status Hadir/Terlambat dihitung dari jadwal.</p>
           <Field label="Keterangan (opsional)"><input className="text-input" maxLength={200} value={ket} onChange={(e) => setKet(e.target.value)} /></Field>
           {err && <div className="login-error-box" role="alert"><Icon name="warning" size={17} /><div><span>{err}</span></div></div>}

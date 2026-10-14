@@ -127,6 +127,13 @@ assert.deepEqual(hitung({ tanggal: ["2026-10-15"], data: { "2026-10-15": { log: 
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:00:00"), ...P("A1", "1", "15:00:00") }, manual: { 1: man() } } } })), [], "alat ada -> manual diabaikan");
   // manual Terlambat tetap memicu saran terlambat (jam dari jadwal)
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ status: "Terlambat", masuk: "08:00:00" }) } } } })), [`${T}:lupaKtm:1`, `${T}:terlambat:1`]);
+  // Terlambat manual: saran "terlambat" untuk SEMUA alasan kecuali "Alat bermasalah" (bukan salah siswa)
+  for (const alasan of ["Lupa KTM", "KTM hilang", "Kartu rusak", "Lainnya"]) {
+    assert.ok(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan, status: "Terlambat", masuk: "08:00:00" }) } } } })).includes(`${T}:terlambat:1`), `terlambat + ${alasan}`);
+  }
+  assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan: "Alat bermasalah", status: "Terlambat", masuk: "08:00:00" }) } } } })), [], "Alat bermasalah: tidak ada saran terlambat");
+  // tap alat Terlambat tetap disarankan walau ada manual 'Alat bermasalah' yang diabaikan
+  assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ alasan: "Alat bermasalah" }) } } } })), [`${T}:terlambat:1`]);
   // hanya-pulang manual tidak memicu saran KTM
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: M("A1", "1", "07:00:00"), manual: { 1: man({ masuk: undefined, pulang: "15:01:00" }) } } } })), [], "masuk dari alat, pulang manual");
   // aturan nonaktif / tidak ada di master -> tidak ada saran

@@ -9,6 +9,7 @@ const PiketLayout = lazy(() => import("../piket/PiketLayout"));
 const KepalaLayout = lazy(() => import("../kepala/KepalaLayout"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const StudentPage = lazy(() => import("../pages/StudentPage"));
+const PanduanOrtu = lazy(() => import("../pages/Panduan").then((m) => ({ default: () => { const { session } = useAuth(); return session?.role === "ortu" ? <m.PanduanOrtu nis={session.nis} /> : <Navigate to="/login" replace />; } })));
 
 function Loader() {
   return <div className="route-loader" aria-label="Memuat halaman"><span className="spinner" /></div>;
@@ -65,5 +66,6 @@ export const router = createBrowserRouter([
   { path: "/waka/*", element: <Page><PanelGuard role="waka"><WakaLayout /></PanelGuard></Page> },
   { path: "/piket/*", element: <Page><PanelGuard role="piket"><PiketLayout /></PanelGuard></Page> },
   { path: "/siswa/:nis", element: <Page><StudentGuard /></Page> },
+  { path: "/panduan", element: <Page><PanduanOrtu /></Page> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);

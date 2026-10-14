@@ -1088,6 +1088,7 @@ test("presensi manual — piket: lupa KTM & KTM hilang (status dari jadwal), tid
 
   const massal = page.getByTestId("massal-panel");
   await massal.getByLabel("Kelas alat bermasalah").selectOption("XII IPS");
+  await massal.getByLabel("Jam masuk massal").fill("08:00"); // lewat batas masuk -> Terlambat, tetapi alasan "Alat bermasalah" bukan salah siswa (tanpa saran)
   // GANI & HANI sudah tercatat -> hanya 803, 804, 805 yang menjadi kandidat
   await expect(massal.getByLabel(/Tidak hadir: /)).toHaveCount(3);
   await massal.getByLabel("Tidak hadir: KIKI ALAT").check(); // KIKI tidak hadir
@@ -1100,13 +1101,24 @@ test("presensi manual — piket: lupa KTM & KTM hilang (status dari jadwal), tid
   await expect(tercatat).not.toContainText("KIKI ALAT");
   await expect(page.locator(".piket-grid[data-nis='805']")).toBeVisible(); // KIKI tetap "belum tercatat hadir"
 
+  // Alfa KIKI sudah dikonfirmasi waka -> piket DITOLAK (waka yang dapat membatalkannya)
+  await dbPut(`validasi/${T.hariIni}/805`, { status: "Alfa", oleh: "uji-waka", ts: Date.now() });
+  await dbPut(`validasiByStudent/805/${T.hariIni}`, { status: "Alfa" });
+  await page.locator(".piket-grid[data-nis='805']").getByRole("button", { name: "Hadir manual" }).click();
+  dlg = page.getByRole("dialog", { name: "Hadir manual" });
+  await dlg.getByLabel("Jam masuk").fill("07:00");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(dlg.getByRole("alert")).toContainText("dikonfirmasi Alfa oleh Waka");
+  await dlg.getByRole("button", { name: "Batal" }).click();
+  await expect(page.getByTestId("manual-tercatat")).not.toContainText("KIKI ALAT");
+
   // koreksi: hapus entri manual milik piket
   await tercatat.getByRole("button", { name: "Hapus presensi manual JONI ALAT" }).click();
   await expect(toast(page)).toContainText("Presensi manual JONI ALAT dihapus");
   await expect(tercatat).not.toContainText("JONI ALAT");
   await expect(page.locator(".piket-grid[data-nis='804']")).toBeVisible();
   await sehat(page);
-  bersih(lap, "piket (presensi manual)");
+  bersih(kecualikan(lap, 1), "piket (presensi manual)");
 });
 
 test("presensi manual — waka: tidak ada di validasi, saran 'Lupa membawa KTM' / 'Menghilangkan KTM', alat menang", async ({ page }) => {
@@ -1153,6 +1165,23 @@ test("presensi manual — waka: tidak ada di validasi, saran 'Lupa membawa KTM' 
   await page.getByRole("button", { name: /^Setujui/ }).first().click();
   await expect(toast(page)).toContainText("disetujui");
   await expect(page.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: "GANI LUPA" })).toHaveCount(0);
+
+  // KONFLIK ALFA: KIKI Alfa terverifikasi; waka mencatat manual -> konfirmasi, lalu validasi dibatalkan pada update yang sama
+  await menu(page, "Presensi manual");
+  const baris805 = page.locator(".piket-grid[data-nis='805']");
+  await expect(baris805).toContainText("Alfa terverifikasi");
+  await baris805.getByRole("button", { name: "Hadir manual" }).click();
+  const dlgAlfa = page.getByRole("dialog", { name: "Hadir manual" });
+  await expect(dlgAlfa.getByText("Alfa terverifikasi akan dibatalkan")).toBeVisible();
+  await dlgAlfa.getByLabel("Jam masuk").fill("07:00");
+  await dlgAlfa.getByRole("button", { name: "Simpan & batalkan Alfa" }).click();
+  await expect(toast(page)).toContainText("KIKI ALAT: hadir manual (Hadir) tercatat");
+  await expect(page.getByTestId("manual-tercatat")).toContainText("KIKI ALAT");
+  await expect(page.locator(".piket-grid[data-nis='805']")).toHaveCount(0);
+  await menu(page, "Jejak audit");
+  await expect(page.locator(".table-row", { hasText: `validasi/${T.hariIni}/805` }).first()).toBeVisible();
+  await menu(page, "Validasi harian");
+  await expect(page.locator(".table-row", { hasText: "KIKI ALAT" })).toHaveCount(0); // Alfa dibatalkan & kini hadir manual
   await sehat(page);
   bersih(lap, "waka (presensi manual)");
 });
@@ -1190,4 +1219,107 @@ test("presensi manual — orang tua melihat 'Hadir (dicatat manual: Lupa KTM)'; 
   await expect(pm.getByRole("button", { name: "Hadir manual" })).toHaveCount(0);
   bersih(lapM, "piket (Minggu, presensi manual)");
   await kM.close();
+});
+
+test("pemetaan saran (autoMap) di Tata tertib, cadangan nama sekali-jalan, peringatan; Log harian & rekap bulanan memuat presensi manual", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+
+  // cadangan sekali-jalan: hapus pemetaan lupaKtm -> halaman Saran menulis ulang id aturannya (bukan bergantung nama selamanya)
+  await dbPut("discipline/autoMap/lupaKtm", null);
+  await menu(page, "Perlu ditinjau");
+  await expect(page.getByTestId("saran-belum-dipetakan")).toContainText("Alfa terverifikasi"); // 'alfa' memang belum dipetakan
+  await expect(page.getByTestId("saran-belum-dipetakan")).not.toContainText("Lupa membawa KTM");
+  await menu(page, "Tata tertib");
+  await page.getByRole("tab", { name: "Pemetaan saran" }).click();
+  const peta = page.getByTestId("pemetaan-saran");
+  await expect(peta.getByLabel("Aturan untuk saran Lupa membawa KTM")).toHaveValue("rg14");
+  await expect(peta.getByLabel("Aturan untuk saran Menghilangkan KTM")).toHaveValue("rg15");
+
+  // dropdown: petakan 'Alfa terverifikasi' ke aturan, lalu peringatan di halaman Saran berubah
+  await peta.getByLabel("Aturan untuk saran Alfa terverifikasi").selectOption("sd03");
+  await expect(toast(page)).toContainText("Pemetaan saran disimpan");
+  await expect(peta.getByLabel("Aturan untuk saran Alfa terverifikasi")).not.toHaveValue("");
+  await menu(page, "Perlu ditinjau");
+  await expect(page.getByTestId("saran-belum-dipetakan")).toHaveCount(0);
+  // pemetaan tercatat di jejak audit
+  await menu(page, "Jejak audit");
+  await expect(page.locator(".table-row", { hasText: "autoMap/alfa" }).first()).toBeVisible();
+  await expect(page.locator(".table-row", { hasText: "autoMap/lupaKtm" }).first()).toBeVisible();
+  // kembalikan agar tidak mengubah uji lain
+  await menu(page, "Tata tertib");
+  await page.getByRole("tab", { name: "Pemetaan saran" }).click();
+  await page.getByTestId("pemetaan-saran").getByLabel("Aturan untuk saran Alfa terverifikasi").selectOption({ label: "(belum dipetakan)" });
+  await expect(toast(page)).toContainText("Pemetaan saran disimpan");
+  bersih(lap, "waka (pemetaan saran)");
+
+  // admin: Log harian memuat entri manual (badge, alasan, petugas) + rekap bulanan memakai data gabungan (manual terhitung Hadir)
+  const kA = await browser.newContext(opsiKonteks());
+  const pa = await kA.newPage();
+  const lapA = await siapkan(pa);
+  await loginStaf(pa, "admin");
+  await menu(pa, "Laporan");
+  await pa.getByRole("tab", { name: "Log harian" }).click();
+  const gani = pa.locator(".table-row.log-grid", { hasText: "GANI LUPA" });
+  await expect(gani.first()).toBeVisible();
+  await expect(gani.first()).toContainText("Manual");
+  await expect(gani.first()).toContainText("Lupa KTM");
+  await expect(gani.first()).toContainText("Bu Rina");
+  await expect(pa.locator(".table-row.log-grid", { hasText: "HANI HILANG" }).filter({ hasText: "diabaikan (ada tap alat)" }).first()).toBeVisible(); // alat menang, manual tampil bertanda
+  const [unduh] = await Promise.all([pa.waitForEvent("download"), pa.getByRole("button", { name: "Unduh CSV" }).click()]);
+  const csv = readFileSync(await unduh.path(), "utf8");
+  expect(csv).toContain("Manual: Lupa KTM");
+  expect(csv).toContain("Bu Rina");
+  await pa.getByRole("tab", { name: "Rekap bulanan" }).click();
+  const rowGani = pa.locator(".table-row.report-grid", { hasText: "GANI LUPA" });
+  await expect(rowGani).toHaveCount(1);
+  await expect(rowGani.locator(".num.good")).toHaveText("1"); // hadir hari ini berkat presensi manual
+  bersih(lapA, "admin (log harian & rekap bulanan manual)");
+  await kA.close();
+});
+
+test("panduan: menu Panduan di setiap peran (statis) + tautan di portal orang tua", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Panduan");
+  await expect(page.getByTestId("panduan-waka")).toContainText("Panduan Waka Kesiswaan");
+  await expect(page.getByTestId("panduan-waka")).toContainText("Presensi manual");
+  await page.getByRole("tab", { name: "SOP harian" }).click();
+  await expect(page.getByTestId("panduan-sop")).toContainText("Jika alat mati atau WiFi putus");
+  await expect(page.getByTestId("panduan-sop")).toContainText("Sabtu: backup");
+  bersih(lap, "waka (panduan)");
+
+  for (const [peran, judulPanduan] of [["admin", "Panduan Admin"], ["kepala", "Panduan Kepala Madrasah"]]) {
+    const k = await browser.newContext(opsiKonteks());
+    const p = await k.newPage();
+    const l = await siapkan(p);
+    await loginStaf(p, peran);
+    await menu(p, "Panduan");
+    await expect(p.getByTestId(`panduan-${peran}`)).toContainText(judulPanduan);
+    bersih(l, `${peran} (panduan)`);
+    await k.close();
+  }
+
+  const kP = await browser.newContext(opsiKonteks());
+  const pp = await kP.newPage();
+  const lapP = await siapkan(pp);
+  await masukPiket(pp);
+  await menu(pp, "Panduan");
+  await expect(pp.getByTestId("panduan-piket")).toContainText("Siapa yang bertugas?");
+  await expect(pp.getByTestId("panduan-piket")).toContainText("Mode alat bermasalah");
+  bersih(lapP, "piket (panduan)");
+  await kP.close();
+
+  const kO = await browser.newContext(opsiKonteks());
+  const po = await kO.newPage();
+  const lapO = await siapkan(po);
+  await loginOrtu(po, "111", "482915");
+  await po.getByRole("link", { name: "Panduan" }).click();
+  await expect(po).toHaveURL(/\/panduan$/);
+  await expect(po.getByTestId("panduan-ortu")).toContainText("Lupa PIN");
+  await expect(po.getByTestId("panduan-ortu")).toContainText("dicatat manual");
+  await po.getByRole("link", { name: "Kembali" }).click();
+  await expect(po).toHaveURL(/\/siswa\/111$/);
+  bersih(lapO, "ortu (panduan)");
+  await kO.close();
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { get } from "firebase/database";
 import Icon from "../components/Icon";
 import { Spinner, StatusBadge } from "../components/ui";
@@ -91,6 +91,7 @@ function Header({ onLogout, nama, nis }: { onLogout: () => void; nama?: string; 
       </div>
       <div className="student-header-right">
         {nama && <div className="student-chip"><span className={`avatar ${toneOf(nis ?? "")}`}>{initials(nama)}</span><span><b>{nama}</b><small>NIS {nis}</small></span></div>}
+        <Link className="student-logout" to="/panduan"><Icon name="file" size={17} />Panduan</Link>
         <button className="student-logout" onClick={onLogout}><Icon name="logout" size={17} />Keluar</button>
       </div>
     </header>

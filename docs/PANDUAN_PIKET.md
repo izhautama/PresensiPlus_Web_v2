@@ -1,0 +1,42 @@
+# Panduan Guru Piket
+
+Untuk: Guru piket (akun bersama meja piket)
+
+## Masuk dan memilih nama
+
+1. Buka alamat aplikasi, tab Admin, isi email dan password akun meja piket.
+2. Layar "Siapa yang bertugas?" muncul: pilih nama Anda. Nama ini tercatat pada semua yang Anda input.
+3. Untuk ganti petugas tekan Ganti petugas. Tombol Nama perangkat boleh dipakai memberi nama HP/komputer ini (contoh: HP piket pintu depan).
+4. Selesai bertugas, tekan Keluar.
+
+> Catatan: Akun dipakai bersama, jadi nama dipilih sendiri. Semua tindakan juga tercatat di log aktivitas beserta perangkat.
+
+## Siswa tidak masuk: Izin, Sakit, Dispensasi
+
+1. Beranda menampilkan siswa yang belum tap hari ini.
+2. Pada nama siswa tekan Izin, Sakit, atau Dispensasi (siswa mewakili sekolah, dihitung hadir).
+3. Isi keterangan (wajib, min. 3 huruf) dan centang Surat fisik diterima bila ada. Simpan arsip surat di map dokumen.
+4. Tanggal lain atau izin terencana: tombol Izin tanggal lain / terencana (maksimal 7 hari ke depan; hanya Izin atau Dispensasi).
+5. Salah input: tombol Hapus pada daftar Sudah berketerangan.
+
+## Siswa hadir tetapi tidak tercatat alat
+
+1. Satu siswa (lupa KTM, KTM hilang, kartu rusak): tombol Hadir manual pada namanya, atau menu Presensi manual.
+2. Pilih alasan, isi jam masuk. Hadir atau Terlambat dihitung otomatis dari jadwal kelas.
+3. Alat mati atau WiFi putus: menu Presensi manual, kotak Mode alat bermasalah, pilih kelas, centang yang TIDAK hadir, tekan Tandai hadir.
+4. Salah catat: tombol Hapus pada daftar Presensi manual tercatat. Catat pulang manual tersedia untuk siswa yang sudah masuk.
+
+## Izin per jam dan pelanggaran ringan
+
+1. Izin per jam: pilih kelas, isi sel S, I, atau D pada jam pelajaran (siswa pulang awal dll), beri keterangan. Sel A (Alfa) hanya Waka.
+2. Pelanggaran: pilih siswa dan jenis dari daftar (hanya pelanggaran Ringan atau yang punya takziran). Poin tidak dapat diubah.
+3. Catatan pelanggaran Anda sendiri dapat dihapus dengan alasan.
+
+## Batasan yang normal
+
+1. Hanya bisa menginput sampai beberapa hari ke belakang (diatur Waka, bawaan 2 hari) dan tidak ke masa depan untuk presensi manual.
+2. Siswa yang Alfa-nya sudah dikonfirmasi Waka tidak dapat diubah oleh piket: hubungi Waka.
+3. Hari Minggu libur: presensi manual tidak tersedia.
+
+---
+Versi singkat ini juga tersedia di aplikasi pada menu Panduan.

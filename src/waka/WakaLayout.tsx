@@ -14,6 +14,7 @@ const Pelanggaran = lazy(() => import("../kesiswaan/Pelanggaran"));
 const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
+const Panduan = lazy(() => import("../pages/Panduan"));
 const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 
 /** Panel Waka Kesiswaan. Halaman kesiswaan dipakai bersama kepala/admin; hak tulis ditegakkan Security Rules. */
@@ -31,6 +32,7 @@ export default function WakaLayout() {
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="panduan" element={<Panduan peran="waka" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />
           <Route path="petugas-piket" element={<PetugasPiket />} />
           <Route path="pengaturan" element={<Pengaturan />} />

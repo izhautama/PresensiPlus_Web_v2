@@ -1032,6 +1032,16 @@ await manual("manual: waka hariKe Senin setelah Minggu DITERIMA (kontrol Minggu)
 // ---- kepemilikan & validasi Alfa
 await manual("manual: piket DITOLAK bila Alfa sudah divalidasi waka (111)", piket, TGL, "111", "tolak");
 await manual("manual: waka tetap boleh walau Alfa tervalidasi (111)", waka, TGL, "111", "izin");
+// ---- konflik Alfa: waka mencatat manual + membatalkan Alfa (validasi + salinan + audit) dalam SATU update; piket tidak boleh
+const batalAlfaBody = (u, n, o = {}) => ({
+  ...manualBody(u, TGL, n, o),
+  [`validasi/${TGL}/${n}`]: null, [`validasiByStudent/${n}/${TGL}`]: null,
+  [`discipline/audit/${randomBytes(4).toString("hex")}`]: audit(u, { path: `validasi/${TGL}/${n}`, aksi: "hapus" }),
+});
+await uji("manual: waka catat manual + batalkan Alfa terverifikasi (222) dalam SATU update DITERIMA", waka, "PATCH", "", batalAlfaBody(waka, "222", { act: { tanpa: true } }), "izin");
+await cek("manual: Alfa 222 benar-benar terhapus bersama salinannya", waka, `validasi/${TGL}/222`, (j) => j === null);
+await uji("manual: PIKET tidak bisa membatalkan Alfa lewat update manual (222 sudah bebas; uji pada 111)", piket, "PATCH", "", batalAlfaBody(piket, "111"), "tolak");
+await uji("manual: rules tidak mewajibkan audit untuk batal Alfa oleh waka (audit dijaga klien) DITERIMA", waka, "PATCH", "", { ...manualBody(waka, TGL, "111", { act: { tanpa: true } }), [`validasi/${TGL}/111`]: null, [`validasiByStudent/111/${TGL}`]: null }, "izin"); // audit tidak diwajibkan rules untuk validasi; konsistensi audit dijaga klien
 await manual("manual: waka menulis entri untuk nis 331", waka, TM, "331", "izin");
 await manual("manual: piket TIDAK bisa menimpa entri milik waka", piket, TM, "331", "tolak", { tap: { masuk: "07:00:00" } });
 await manual("manual: piket menimpa entri milik piket (koreksi) DITERIMA", piket, TM, "555", "izin", { tap: { masuk: "07:12:00", alasan: "Kartu rusak" } });

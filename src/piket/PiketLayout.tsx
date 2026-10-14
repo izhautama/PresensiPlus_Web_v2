@@ -8,6 +8,7 @@ const Beranda = lazy(() => import("./Beranda"));
 const PerJam = lazy(() => import("../kesiswaan/PerJam"));
 const Pelanggaran = lazy(() => import("./Pelanggaran"));
 const PresensiManual = lazy(() => import("./PresensiManual"));
+const Panduan = lazy(() => import("../pages/Panduan"));
 
 function Gerbang() {
   const { petugas } = usePetugas();
@@ -19,6 +20,7 @@ function Gerbang() {
           <Route index element={<Beranda />} />
           <Route path="per-jam" element={<PerJam />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="panduan" element={<Panduan peran="piket" />} />
           <Route path="pelanggaran" element={<Pelanggaran />} />
           <Route path="*" element={<Navigate to="/piket" replace />} />
         </Routes>

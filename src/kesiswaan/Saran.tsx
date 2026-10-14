@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner, StatusBadge } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
 import { initials, toneOf } from "../lib/attendance";
-import { TIPE_LABEL, type Saran } from "../lib/saran";
+import { SEMUA_TIPE_SARAN, TIPE_LABEL, cariAturanBawaan, type Saran } from "../lib/saran";
 import { addDays, formatTanggal, weekday } from "../lib/time";
+import { simpanAutoMap } from "../services/discipline";
 import { abaikanSaran, setujuiSaran, SudahDiputuskan } from "../services/saran";
 import { rentang, useSaran } from "./useSaran";
 import { useActor } from "./useDiscipline";
@@ -27,6 +28,21 @@ export default function SaranHalaman() {
   const id = (s: Saran) => `${s.tanggal}|${s.key}`;
   const semuaLibur = tanggal.length > 0 && tanggal.every((t) => weekday(t) === 0);
   const aturanKosong = !loading && Object.values(autoMap).filter(Boolean).length === 0;
+
+  // Cadangan nama hanya SEKALI: bila ditemukan, tulis id aturannya ke autoMap (dengan audit) agar tidak bergantung nama lagi
+  const sudahDiusulkan = useRef(new Set<string>());
+  useEffect(() => {
+    if (loading || !bisaTulis) return;
+    for (const tipe of SEMUA_TIPE_SARAN) {
+      if (autoMap[tipe] || sudahDiusulkan.current.has(tipe)) continue;
+      const id = cariAturanBawaan(tipe, rules);
+      if (!id) continue;
+      sudahDiusulkan.current.add(tipe);
+      simpanAutoMap(tipe, id, undefined, actor).catch(() => sudahDiusulkan.current.delete(tipe));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, bisaTulis, autoMap, rules]);
+  const belumDipetakan = !loading && !aturanKosong ? SEMUA_TIPE_SARAN.filter((t) => !autoMap[t] && !(bisaTulis && cariAturanBawaan(t, rules))) : [];
 
   const tandaiSibuk = (daftar: Saran[], on: boolean) => setSibuk((x) => { const n = new Set(x); daftar.forEach((s) => (on ? n.add(id(s)) : n.delete(id(s)))); return n; });
 
@@ -67,6 +83,7 @@ export default function SaranHalaman() {
       </div>
 
       {error && <div className="notice warn" role="alert"><Icon name="warning" size={17} /><span>Sebagian data tidak dapat dimuat ({error}).</span></div>}
+      {belumDipetakan.length > 0 && <div className="notice warn" data-testid="saran-belum-dipetakan"><Icon name="warning" size={17} /><span>Jenis saran belum dipetakan ke aturan: {belumDipetakan.map((t) => TIPE_LABEL[t]).join(", ")}. Saran jenis ini tidak dibuat. Atur di Tata tertib &gt; Pemetaan saran.</span></div>}
       {aturanKosong && <div className="notice warn"><Icon name="warning" size={17} /><span>Pemetaan saran belum diatur (autoMap kosong). Isi tata tertib awal terlebih dahulu.</span></div>}
 
       {semuaLibur ? (

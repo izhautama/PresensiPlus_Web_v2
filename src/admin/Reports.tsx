@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { get } from "firebase/database";
+import { get, orderByKey, query, startAt, endAt } from "firebase/database";
 import Icon from "../components/Icon";
 import { Empty, Spinner, StatusBadge } from "../components/ui";
 import { downloadCSV, maskUid, persenWarna, rekapBulan } from "../lib/attendance";
 import { formatTanggal, monthKey, monthLabel } from "../lib/time";
-import { gabungSemua, type ManualTap } from "../lib/manual";
+import { gabungSemua, gabungTap, type ManualTap } from "../lib/manual";
 import type { DayRecord, LogEntry } from "../lib/types";
 import { r, useLive } from "../services/db";
 import { useAdminData } from "./AdminData";
@@ -33,18 +33,24 @@ function Bulanan() {
   const { students, schedule, today, kelasList } = useAdminData();
   const [bulan, setBulan] = useState(monthKey(today));
   const [kelas, setKelas] = useState("");
-  const [data, setData] = useState<Record<string, Record<string, DayRecord>> | null>(null);
+  const [att, setAtt] = useState<Record<string, Record<string, DayRecord>> | null>(null);
+  const [manualBulan, setManualBulan] = useState<Record<string, Record<string, ManualTap>> | null>(null);
   const [err, setErr] = useState("");
   const [muat, setMuat] = useState(0);
 
   // Dibaca sekali (bukan realtime) agar hemat kuota unduhan paket gratis
   useEffect(() => {
-    setData(null); setErr("");
-    // attendance (alat + keterangan) digabung dengan manualTap (alat menang) lewat fungsi tunggal lib/manual.ts
-    Promise.all([get(r("attendance")), get(r("manualTap")).catch(() => null)])
-      .then(([a, m]) => setData(gabungSemua((a.val() ?? {}) as Record<string, Record<string, DayRecord>>, (m?.val() ?? {}) as Record<string, Record<string, ManualTap>>)))
-      .catch((e) => setErr(e.message));
+    setAtt(null); setErr("");
+    get(r("attendance")).then((x) => setAtt((x.val() ?? {}) as Record<string, Record<string, DayRecord>>)).catch((e) => setErr(e.message));
   }, [muat]);
+  // presensi manual: HANYA bulan yang dipilih (query rentang kunci tanggal), bukan seluruh node
+  useEffect(() => {
+    setManualBulan(null);
+    get(query(r("manualTap"), orderByKey(), startAt(`${bulan}-01`), endAt(`${bulan}-31`)))
+      .then((x) => setManualBulan((x.val() ?? {}) as Record<string, Record<string, ManualTap>>)).catch((e) => setErr(e.message));
+  }, [muat, bulan]);
+  // fungsi tunggal lib/manual.ts: alat menang, manual mengisi yang kosong
+  const data = useMemo(() => (att && manualBulan ? gabungSemua(att, manualBulan) : null), [att, manualBulan]);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -90,17 +96,33 @@ function Harian() {
   const [tanggal, setTanggal] = useState(today);
   const live = useLive<Record<string, LogEntry>>(`log/${tanggal}`);
   const izin = useLive<Record<string, string>>(`izin/${tanggal}`);
+  const manual = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const [q, setQ] = useState("");
 
-  const rows = useMemo(() => {
+  type Baris = { key: string; uid: string; jam: string; nis: string; nama?: string; kelas?: string; status: string; infoManual?: { alasan: string; petugas?: string; diabaikan: boolean } };
+  const rows = useMemo<Baris[]>(() => {
     const qq = q.trim().toLowerCase();
-    return Object.entries(live.data ?? {}).map(([key, e]) => ({ key, uid: key.split("_")[0], ...e }))
+    const alat: Baris[] = Object.entries(live.data ?? {}).map(([key, e]) => ({ key, uid: key.split("_")[0], ...e }));
+    // entri manual digabung dengan tap alat lewat gabungTap yang sama (alat menang); yang diabaikan tetap tampil bertanda
+    const perNis: Record<string, { masuk?: LogEntry; pulang?: LogEntry }> = {};
+    for (const x of alat) { const slot = (perNis[x.nis] ??= {}); if (x.key.endsWith("_M")) slot.masuk = x; else slot.pulang = x; }
+    const tambahan: Baris[] = [];
+    for (const [nis, tap] of Object.entries(manual.data ?? {})) {
+      const g = gabungTap({ masuk: perNis[nis]?.masuk, pulang: perNis[nis]?.pulang }, tap);
+      const info = { alasan: tap.alasan, petugas: tap.petugas, diabaikan: Boolean(g.manual?.diabaikan) };
+      const s = studentMap[Object.keys(studentMap).find((u) => studentMap[u].nis === nis) ?? ""];
+      const dasar = { uid: "—", nis, nama: s?.nama, kelas: s?.kelas, infoManual: info };
+      if (tap.masuk && (g.manual?.dipakai.includes("masuk") || perNis[nis]?.masuk)) tambahan.push({ ...dasar, key: `${nis}_manual_M`, jam: tap.masuk, status: tap.status, infoManual: { ...info, diabaikan: !g.manual?.dipakai.includes("masuk") } });
+      if (tap.pulang) tambahan.push({ ...dasar, key: `${nis}_manual_P`, jam: tap.pulang, status: "Pulang", infoManual: { ...info, diabaikan: !g.manual?.dipakai.includes("pulang") } });
+    }
+    return [...alat, ...tambahan]
       .filter((x) => !qq || `${x.nama} ${x.nis}`.toLowerCase().includes(qq))
       .sort((a, b) => b.jam.localeCompare(a.jam));
-  }, [live.data, q]);
+  }, [live.data, manual.data, studentMap, q]);
 
-  const csv = () => downloadCSV(`log_tap_${tanggal}.csv`, ["Tanggal", "Jam", "NIS", "Nama", "Kelas", "Status", "UID"],
-    [...rows].reverse().map((x) => [tanggal, x.jam, x.nis, x.nama, x.kelas, x.status, tampilUid(x.uid)]));
+  const sumber = (x: Baris) => (x.infoManual ? `Manual: ${x.infoManual.alasan}${x.infoManual.diabaikan ? " (diabaikan, ada tap alat)" : ""}` : "Alat");
+  const csv = () => downloadCSV(`log_tap_${tanggal}.csv`, ["Tanggal", "Jam", "NIS", "Nama", "Kelas", "Status", "Sumber", "Petugas", "UID"],
+    [...rows].reverse().map((x) => [tanggal, x.jam, x.nis, x.nama, x.kelas, x.status, sumber(x), x.infoManual?.petugas ?? "", tampilUid(x.uid)]));
   const nIzin = Object.keys(izin.data ?? {}).length;
 
   return (
@@ -114,11 +136,13 @@ function Harian() {
       <p className="caption-text">{formatTanggal(tanggal)} · {rows.length} tap · {nIzin} izin/sakit/dispensasi · {tanggal === today ? "diperbarui real-time" : "arsip"}</p>
       <div className="table-panel">
         <div className="table-head log-grid"><span>Jam</span><span>Siswa</span><span>Kelas</span><span>Status</span><span>UID kartu</span></div>
-        {live.loading ? <div className="page-loader"><Spinner dark /></div> : rows.length === 0 ? <Empty icon="card" title="Tidak ada tap pada tanggal ini" /> : rows.map((x) => (
+        {live.loading || manual.loading ? <div className="page-loader"><Spinner dark /></div> : rows.length === 0 ? <Empty icon="card" title="Tidak ada tap pada tanggal ini" /> : rows.map((x) => (
           <div className="table-row log-grid" key={x.key}>
             <span className="mono">{x.jam}</span>
             <span className="student-cell"><span><b>{x.nama ?? studentMap[x.uid]?.nama ?? "—"}</b><small>NIS {x.nis}</small></span></span>
-            <span>{x.kelas}</span><span><StatusBadge status={x.status} /></span><span className="mono muted">{tampilUid(x.uid)}</span>
+            <span>{x.kelas}</span>
+            <span><StatusBadge status={x.status} />{x.infoManual && <small className="block"><span className="badge badge-ubah">Manual</span> {x.infoManual.alasan}{x.infoManual.petugas ? ` · ${x.infoManual.petugas}` : ""}{x.infoManual.diabaikan ? " · diabaikan (ada tap alat)" : ""}</small>}</span>
+            <span className="mono muted">{x.infoManual ? "—" : tampilUid(x.uid)}</span>
           </div>
         ))}
       </div>

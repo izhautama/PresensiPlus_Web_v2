@@ -408,6 +408,12 @@ function ganti(teks, dari, ke) {
 const dir = mkdtempSync(join(tmpdir(), "mutasi-"));
 let selamat = 0;
 const tidakTerverifikasi = [];
+let dijalankan = 0, dijalankanEkuivalen = 0;
+// Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
+// Kelompok: manual | piket | saran | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
+const GRUP = (nama) => /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 console.log(`Uji mutasi (${mutasi.length} mutasi)\n`);
 for (const [i, m] of mutasi.entries()) {
@@ -415,8 +421,10 @@ for (const [i, m] of mutasi.entries()) {
   const sebelum = JSON.stringify(rules);
   try { m.ubah(rules.rules); } catch (e) { throw new Error(`[${i + 1}] "${m.nama}": ${e.message}`); }
   if (JSON.stringify(rules) === sebelum) throw new Error(`mutasi "${m.nama}" tidak mengubah apa pun`);
+  if (grupDipilih !== "semua" && GRUP(m.nama) !== grupDipilih) continue;
   if (hanya && !hanya.has(i + 1)) continue; // MUTASI_HANYA=39,56 : jalankan subset saja (iterasi cepat)
   if (process.env.MUTASI_KERING) { console.log(`  pola OK [${i + 1}] ${m.nama}`); continue; } // hanya validasi pola, tanpa emulator
+  dijalankan++; if (m.ekuivalen) dijalankanEkuivalen++;
   const file = join(dir, `m${i}.json`);
   writeFileSync(file, JSON.stringify(rules));
   const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file }, encoding: "utf8" });
@@ -431,8 +439,8 @@ for (const [i, m] of mutasi.entries()) {
   if (tertangkap) console.log(`    ${gagal.length} uji gagal, mis.: ${gagal.slice(0, 2).join(" | ")}`);
   else console.log(`    status keluar ${r.status}${m.ekuivalen ? " (seluruh uji lain tetap lolos)" : `\n${r.stderr?.slice(0, 300) ?? ""}`}`);
 }
-const ekuivalen = mutasi.filter((m) => m.ekuivalen).length;
-console.log(`\n${mutasi.length - ekuivalen - selamat}/${mutasi.length - ekuivalen} mutasi non-ekuivalen tertangkap (${ekuivalen} ekuivalen terdokumentasi)`);
+console.log(`
+${dijalankan - dijalankanEkuivalen - selamat}/${dijalankan - dijalankanEkuivalen} mutasi non-ekuivalen tertangkap (${dijalankanEkuivalen} ekuivalen terdokumentasi) [grup: ${grupDipilih}${process.env.MUTASI_HANYA ? ", subset" : ""}]`);
 if (tidakTerverifikasi.length) console.log(`
 ${tidakTerverifikasi.length} mutasi TIDAK TERVERIFIKASI (emulator macet): jalankan ulang dalam kelompok lebih kecil, mis. MUTASI_HANYA=${tidakTerverifikasi.map((x) => x.match(/\d+/)[0]).join(",")}`);
 process.exit(selamat ? 1 : tidakTerverifikasi.length ? 2 : 0);

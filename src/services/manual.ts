@@ -3,6 +3,7 @@ import { hariKeDariTanggal } from "../lib/piket";
 import { statusDariJam, type AlasanManual, type ManualTap } from "../lib/manual";
 import type { ScheduleRow } from "../lib/types";
 import { kirimUpdate, sisipkanAktivitas } from "./aktivitas";
+import { tambahAudit } from "./discipline";
 
 type Updates = Record<string, unknown>;
 /** Pencatat: piket (uid akun bersama + nama petugas pilihan) atau waka (uid + nama). */
@@ -33,25 +34,46 @@ function sisipkanEntri(u: Updates, a: InputManual, p: PencatatManual, schedule: 
   return status;
 }
 
-/** Catat presensi manual satu siswa (+ log aktivitas, wajib untuk piket). */
-export async function catatManual(a: InputManual, p: PencatatManual, schedule: ScheduleRow[]) {
+/**
+ * Waka mencatat manual untuk siswa yang Alfa-nya sudah divalidasi: validasi + salinan anak DIBATALKAN pada update yang SAMA,
+ * dengan jejak audit. Piket tidak boleh (rules menolak karena Alfa sudah divalidasi).
+ */
+function sisipkanBatalAlfa(u: Updates, tanggal: string, nis: string, p: PencatatManual) {
+  u[`validasi/${tanggal}/${nis}`] = null;
+  u[`validasiByStudent/${nis}/${tanggal}`] = null;
+  tambahAudit(u, { uid: p.uid, nama: p.petugas }, "hapus", `validasi/${tanggal}/${nis}`, { status: "Alfa" }, { dibatalkan: "otomatis: presensi manual" });
+}
+
+/** Catat presensi manual satu siswa (+ log aktivitas, wajib untuk piket). `batalAlfa` hanya untuk waka. */
+export async function catatManual(a: InputManual, p: PencatatManual, schedule: ScheduleRow[], opsi: { batalAlfa?: boolean } = {}) {
   const u: Updates = {};
   const status = sisipkanEntri(u, a, p, schedule);
-  sisipkanAktivitas(u, { aksi: "presensi-manual", nis: a.nis, detail: `${a.alasan} ${a.tanggal}: ${status}${a.masuk ? ` masuk ${a.masuk.slice(0, 5)}` : ""}${a.pulang ? ` pulang ${a.pulang.slice(0, 5)}` : ""}${a.keterangan?.trim() ? ` — ${a.keterangan.trim()}` : ""}` });
+  const ringkas = `${a.alasan} ${a.tanggal}: ${status}${a.masuk ? ` masuk ${a.masuk.slice(0, 5)}` : ""}${a.pulang ? ` pulang ${a.pulang.slice(0, 5)}` : ""}${a.keterangan?.trim() ? ` — ${a.keterangan.trim()}` : ""}`;
+  if (opsi.batalAlfa) {
+    sisipkanBatalAlfa(u, a.tanggal, a.nis, p);
+    sisipkanAktivitas(u, { aksi: "batal-alfa", nis: a.nis, detail: `Batal Alfa otomatis: presensi manual — ${ringkas}` });
+  } else {
+    sisipkanAktivitas(u, { aksi: "presensi-manual", nis: a.nis, detail: ringkas });
+  }
   await kirimUpdate(u);
   return status;
 }
 
 /** Mode "alat bermasalah": tandai banyak siswa hadir sekaligus dalam SATU update (satu entri log). */
 export async function catatManualMassal(
-  a: { tanggal: string; masuk: string; kelas: string; siswa: { nis: string }[]; alasan: AlasanManual; keterangan?: string },
+  a: { tanggal: string; masuk: string; kelas: string; siswa: { nis: string }[]; alasan: AlasanManual; keterangan?: string; batalAlfa?: string[] },
   p: PencatatManual,
   schedule: ScheduleRow[],
 ) {
   if (a.siswa.length === 0) throw new Error("Tidak ada siswa yang ditandai.");
   const u: Updates = {};
   for (const s of a.siswa) sisipkanEntri(u, { tanggal: a.tanggal, nis: s.nis, kelas: a.kelas, masuk: a.masuk, alasan: a.alasan, keterangan: a.keterangan }, p, schedule);
-  sisipkanAktivitas(u, { aksi: "presensi-manual", detail: `${a.alasan} ${a.tanggal}, kelas ${a.kelas}: ${a.siswa.length} siswa ditandai hadir (masuk ${a.masuk.slice(0, 5)})` });
+  const batal = (a.batalAlfa ?? []).filter((n) => a.siswa.some((s) => s.nis === n));
+  for (const nis of batal) sisipkanBatalAlfa(u, a.tanggal, nis, p);
+  sisipkanAktivitas(u, {
+    aksi: batal.length ? "batal-alfa" : "presensi-manual",
+    detail: `${batal.length ? `Batal Alfa otomatis (${batal.length} siswa): presensi manual — ` : ""}${a.alasan} ${a.tanggal}, kelas ${a.kelas}: ${a.siswa.length} siswa ditandai hadir (masuk ${a.masuk.slice(0, 5)})`,
+  });
   await kirimUpdate(u);
 }
 
