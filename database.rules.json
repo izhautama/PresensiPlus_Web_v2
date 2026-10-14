@@ -1,0 +1,826 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "roles": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin')",
+        ".write": "auth != null && $uid !== auth.uid && ((root.child('roles').child(auth.uid).val() === 'admin' && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket')) || (root.child('roles').child(auth.uid).val() === 'waka' && ((data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket'))))",
+        ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'"
+      }
+    },
+    "staff": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin')",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        ".validate": "newData.hasChildren(['email', 'nama', 'role', 'dibuat'])",
+        "email": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+        },
+        "nama": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+        },
+        "role": {
+          ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'"
+        },
+        "dibuat": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "config": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'device')",
+      ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "schedule": {
+        ".read": "auth != null"
+      },
+      "students": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+        "$cardUid": {
+          ".validate": "$cardUid.matches(/^[0-9A-F]{8,20}$/) && newData.hasChildren(['nis', 'nama', 'kelas'])",
+          "nis": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"
+          },
+          "nama": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+          },
+          "kelas": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 15"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "version": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        ".validate": "newData.isNumber()"
+      }
+    },
+    "parents": {
+      "$nis": {
+        ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        "ver": {
+          ".read": true,
+          ".validate": "newData.isNumber() && newData.val() >= 1"
+        },
+        "uid": {
+          ".validate": "newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "profiles": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$nis": {
+        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'"
+      }
+    },
+    "attendance": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$nis": {
+        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        "$date": {
+          ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'piket'",
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || (root.child('roles').child(auth.uid).val() === 'device' && newData.exists() && !data.exists()))",
+          ".validate": "$date.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+          "masuk": {
+            ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'device' && newData.exists()",
+            ".validate": "newData.isString() && newData.val().matches(/^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "pulang": {
+            ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'device' && newData.exists()",
+            ".validate": "newData.isString() && newData.val().matches(/^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)"
+          },
+          "status": {
+            ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'device' && newData.exists()",
+            ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'"
+          },
+          "ket": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala' || (root.child('roles').child(auth.uid).val() === 'piket' && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-harian') && newData.parent().parent().parent().parent().child('izinMeta').child($date).child($nis).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_' + 'H').child('ts').val() === now) : newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-izin'))))",
+            ".validate": "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi') && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'piket')"
+          },
+          "catatan": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala' || (root.child('roles').child(auth.uid).val() === 'piket' && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-harian') && newData.parent().parent().parent().parent().child('izinMeta').child($date).child($nis).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_' + 'H').child('ts').val() === now) : newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-izin'))))",
+            ".validate": "newData.isString() && newData.val().length <= 200 && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'piket')"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "log": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$date": {
+        ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'piket'",
+        ".indexOn": [
+          "jam"
+        ],
+        "$key": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || (root.child('roles').child(auth.uid).val() === 'device' && newData.exists()))",
+          ".validate": "$key.matches(/^[0-9A-F]{8,20}_(M|P)$/) && newData.hasChildren(['jam', 'nis', 'status'])"
+        }
+      }
+    },
+    "unknown": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "$date": {
+        "$cardUid": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || (root.child('roles').child(auth.uid).val() === 'device' && newData.exists()))"
+        }
+      }
+    },
+    "device": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "status": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'device' && newData.exists()"
+      },
+      "events": {
+        ".indexOn": [
+          "ts"
+        ],
+        "$id": {
+          ".write": "auth != null && ((root.child('roles').child(auth.uid).val() === 'device' && !data.exists() && newData.exists()) || root.child('roles').child(auth.uid).val() === 'admin')"
+        }
+      },
+      "inbox": {
+        ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'device'",
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        "command": {
+          ".validate": "newData.hasChildren(['id', 'cmd', 'ts'])",
+          "cmd": {
+            ".validate": "newData.val() === 'restart' || newData.val() === 'sync' || newData.val() === 'buzzer' || newData.val() === 'lcd' || newData.val() === 'diagnostik'"
+          },
+          "arg": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 32"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "watching": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "ack": {
+        "$id": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'device' && newData.exists()"
+        }
+      }
+    },
+    "discipline": {
+      "settings": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+        "piketMundurHari": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka'",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 14 && newData.val() % 1 === 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "rules": {
+        ".read": "auth != null",
+        "$ruleId": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && newData.exists()",
+          ".validate": "$ruleId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['kategori', 'nama', 'poin', 'aktif', 'diubahOleh', 'diubahTs'])",
+          "kategori": {
+            ".validate": "newData.val() === 'Sangat Berat' || newData.val() === 'Berat' || newData.val() === 'Sedang' || newData.val() === 'Ringan'"
+          },
+          "nama": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "poin": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000 && newData.val() % 1 === 0"
+          },
+          "takziran": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 300"
+          },
+          "aktif": {
+            ".validate": "newData.isBoolean()"
+          },
+          "diubahOleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "diubahTs": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "remisi": {
+        ".read": "auth != null && !(root.child('roles').child(auth.uid).val() === 'piket')",
+        "$remId": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && newData.exists()",
+          ".validate": "$remId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['kelompok', 'nama', 'poin', 'aktif', 'diubahOleh', 'diubahTs'])",
+          "kelompok": {
+            ".validate": "newData.val() === 'Prestasi' || newData.val() === 'Tanpa prestasi'"
+          },
+          "nama": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "poin": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000 && newData.val() % 1 === 0"
+          },
+          "syarat": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "aktif": {
+            ".validate": "newData.isBoolean()"
+          },
+          "diubahOleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "diubahTs": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "levels": {
+        ".read": "auth != null && !(root.child('roles').child(auth.uid).val() === 'piket')",
+        "$lvlId": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
+          ".validate": "$lvlId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['poin', 'tindakan'])",
+          "poin": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 100000 && newData.val() % 1 === 0"
+          },
+          "tindakan": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "autoMap": {
+        ".read": "auth != null && !(root.child('roles').child(auth.uid).val() === 'piket')",
+        ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
+        "terlambat": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "tanpaTapPulang": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "bolosJam": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "alfa": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
+      "records": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        "$nis": {
+          ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+          ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+          "$recId": {
+            ".write": "auth != null && ((root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && (newData.exists() || newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').val() === true) || (root.child('roles').child(auth.uid).val() === 'piket' && (newData.exists() ? (!data.exists() && newData.child('jenis').val() === 'pelanggaran' && newData.child('sumber').val() === 'piket' && root.child('discipline').child('rules').child(newData.child('refId').val()).child('aktif').val() === true && (root.child('discipline').child('rules').child(newData.child('refId').val()).child('kategori').val() === 'Ringan' || root.child('discipline').child('rules').child(newData.child('refId').val()).child('takziran').val().length > 0) && newData.child('poin').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('poin').val() && newData.child('nama').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('nama').val() && newData.child('kategori').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('kategori').val() && newData.child('takziran').val() === root.child('discipline').child('rules').child(newData.child('refId').val()).child('takziran').val() && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('nis').val() === $nis && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').isNumber() && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() % 1 === 0 && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() >= ((now + 25200000) / 86400000) - (root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2) - 1 && newData.parent().parent().parent().parent().child('piketHarian').child(newData.child('tanggal').val()).child($recId).child('hariKe').val() <= ((now + 25200000) / 86400000) + 0 && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'pelanggaran')) : (data.child('sumber').val() === 'piket' && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').val() === true && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-pelanggaran')))))",
+            ".validate": "$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber']) && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).exists() && !newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('dihapus').exists() && (newData.child('sumber').val() !== 'saran' || ($recId.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]_(terlambat|tanpaTapPulang|bolosJam|alfa)$/) && $recId.beginsWith(newData.child('tanggal').val() + '_') && newData.parent().parent().parent().child('suggest').child(newData.child('tanggal').val()).child($recId.replace(newData.child('tanggal').val() + '_', '') + '_' + $nis).child('keputusan').val() === 'diterima')) && (newData.child('sumber').val() !== 'piket' || root.child('roles').child(auth.uid).val() === 'piket' || data.exists()) && (!data.exists() || (newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahOleh').val() === auth.uid && newData.parent().parent().parent().child('recordMeta').child($nis).child($recId).child('diubahTs').val() !== root.child('discipline').child('recordMeta').child($nis).child($recId).child('diubahTs').val()))",
+            "jenis": {
+              ".validate": "newData.val() === 'pelanggaran' || newData.val() === 'remisi'"
+            },
+            "refId": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
+            "nama": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+            },
+            "kategori": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+            },
+            "poin": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "tanggal": {
+              ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)"
+            },
+            "ta": {
+              ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-20[0-9]{2}$/)"
+            },
+            "takziran": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 300"
+            },
+            "sumber": {
+              ".validate": "newData.val() === 'manual' || newData.val() === 'saran' || newData.val() === 'piket'"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "recordMeta": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        "$nis": {
+          ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+          "$recId": {
+            ".write": "auth != null && newData.exists() && ((root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') || (root.child('roles').child(auth.uid).val() === 'piket' && (newData.parent().parent().parent().child('records').child($nis).child($recId).child('sumber').val() === 'piket' || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'piket') && (newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'pelanggaran') || newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-pelanggaran'))))",
+            ".validate": "$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['dibuatOleh', 'dibuatNama', 'dibuatTs']) && (data.exists() ? (newData.child('dibuatOleh').val() === data.child('dibuatOleh').val() && newData.child('dibuatTs').val() === data.child('dibuatTs').val()) : newData.child('dibuatOleh').val() === auth.uid) && (newData.child('dihapus').exists() ? (newData.child('alasanHapus').exists() && newData.child('snapshot').exists() && !newData.parent().parent().parent().child('records').child($nis).child($recId).exists()) : newData.parent().parent().parent().child('records').child($nis).child($recId).exists())",
+            "dibuatOleh": {
+              ".validate": "newData.isString()"
+            },
+            "dibuatNama": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
+            "dibuatTs": {
+              ".validate": "newData.isNumber()"
+            },
+            "diubahOleh": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "diubahTs": {
+              ".validate": "newData.isNumber()"
+            },
+            "dihapus": {
+              ".validate": "newData.val() === true"
+            },
+            "alasanHapus": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+            },
+            "snapshot": {
+              ".validate": "newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber'])",
+              "jenis": {
+                ".validate": "newData.val() === 'pelanggaran' || newData.val() === 'remisi'"
+              },
+              "refId": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+              },
+              "nama": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+              },
+              "kategori": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+              },
+              "poin": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000 && newData.val() % 1 === 0"
+              },
+              "tanggal": {
+                ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)"
+              },
+              "ta": {
+                ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-20[0-9]{2}$/)"
+              },
+              "takziran": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 300"
+              },
+              "sumber": {
+                ".validate": "newData.val() === 'manual' || newData.val() === 'saran' || newData.val() === 'piket'"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "suggest": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        "$tgl": {
+          ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+          "$key": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && !data.exists() && newData.exists()",
+            ".validate": "$key.matches(/^(terlambat|tanpaTapPulang|bolosJam|alfa)_[0-9]{1,20}$/) && newData.hasChildren(['keputusan', 'oleh', 'ts', 'nis']) && $key.endsWith('_' + newData.child('nis').val()) && (newData.child('keputusan').val() === 'diterima' ? (newData.child('recId').val() === $tgl + '_' + $key.replace('_' + newData.child('nis').val(), '') && newData.parent().parent().parent().child('records').child(newData.child('nis').val()).child(newData.child('recId').val()).exists()) : !newData.child('recId').exists())",
+            "keputusan": {
+              ".validate": "newData.val() === 'diterima' || newData.val() === 'diabaikan'"
+            },
+            "nis": {
+              ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"
+            },
+            "recId": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 70"
+            },
+            "alasan": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+            },
+            "oleh": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "notes": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        "$nis": {
+          "$recId": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500"
+          }
+        }
+      },
+      "audit": {
+        ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+        ".indexOn": [
+          "ts"
+        ],
+        "$id": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala') && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['aksi', 'path', 'oleh', 'olehNama', 'ts'])",
+          "aksi": {
+            ".validate": "newData.val() === 'buat' || newData.val() === 'ubah' || newData.val() === 'hapus' || newData.val() === 'ubah-master'"
+          },
+          "path": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "sebelum": {
+            ".validate": true
+          },
+          "sesudah": {
+            ".validate": true
+          },
+          "oleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "olehNama": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "activity": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$id": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket') && !data.exists() && newData.exists()",
+          ".validate": "$id.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['uid', 'peran', 'akunEmail', 'aksi', 'detail', 'deviceId', 'deviceLabel', 'ts', 'hariKe']) && newData.child('peran').val() === root.child('roles').child(auth.uid).val() && (newData.child('peran').val() === 'piket' ? (newData.child('aksi').val() === 'login' || newData.child('petugas').exists()) : !newData.child('petugas').exists())",
+          "uid": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "peran": {
+            ".validate": "newData.val() === 'admin' || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'"
+          },
+          "akunEmail": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120"
+          },
+          "petugas": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "aksi": {
+            ".validate": "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)"
+          },
+          "nis": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"
+          },
+          "detail": {
+            ".validate": "newData.isString() && newData.val().length >= 0 && newData.val().length <= 300"
+          },
+          "deviceId": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 64"
+          },
+          "deviceLabel": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100"
+          },
+          "deviceNama": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "ts": {
+            ".validate": "newData.val() === now"
+          },
+          "hariKe": {
+            ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() <= ((now + 25200000) / 86400000) && newData.val() > ((now + 25200000) / 86400000) - 1"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "activityLast": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka')",
+        ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket') && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'ts', 'tgl'])",
+        "id": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,40}$/)"
+        },
+        "ts": {
+          ".validate": "newData.val() === now"
+        },
+        "tgl": {
+          ".validate": "newData.isString() && newData.val().matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "piketAkun": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$uid": {
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+        ".validate": "newData.hasChildren(['email', 'nama'])",
+        "email": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120"
+        },
+        "nama": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+        },
+        "terkunci": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka'",
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "piketPerangkat": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$id": {
+        ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'piket' && !data.exists() && newData.exists()",
+        ".validate": "$id.matches(/^[A-Za-z0-9_-]{8,64}$/) && newData.hasChildren(['uid', 'pertama', 'label'])",
+        "uid": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "pertama": {
+          ".validate": "newData.val() === now"
+        },
+        "label": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 100"
+        },
+        "nama": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "sistem": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
+      "backupTerakhir": {
+        ".validate": "newData.isNumber() && newData.val() <= now"
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
+    "lessons": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$kelas": {
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka'",
+          ".validate": "$kelas.length >= 1 && $kelas.length <= 60",
+          "meta": {
+            "$jam": {
+              ".validate": "$jam.matches(/^[1-9]$/)",
+              "mapel": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+              },
+              "guru": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "absen": {
+            "$nis": {
+              ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+              "$jam": {
+                ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'piket' && (!data.exists() || data.val() !== 'A') && newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-jam') && (!newData.exists() || ((newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D') && newData.parent().parent().parent().parent().parent().parent().child('izinMeta').child($tgl).child($nis).child(newData.parent().parent().parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_' + newData.val()).child('ts').val() === now))",
+                ".validate": "$jam.matches(/^[1-9]$/) && (newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A')"
+              }
+            }
+          },
+          "oleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "lessonsByStudent": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$nis": {
+        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+        "$tgl": {
+          ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+          "$jam": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || (root.child('roles').child(auth.uid).val() === 'piket' && (!data.exists() || data.child('k').val() !== 'A') && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-jam') && (!newData.exists() || ((newData.child('k').val() === 'S' || newData.child('k').val() === 'I' || newData.child('k').val() === 'D') && newData.parent().parent().parent().parent().child('izinMeta').child($tgl).child($nis).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_' + newData.child('k').val()).child('ts').val() === now))))",
+            ".validate": "$jam.matches(/^[1-9]$/) && newData.hasChildren(['k'])",
+            "k": {
+              ".validate": "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'"
+            },
+            "mapel": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "validasi": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$nis": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
+          ".validate": "$nis.matches(/^[0-9]{1,20}$/) && newData.hasChildren(['status', 'oleh', 'ts'])",
+          "status": {
+            ".validate": "newData.val() === 'Alfa'"
+          },
+          "catatan": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "oleh": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "validasiByStudent": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka')",
+      "$nis": {
+        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+        "$tgl": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
+          ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/) && newData.hasChildren(['status'])",
+          "status": {
+            ".validate": "newData.val() === 'Alfa'"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "izin": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$date": {
+        ".validate": "$date.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$nis": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || (root.child('roles').child(auth.uid).val() === 'piket' && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-harian') && newData.parent().parent().parent().child('izinMeta').child($date).child($nis).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_' + 'H').child('ts').val() === now) : newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-izin'))))",
+          ".validate": "newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi'"
+        }
+      }
+    },
+    "izinMeta": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$nis": {
+          ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
+          "$metaId": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala' || (root.child('roles').child(auth.uid).val() === 'piket' && newData.exists() && (!data.exists() || data.child('oleh').val() === auth.uid) && newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-harian' || newData.parent().parent().parent().parent().child('activity').child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'izin-jam')))",
+            ".validate": "$metaId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['lingkup', 'ket', 'keterangan', 'suratDiterima', 'petugas', 'oleh', 'ts', 'hariKe']) && (newData.child('lingkup').val() === 'jam' ? newData.child('jam').exists() : !newData.child('jam').exists()) && (!(root.child('roles').child(auth.uid).val() === 'piket') || ($metaId.beginsWith(newData.parent().parent().parent().parent().child('activityLast').child(auth.uid).child('id').val() + '_') && newData.child('ts').val() === now && newData.child('hariKe').isNumber() && newData.child('hariKe').val() % 1 === 0 && newData.child('hariKe').val() >= ((now + 25200000) / 86400000) - (root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2) - 1 && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) + 7 && (newData.child('hariKe').val() <= ((now + 25200000) / 86400000) || newData.child('ket').val() !== 'Sakit')))",
+            "lingkup": {
+              ".validate": "newData.val() === 'harian' || newData.val() === 'jam'"
+            },
+            "jam": {
+              "$i": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9 && newData.val() % 1 === 0"
+              }
+            },
+            "ket": {
+              ".validate": "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')"
+            },
+            "keterangan": {
+              ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 200"
+            },
+            "suratDiterima": {
+              ".validate": "newData.isBoolean()"
+            },
+            "petugas": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
+            "oleh": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "hariKe": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "piketHarian": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$tgl": {
+        ".validate": "$tgl.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/)",
+        "$recId": {
+          ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'waka' || (root.child('roles').child(auth.uid).val() === 'piket' && newData.exists() && (newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'pelanggaran') || newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'hapus-pelanggaran'))))",
+          ".validate": "$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['nis', 'nama', 'kelas', 'pelanggaran', 'petugas', 'hariKe', 'refId', 'poin']) && (!(root.child('roles').child(auth.uid).val() === 'piket') || (newData.child('hariKe').isNumber() && newData.child('hariKe').val() % 1 === 0 && newData.child('hariKe').val() >= ((now + 25200000) / 86400000) - (root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2) - 1 && newData.child('hariKe').val() <= ((now + 25200000) / 86400000) + 0 && (!data.exists() || (newData.child('nis').val() === data.child('nis').val() && newData.child('pelanggaran').val() === data.child('pelanggaran').val() && newData.child('petugas').val() === data.child('petugas').val() && newData.child('hariKe').val() === data.child('hariKe').val()))))",
+          "nis": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"
+          },
+          "nama": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "kelas": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 15"
+          },
+          "pelanggaran": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "takziran": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 300"
+          },
+          "petugas": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "hariKe": {
+            ".validate": "newData.isNumber()"
+          },
+          "refId": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "poin": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000 && newData.val() % 1 === 0"
+          },
+          "kategori": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+          },
+          "dihapus": {
+            ".validate": "newData.val() === true"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "piketRoster": {
+      ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'kepala' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'piket')",
+      "$id": {
+        ".write": "auth != null && (root.child('roles').child(auth.uid).val() === 'admin' || root.child('roles').child(auth.uid).val() === 'waka') && newData.exists()",
+        ".validate": "$id.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['nama', 'aktif'])",
+        "nama": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+        },
+        "aktif": {
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}
