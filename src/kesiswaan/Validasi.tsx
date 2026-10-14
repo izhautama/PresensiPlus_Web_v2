@@ -7,7 +7,11 @@ import { batasJam, initials, toneOf } from "../lib/attendance";
 import { formatTanggal, namaHari, nowHM, weekday } from "../lib/time";
 import type { ManualTap } from "../lib/manual";
 import type { KetHarian, LogEntry, StudentRow } from "../lib/types";
+import { tertahan } from "../lib/hariEfektif";
 import { aturIzin, useLive } from "../services/db";
+import { konfirmasiNormal } from "../services/kalender";
+import { usePanelMode } from "../admin/AdminLayout";
+import { useStatusHari } from "./useKalender";
 import type { Actor } from "../services/discipline";
 import { batalkanAlfa, konfirmasiAlfa } from "../services/perjam";
 import CatatDialog from "./CatatDialog";
@@ -36,6 +40,14 @@ export default function Validasi() {
   const valLive = useLive<Record<string, Valid>>(`validasi/${tanggal}`);
   const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const libur = weekday(tanggal) === 0;
+  const mode = usePanelMode();
+  const hari = useStatusHari(tanggal, logLive.data, manualLive.data, !logLive.loading && !manualLive.loading);
+  const bukanEfektif = hari.efektif === false; // libur / tidak ada kegiatan presensi: tidak ada yang perlu divalidasi
+  const tahanAlfa = tertahan(hari.ringkasan); // tap rendah belum dikonfirmasi normal: validasi Alfa ditahan
+  const konfirmasi = async () => {
+    try { await konfirmasiNormal(tanggal); notify("Hari dikonfirmasi normal. Validasi Alfa dibuka."); }
+    catch (e) { notify((e as Error).message, "err"); }
+  };
 
   // masuk = entri log berkunci *_M ATAU presensi manual dengan jam masuk (siswa hadir tetapi KTM lupa/hilang/alat mati)
   const masukSet = useMemo(() => {
@@ -75,8 +87,16 @@ export default function Validasi() {
         <span className="caption-text inline">{formatTanggal(tanggal)}</span>
       </div>
 
-      {libur ? <div className="panel"><Empty icon="calendar" title="Hari Minggu — libur" text="Tidak ada presensi pada hari libur." /></div> : (
+      {libur ? <div className="panel"><Empty icon="calendar" title="Hari Minggu — libur" text="Tidak ada presensi pada hari libur." /></div> : bukanEfektif ? (
+        <div className="panel" data-testid="validasi-bukan-efektif"><Empty icon="calendar" title="Bukan hari efektif" text="Belum ada bukti presensi pada tanggal ini (libur, alat mati seharian, atau sistem belum dipakai) atau tanggal ini ditetapkan libur di Kalender. Siswa tidak dihitung Alpha, jadi tidak ada yang perlu divalidasi. Bila sekolah sebenarnya masuk, isi Presensi manual atau tetapkan 'efektif' di menu Kalender." /></div>
+      ) : (
         <>
+          {tahanAlfa && (
+            <div className="notice warn" role="alert" data-testid="validasi-tertahan"><Icon name="warning" size={17} />
+              <span>Tap pada tanggal ini jauh di bawah biasanya (alat mungkin bermasalah sebagian hari). <b>Validasi Alfa ditahan</b> agar siswa yang sebenarnya hadir tidak tercatat Alfa. Isi Presensi manual untuk siswa yang hadir, atau bila memang normal tekan konfirmasi.</span>
+              {mode === "waka" && <button className="secondary-button sm" onClick={konfirmasi}>Konfirmasi hari ini normal</button>}
+            </div>
+          )}
           <div className="validasi-progress" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div><b>{selesai} dari {total}</b> sudah divalidasi</div>
             <div className="progress"><span style={{ width: `${pct}%` }} /></div>
@@ -100,7 +120,7 @@ export default function Validasi() {
                           <button className="secondary-button sm" onClick={() => setAksi({ jenis: "izin", s, ket: "Izin" })}>Izin</button>
                           <button className="secondary-button sm" onClick={() => setAksi({ jenis: "izin", s, ket: "Sakit" })}>Sakit</button>
                           <button className="secondary-button sm" onClick={() => setAksi({ jenis: "izin", s, ket: "Dispensasi" })}>Dispensasi</button>
-                          <button className="danger-button sm" disabled={alfaBelumBoleh(s.kelas)} title={alfaBelumBoleh(s.kelas) ? "Menunggu batas keterlambatan terlewati" : undefined} onClick={() => setAksi({ jenis: "alfa", s })}>Alfa</button>
+                          <button className="danger-button sm" disabled={alfaBelumBoleh(s.kelas) || tahanAlfa} title={tahanAlfa ? "Ditahan: tap rendah belum dikonfirmasi normal" : alfaBelumBoleh(s.kelas) ? "Menunggu batas keterlambatan terlewati" : undefined} onClick={() => setAksi({ jenis: "alfa", s })}>Alfa</button>
                         </>
                       )}
                       {status === "izin" && <button className="secondary-button sm" onClick={async () => { try { await aturIzin(s.nis, tanggal, null, ""); notify("Keterangan dihapus"); } catch (e) { notify((e as Error).message, "err"); } }}>Hapus keterangan</button>}

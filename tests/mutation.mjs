@@ -280,7 +280,7 @@ const mutasi = [
   { nama: "piketAkun: waka boleh menulis seluruh entri (email, nama)", ubah: (r) => { const n = r.piketAkun.$uid; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
   { nama: "piketAkun: dapat dibaca kepala", ubah: (r) => { r.piketAkun[".read"] = `(${r.piketAkun[".read"]}) || (auth != null && ${KEPALA})`; } },
   { nama: "sistem: backupTerakhir dapat dibaca waka", ubah: (r) => { r.sistem[".read"] = `(${r.sistem[".read"]}) || (auth != null && ${WAKA})`; } },
-  { nama: "sistem: backupTerakhir dapat ditulis waka", ubah: (r) => { r.sistem[".write"] = `(${r.sistem[".write"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "sistem: backupTerakhir dapat ditulis waka", ubah: (r) => { r.sistem[".write"] = `auth != null && ${WAKA}`; } }, // waka menulis di tingkat node sistem (mencakup backupTerakhir)
   { nama: "sistem: backupTerakhir boleh di masa depan", ubah: (r) => { r.sistem.backupTerakhir[".validate"] = "newData.isNumber()"; } },
   { nama: "piketPerangkat: pendaftaran boleh ditimpa", ubah: (r) => { const n = r.piketPerangkat.$id; n[".write"] = ganti(n[".write"], " && !data.exists()", ""); } },
   { nama: "piketPerangkat: dapat dibaca kepala", ubah: (r) => { r.piketPerangkat[".read"] = `(${r.piketPerangkat[".read"]}) || (auth != null && ${KEPALA})`; } },
@@ -397,6 +397,64 @@ const mutasi = [
   } },
   { nama: "autoMap: kunci 'lupaKtm' tidak diizinkan", ubah: (r) => { delete r.discipline.autoMap.lupaKtm; } },
   { nama: "autoMap: kunci asing diterima", ubah: (r) => { delete r.discipline.autoMap.$other; } },
+  // ---------------------------------------------------------------- KALENDER HARI EFEKTIF
+  { nama: "kalender: kepala boleh mengatur override", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${KEPALA})`; } },
+  { nama: "kalender: piket boleh mengatur override", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${PIKET})`; } },
+  { nama: "kalender: siapa pun yang login boleh mengatur override", ubah: (r) => { r.kalender.$tgl[".write"] = "auth != null"; } },
+  { nama: "kalender: status override bebas", ubah: (r) => { r.kalender.$tgl.status[".validate"] = "newData.isString()"; } },
+  { nama: "kalender: alasan override tidak diperiksa panjangnya", ubah: (r) => { r.kalender.$tgl.alasan[".validate"] = "newData.isString()"; } },
+  { nama: "kalender: 'oleh' bukan pengguna sendiri diterima", ubah: (r) => { r.kalender.$tgl.oleh[".validate"] = "newData.isString()"; } },
+  { nama: "kalender: ts bukan 'sekarang' diterima", ubah: (r) => { r.kalender.$tgl.ts[".validate"] = "newData.isNumber()"; } },
+  { nama: "kalender: field asing diterima", ubah: (r) => { delete r.kalender.$tgl.$other; } },
+  { nama: "kalender: anonim boleh membaca", ubah: (r) => { r.kalender[".read"] = "true"; } },
+  { nama: "kalenderEfektif: siapa pun yang login boleh menulis", ubah: (r) => { r.kalenderEfektif.$tgl[".write"] = "auth != null"; } },
+  { nama: "kalenderEfektif: piket menulis TANPA log aktivitas", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    n[".write"] = ganti(n[".write"], `(${PIKET} && ${actOk(2, ["hitung-kalender"])})`, `(${PIKET})`);
+  } },
+  { nama: "kalenderEfektif: aksi log piket bebas (bukan 'hitung-kalender')", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    n[".write"] = ganti(n[".write"], `(${ENT(2)}.child('aksi').val() === 'hitung-kalender')`, `(${ENT(2)}.child('aksi').exists())`);
+  } },
+  { nama: "kalenderEfektif: efektif TANPA bukti diterima (otomatis)", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    const baru = n[".validate"].replace(/\(newData\.child\('efektif'\)\.val\(\) === false \|\| newData\.child\('tap'\)\.val\(\) \+ newData\.child\('manual'\)\.val\(\) >= \([^]*?: 1\)\)/, "true");
+    if (baru === n[".validate"]) throw new Error("pola bukti tidak ditemukan");
+    n[".validate"] = baru;
+  } },
+  { nama: "kalenderEfektif: ambang diabaikan (selalu 1)", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    const baru = n[".validate"].replace(/\(newData\.parent\(\)\.parent\(\)\.child\('sistem'\)\.child\('ambangHariEfektif'\)\.val\(\) != null \? [^]*?: 1\)/, "1");
+    if (baru === n[".validate"]) throw new Error("pola ambang tidak ditemukan");
+    n[".validate"] = baru;
+  } },
+  { nama: "kalenderEfektif: override tidak ditegakkan (hitungan otomatis boleh menimpa)", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    const baru = n[".validate"].split(`${nav(2)}.child('kalender').child($tgl).exists()`).join("false");
+    if (baru === n[".validate"]) throw new Error("pola override tidak ditemukan");
+    n[".validate"] = baru;
+  } },
+  { nama: "kalenderEfektif: efektif tidak dicocokkan dengan override", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    n[".validate"] = ganti(n[".validate"], ` && newData.child('efektif').val() === (${nav(2)}.child('kalender').child($tgl).child('status').val() === 'efektif')`, "");
+  } },
+  { nama: "kalenderEfektif: sumber 'override' diterima tanpa override", ubah: (r) => {
+    const n = r.kalenderEfektif.$tgl;
+    n[".validate"] = ganti(n[".validate"], "(newData.child('sumber').val() === 'otomatis' && (", "((");
+  } },
+  { nama: "kalenderEfektif: tap bukan bilangan bulat >= 0", ubah: (r) => { r.kalenderEfektif.$tgl.tap[".validate"] = "newData.isNumber()"; } },
+  { nama: "kalenderEfektif: manual bukan bilangan bulat >= 0", ubah: (r) => { r.kalenderEfektif.$tgl.manual[".validate"] = "newData.isNumber()"; } },
+  { nama: "kalenderEfektif: dihitung bukan 'sekarang' diterima", ubah: (r) => { r.kalenderEfektif.$tgl.dihitung[".validate"] = "newData.isNumber()"; } },
+  { nama: "kalenderEfektif: penanda 'normal' dapat diatur siapa pun yang boleh menulis", ubah: (r) => { r.kalenderEfektif.$tgl.normal[".validate"] = "newData.val() === true"; } },
+  { nama: "kalenderEfektif: 'normal' bernilai false diterima", ubah: (r) => { r.kalenderEfektif.$tgl.normal[".validate"] = ganti(r.kalenderEfektif.$tgl.normal[".validate"], "newData.val() === true && ", ""); } },
+  { nama: "kalenderEfektif: field asing diterima", ubah: (r) => { delete r.kalenderEfektif.$tgl.$other; } },
+  { nama: "kalenderEfektif: anonim boleh membaca", ubah: (r) => { r.kalenderEfektif[".read"] = "true"; } },
+  { nama: "ambang: kepala boleh mengubah", ubah: (r) => { const n = r.sistem.ambangHariEfektif; n[".write"] = `(${n[".write"]}) || (auth != null && ${KEPALA})`; } },
+  { nama: "ambang: nilai bebas (tidak 1..500 bulat)", ubah: (r) => { r.sistem.ambangHariEfektif[".validate"] = "newData.isNumber()"; } },
+  { nama: "ambang: ortu boleh membaca", ubah: (r) => { r.sistem.ambangHariEfektif[".read"] = "auth != null"; } },
+  { nama: "sistem: waka boleh membaca seluruh node sistem", ubah: (r) => { r.sistem[".read"] = `(${r.sistem[".read"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "sistem: waka boleh menulis backupTerakhir", ubah: (r) => { const n = r.sistem.backupTerakhir; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "profiles: aktifSejak format bebas", ubah: (r) => { r.profiles.$nis.aktifSejak[".validate"] = "newData.isString()"; } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
 
@@ -410,10 +468,10 @@ let selamat = 0;
 const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
-// Kelompok: manual | piket | saran | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+// Kelompok: manual | piket | saran | kalender | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
+const GRUP = (nama) => /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 console.log(`Uji mutasi (${mutasi.length} mutasi)\n`);
 for (const [i, m] of mutasi.entries()) {

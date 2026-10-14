@@ -84,6 +84,20 @@ Butuh Java (emulator Database) dan, untuk E2E, `npx playwright install chromium`
 
 Catatan: `releases/` (snapshot dist + rules) tidak ikut Git. Source selalu dipulihkan dari tag Git; build ulang dengan `npm ci && npm run build`.
 
+## Hari efektif berbasis bukti (v2.2)
+Sebuah tanggal adalah **hari efektif** hanya bila ada bukti sekolah berlangsung dan sistem merekam; hari tanpa bukti (libur, alat mati seharian, sistem belum dipakai) **tidak dihitung** dan siswa tidak menjadi Alpha. Aturan, berurutan:
+1. **Override kalender** `kalender/{tgl}` (`libur` | `efektif` + alasan; waka/admin) menang atas semua aturan otomatis.
+2. Tanpa override: Minggu = libur; selain itu efektif bila **tap masuk alat + siswa hadir hanya lewat presensi manual >= ambang** (`sistem/ambangHariEfektif`, bawaan 1, 1..500, diubah waka/admin di halaman Kalender).
+3. Izin/Sakit/Dispensasi saja **tidak** membuat hari efektif. Pada hari efektif tetap dihitung sesuai kategorinya.
+4. Hari ini "berjalan": menjadi efektif begitu ambang tercapai; siswa belum tap tetap "Belum tap" sampai batas jam terlambat lewat DAN hari efektif.
+5. Siswa baru: dihitung sejak `profiles/{nis}/aktifSejak` (diisi saat siswa ditambahkan; siswa lama = tanggal efektif pertama lewat migrasi).
+
+**Ringkasan agregat** `kalenderEfektif/{tgl} = {efektif, tap, manual, sumber, rendah?, normal?, dihitung}` dibaca semua pengguna login (orang tua tidak boleh membaca `log`), ditulis klien staf: otomatis untuk hari-hari yang belum punya ringkasan (maks. 31 hari ke belakang) saat Dashboard dibuka; hari ini saat status efektif berubah dan (setelah jam pulang) saat jumlah berubah; tombol **Hitung ulang** (admin/waka); **Migrasi sekali jalan** (admin, dry-run dulu). Rules menegakkan konsistensi: override tidak dapat ditimpa hitungan otomatis, dan `efektif=true` otomatis butuh `tap+manual >= ambang`. Data diambil dengan query rentang kunci (bukan seluruh node `log`).
+
+**Tap rendah:** bila tap < 50% median 10 hari efektif sebelumnya (butuh >= 3 pembanding), tanggal ditandai `rendah`: banner di Dashboard, validasi Alfa dan saran Alfa ditahan sampai waka menekan **Konfirmasi hari ini normal**.
+
+**Satu rumus:** `rekapSiswa()` di `src/lib/hariEfektif.ts` dipakai di semua tempat (portal orang tua, laporan bulanan/CSV, rekap tahunan). Identitas yang diuji: Tepat + Terlambat + Izin/Sakit + Dispensasi + Alpha = hari efektif siswa; persen = (Tepat + Terlambat + Dispensasi) / hari efektif siswa, "–" bila 0 hari. `rekap()`/`rekapBulan()` lama dihapus.
+
 ## Panduan pengguna
 Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.
 Isinya dibuat dari satu sumber, `src/lib/panduan.ts`, yang juga dipakai menu **Panduan** di aplikasi (halaman statis tanpa data). Setelah mengubah isi, jalankan `node scripts/buat-panduan.mjs`; `tests/panduan.test.mjs` memastikan docs dan aplikasi selalu sama.

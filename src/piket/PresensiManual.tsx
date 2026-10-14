@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
@@ -37,7 +38,9 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
   const mundur = usePiketMundur();
   const pencatat = usePencatat();
   const notify = useToast();
-  const [tanggal, setTanggal] = useState(tanggalAwal ?? today);
+  const [params] = useSearchParams();
+  const qTanggal = params.get("tanggal");
+  const [tanggal, setTanggal] = useState(tanggalAwal ?? (qTanggal && /^\d{4}-\d{2}-\d{2}$/.test(qTanggal) && qTanggal <= today ? qTanggal : today));
   const [kelas, setKelas] = useState("");
   const [q, setQ] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);

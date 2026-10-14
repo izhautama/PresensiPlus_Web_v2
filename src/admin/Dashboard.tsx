@@ -5,10 +5,13 @@ import { Empty, StatusBadge } from "../components/ui";
 import { batasJam, initials, toneOf } from "../lib/attendance";
 import { namaHari, nowHM, relatif, salam, weekday } from "../lib/time";
 import { useAdminData } from "./AdminData";
+import BannerTapRendah from "../kesiswaan/BannerTapRendah";
+import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { usePanelBase, usePanelMode } from "./AdminLayout";
 
 export default function Dashboard() {
   const { students, byNis, log, schedule, today, now, device, online, serverNow, ready } = useAdminData();
+  useKalenderOtomatis(); // hitung hari efektif (kemarin & hari-hari yang belum punya ringkasan; hari ini bila berubah)
   const kepala = usePanelMode() === "kepala";
   const base = usePanelBase();
   const libur = weekday(today) === 0;
@@ -45,6 +48,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <BannerTapRendah />
       <section className="welcome">
         <div>
           <p className="eyebrow">MONITORING HARI INI</p>

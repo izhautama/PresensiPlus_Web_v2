@@ -25,6 +25,7 @@ Untuk: Guru piket (akun bersama meja piket)
 2. Pilih alasan, isi jam masuk. Hadir atau Terlambat dihitung otomatis dari jadwal kelas.
 3. Alat mati atau WiFi putus: menu Presensi manual, kotak Mode alat bermasalah, pilih kelas, centang yang TIDAK hadir, tekan Tandai hadir.
 4. Salah catat: tombol Hapus pada daftar Presensi manual tercatat. Catat pulang manual tersedia untuk siswa yang sudah masuk.
+5. Hari tanpa satu pun tap alat bukan hari efektif. Presensi manual dihitung sebagai bukti hadir, jadi hari itu menjadi hari efektif setelah ada yang dicatat.
 
 ## Izin per jam dan pelanggaran ringan
 

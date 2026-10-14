@@ -1278,6 +1278,249 @@ test("pemetaan saran (autoMap) di Tata tertib, cadangan nama sekali-jalan, perin
   await kA.close();
 });
 
+// ===================================================================== HARI EFEKTIF BERBASIS BUKTI + KALENDER AKADEMIK
+const hariDi = (d, n) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const hariMinggu = (d) => new Date(`${d}T12:00:00Z`).getUTCDay() === 0;
+const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json?ns=${PROJECTS[proyek()].ns}`, { headers: OWNER })).json();
+/** Tanggal 2..9 hari lalu yang bukan Minggu, bukan kemarin/hari ini (tanpa bukti apa pun pada data awal). */
+const tanggalKosong = (...kecuali) => { for (let k = 2; k <= 9; k++) { const d = hariDi(T.hariIni, -k); if (!hariMinggu(d) && !kecuali.includes(d) && d !== T.kemarin) return d; } throw new Error("tidak ada tanggal kosong"); };
+async function pilihTanggalKal(page, d) {
+  const sel = page.locator(`button.kal-hari[data-tgl="${d}"]`);
+  for (let i = 0; i < 6 && !(await sel.count()); i++) await page.getByRole("button", { name: "Bulan sebelumnya" }).click();
+  await sel.click();
+  return sel;
+}
+const atur = async (page, jenis, alasan) => {
+  await page.getByLabel("Jenis override").selectOption(jenis);
+  await page.getByLabel("Alasan override").fill(alasan);
+};
+
+test("hari efektif: portal orang tua tidak lagi menampilkan Alpha untuk bulan tanpa kegiatan; 'Hari efektif ke-N'; riwayat libur", async ({ page }) => {
+  const lap = await siapkan(page);
+  await loginOrtu(page, "111", "482915");
+  // bulan-bulan tahun ajaran SEBELUM bulan hari efektif pertama: tidak ada kegiatan presensi
+  const taMulai = Number(T.hariIni.slice(5, 7)) >= 7 ? Number(T.hariIni.slice(0, 4)) : Number(T.hariIni.slice(0, 4)) - 1;
+  const bulanPertama = T.kemarin.slice(0, 7);
+  const kosong = [];
+  for (let m = 7, y = taMulai; `${y}-${String(m).padStart(2, "0")}` < bulanPertama; m = m === 12 ? 1 : m + 1, y = m === 1 ? y + 1 : y) kosong.push(`${y}-${String(m).padStart(2, "0")}`);
+  for (const k of kosong) {
+    const sel = page.getByTestId(`bulan-kosong-${k}`);
+    await expect(sel, `bulan ${k}`).toHaveText("Belum ada kegiatan presensi");
+  }
+  const total = page.getByTestId("total-tahunan").locator("td");
+  const alphaTotal = Number(await total.nth(6).innerText());
+  expect(alphaTotal, "Alpha total tahun ajaran (dulu puluhan Alpha dari hari tanpa kegiatan)").toBeLessThanOrEqual(2);
+  // Hari efektif ke-N (hanya hari ber-bukti pada bulan berjalan)
+  const n = [T.kemarin, T.hariIni].filter((d) => d.slice(0, 7) === T.hariIni.slice(0, 7)).length;
+  await expect(page.getByTestId("hari-efektif-ke")).toHaveText(`Hari efektif ke-${n}`);
+  await expect(page.getByText(`dari ${n} hari efektif bulan ini`)).toBeVisible();
+  // riwayat: hari tanpa kegiatan = "Libur / tidak ada kegiatan presensi" (abu-abu), bukan Alpha
+  const baris = page.locator("section.panel.no-print .simple-list [data-tgl]");
+  await expect(baris).toHaveCount(10);
+  for (let i = 0; i < 10; i++) {
+    const b = baris.nth(i);
+    const tgl = await b.getAttribute("data-tgl");
+    if (tgl === T.kemarin || tgl === T.hariIni) continue;
+    await expect(b, tgl).toContainText("Libur / tidak ada kegiatan presensi");
+    await expect(b, tgl).not.toContainText("Tanpa keterangan");
+  }
+  await expect(page.getByText("Libur dan hari tanpa kegiatan presensi")).toBeVisible(); // catatan rumus baru
+  bersih(lap, "ortu (hari efektif)");
+});
+
+test("kalender akademik: override libur/efektif (peringatan tegas), efek ke portal orang tua, kepala hanya melihat", async ({ page, browser }) => {
+  // portal ortu membaca attendance/{nis} (bukan log): ANDI tap Terlambat kemarin sebagai data alat
+  await dbPut(`attendance/111/${T.kemarin}`, { masuk: "07:30:00", status: "Terlambat" });
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Kalender");
+  await expect(judul(page)).toHaveText("Kalender akademik");
+
+  // warna otomatis: kemarin & hari ini ber-bukti
+  await expect(page.locator(`button.kal-hari[data-tgl="${T.hariIni}"]`)).toHaveAttribute("data-jenis", "berjalan");
+  await pilihTanggalKal(page, T.kemarin);
+  await expect(page.getByTestId("kal-status")).toHaveText("Efektif (otomatis)");
+  await expect(page.getByTestId("kal-detail")).toContainText("Tap alat");
+
+  // override LIBUR pada hari ber-tap: tap terlihat "di hari libur" di portal, tidak masuk rekap
+  await atur(page, "libur", "Rapat guru seluruh hari");
+  await page.getByRole("button", { name: "Simpan override" }).click();
+  await expect(toast(page)).toContainText("override libur tersimpan");
+  await expect(page.locator(`button.kal-hari[data-tgl="${T.kemarin}"]`)).toHaveAttribute("data-jenis", "ovr-libur");
+
+  // override EFEKTIF pada tanggal tanpa bukti: peringatan tegas + wajib dicentang
+  const dk = tanggalKosong();
+  await pilihTanggalKal(page, dk);
+  await expect(page.locator(`button.kal-hari[data-tgl="${dk}"]`)).toHaveAttribute("data-jenis", /libur|belum/);
+  await atur(page, "efektif", "Hari pengganti, alat mati");
+  await expect(page.getByTestId("kal-peringatan-efektif")).toContainText("Semua siswa tanpa tap/izin/manual akan tercatat Alpha");
+  await expect(page.getByTestId("kal-peringatan-efektif")).toContainText("presensi manual");
+  await page.getByRole("button", { name: "Simpan override" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Centang pernyataan" })).toBeVisible(); // belum dicentang
+  await page.getByLabel(/Saya mengerti/).check();
+  await page.getByRole("button", { name: "Simpan override" }).click();
+  await expect(toast(page)).toContainText("override efektif tersimpan");
+  await expect(page.locator(`button.kal-hari[data-tgl="${dk}"]`)).toHaveAttribute("data-jenis", "ovr-efektif");
+  // alasan wajib
+  await pilihTanggalKal(page, hariDi(T.hariIni, -1) === dk ? T.kemarin : dk);
+  await page.getByLabel("Alasan override").fill("ab");
+  await page.getByLabel(/Saya mengerti/).check().catch(() => {});
+  await page.getByRole("button", { name: "Simpan override" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Alasan wajib" })).toBeVisible();
+
+  // orang tua membaca kalenderEfektif: dk = Alpha (hari efektif tanpa data), kemarin = tap di hari libur
+  const kO = await browser.newContext(opsiKonteks());
+  const po = await kO.newPage();
+  const lapO = await siapkan(po);
+  await loginOrtu(po, "111", "482915");
+  const riw = (d) => po.locator(`section.panel.no-print .simple-list [data-tgl="${d}"]`);
+  await expect(riw(dk)).toContainText("Tanpa keterangan");
+  await expect(riw(T.kemarin)).toContainText("di hari libur");
+
+  // hapus override -> kembali normal
+  await pilihTanggalKal(page, dk);
+  await page.getByRole("button", { name: "Hapus override" }).click();
+  await expect(toast(page)).toContainText("Override dihapus");
+  await pilihTanggalKal(page, T.kemarin);
+  await page.getByRole("button", { name: "Hapus override" }).click();
+  await expect(page.locator(`button.kal-hari[data-tgl="${T.kemarin}"]`)).toHaveAttribute("data-jenis", "efektif");
+  await po.getByRole("button", { name: /Diperbarui/ }).click();
+  await expect(riw(dk)).toContainText("Libur / tidak ada kegiatan presensi");
+  await expect(riw(T.kemarin)).not.toContainText("di hari libur");
+  await expect(riw(T.kemarin)).toContainText("Masuk 07:30");
+  bersih(lapO, "ortu (efek override kalender)");
+  await kO.close();
+  await dbPut(`attendance/111/${T.kemarin}`, null);
+  bersih(lap, "waka (kalender)");
+
+  // kepala: hanya melihat
+  const kK = await browser.newContext(opsiKonteks());
+  const pk = await kK.newPage();
+  const lapK = await siapkan(pk);
+  await loginStaf(pk, "kepala");
+  await menu(pk, "Kalender");
+  await expect(pk.getByText("Hanya admin dan waka yang dapat mengatur override.")).toBeVisible();
+  await expect(pk.getByLabel("Jenis override")).toHaveCount(0);
+  await expect(pk.getByTestId("ambang-saat-ini")).toHaveCount(0);
+  bersih(lapK, "kepala (kalender)");
+  await kK.close();
+});
+
+test("hari efektif: hitung ulang (idempoten), ambang, hitung otomatis saat Dashboard dibuka", async ({ page }) => {
+  const dh = tanggalKosong();
+  const nama = (n) => `ALAT${n}${proyek()}`;
+  // bukti mentah: 2 tap alat pada tanggal tanpa ringkasan benar
+  await dbPut(`log/${dh}/${"AAAA9101"}_M`, { jam: "07:00:00", nis: "111", status: "Hadir", nama: nama(1), kelas: "XI IPS" });
+  await dbPut(`log/${dh}/${"BBBB9102"}_M`, { jam: "07:02:00", nis: "222", status: "Hadir", nama: nama(2), kelas: "XI IPS" });
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Kalender");
+  const dari = page.getByLabel("Hitung dari"), sampai = page.getByLabel("Hitung sampai");
+  await dari.fill(dh); await sampai.fill(dh);
+  await page.getByRole("button", { name: "Pratinjau" }).click();
+  await expect(page.getByTestId("hitung-ulang-hasil")).toHaveText("Pratinjau: 1 dari 1 tanggal akan berubah.");
+  await page.getByRole("button", { name: "Hitung ulang" }).click();
+  await expect(page.getByTestId("hitung-ulang-hasil")).toHaveText("1 dari 1 tanggal diperbarui.");
+  expect(await dbGet(`kalenderEfektif/${dh}`)).toMatchObject({ efektif: true, tap: 2, manual: 0, sumber: "otomatis" });
+  await page.getByRole("button", { name: "Hitung ulang" }).click(); // IDEMPOTEN
+  await expect(page.getByTestId("hitung-ulang-hasil")).toHaveText("0 dari 1 tanggal diperbarui.");
+
+  // ambang 5: 2 bukti belum cukup -> tanggal itu bukan hari efektif setelah dihitung ulang
+  await page.getByLabel("Ambang hari efektif").fill("5");
+  await page.getByRole("button", { name: "Simpan ambang" }).click();
+  await expect(page.getByTestId("ambang-saat-ini")).toHaveText("5 siswa");
+  await page.getByRole("button", { name: "Hitung ulang" }).click();
+  await expect(page.getByTestId("hitung-ulang-hasil")).toHaveText("1 dari 1 tanggal diperbarui.");
+  await expect.poll(async () => (await dbGet(`kalenderEfektif/${dh}`)).efektif, { timeout: 15_000 }).toBe(false);
+  await page.getByLabel("Ambang hari efektif").fill("0");
+  await page.getByRole("button", { name: "Simpan ambang" }).click();
+  await expect(toast(page)).toContainText("Ambang harus bilangan bulat 1–500"); // nilai tak valid ditolak
+  await page.getByLabel("Ambang hari efektif").fill("1");
+  await page.getByRole("button", { name: "Simpan ambang" }).click();
+  await expect(page.getByTestId("ambang-saat-ini")).toHaveText("1 siswa");
+  await page.getByRole("button", { name: "Hitung ulang" }).click();
+  await expect.poll(async () => (await dbGet(`kalenderEfektif/${dh}`)).efektif, { timeout: 15_000 }).toBe(true);
+  // hari ini tidak boleh dihitung ulang lewat tombol
+  await sampai.fill(T.hariIni);
+  await page.getByRole("button", { name: "Hitung ulang" }).click();
+  await expect(toast(page)).toContainText("hanya untuk tanggal sebelum hari ini");
+
+  // HITUNG OTOMATIS saat Dashboard dibuka: hapus ringkasan -> muncul lagi tanpa tombol
+  await dbPut(`kalenderEfektif/${dh}`, null);
+  await page.goto("/waka");
+  await expect.poll(async () => (await dbGet(`kalenderEfektif/${dh}`))?.tap ?? -1, { timeout: 20_000 }).toBe(2);
+  expect(await dbGet(`kalenderEfektif/${dh}`)).toMatchObject({ efektif: true, manual: 0, sumber: "otomatis" });
+  bersih(lap, "waka (hitung ulang & otomatis)");
+  // bersihkan
+  await dbPut(`log/${dh}`, null);
+  await dbPut(`kalenderEfektif/${dh}`, null);
+});
+
+test("tap rendah: banner Dashboard, validasi Alfa ditahan sampai 'Konfirmasi hari ini normal'", async ({ page }) => {
+  // kemarin ditandai tap rendah (simulasi hasil hitung: 6 tap vs median jauh lebih tinggi)
+  await dbPut(`kalenderEfektif/${T.kemarin}`, { efektif: true, tap: 6, manual: 0, sumber: "otomatis", rendah: true, dihitung: Date.now() });
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  const banner = page.getByTestId("banner-tap-rendah");
+  await expect(banner).toContainText("Tap rendah");
+  await expect(banner.locator(`[data-tgl="${T.kemarin}"]`)).toBeVisible();
+  await expect(banner.getByRole("link", { name: "Isi presensi manual" })).toHaveAttribute("href", new RegExp(`/waka/presensi-manual\\?tanggal=${T.kemarin}`));
+
+  await menu(page, "Validasi harian");
+  await page.locator("input[type=date]").fill(T.kemarin);
+  await expect(page.getByTestId("validasi-tertahan")).toContainText("Validasi Alfa ditahan");
+  const alfa = page.getByRole("button", { name: "Alfa", exact: true }).first();
+  await expect(alfa).toBeVisible();
+  await expect(alfa).toBeDisabled();
+  await page.getByTestId("validasi-tertahan").getByRole("button", { name: "Konfirmasi hari ini normal" }).click();
+  await expect(toast(page)).toContainText("Hari dikonfirmasi normal");
+  await expect(page.getByTestId("validasi-tertahan")).toHaveCount(0);
+  await expect(alfa).toBeEnabled();
+  expect((await dbGet(`kalenderEfektif/${T.kemarin}`)).normal).toBe(true);
+  // banner hilang setelah dikonfirmasi
+  await menu(page, "Dashboard");
+  await expect(page.getByTestId("banner-tap-rendah")).toHaveCount(0);
+  // kembalikan
+  await dbPut(`kalenderEfektif/${T.kemarin}`, { efektif: true, tap: 6, manual: 0, sumber: "otomatis", dihitung: Date.now() });
+  bersih(lap, "waka (tap rendah)");
+});
+
+test("hari bukan efektif: validasi harian tidak menampilkan siapa pun sebagai Alpha", async ({ page }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Validasi harian");
+  const dk = tanggalKosong();
+  await page.locator("input[type=date]").fill(dk);
+  await expect(page.getByTestId("validasi-bukan-efektif")).toContainText("Bukan hari efektif");
+  await expect(page.getByRole("button", { name: "Alfa", exact: true })).toHaveCount(0);
+  bersih(lap, "waka (validasi hari tanpa kegiatan)");
+});
+
+test("migrasi kalender (admin): dry-run dulu, lalu terapkan; aktifSejak siswa lama terisi; idempoten", async ({ page }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  await menu(page, "Kalender");
+  const panel = page.getByTestId("migrasi-kalender");
+  await expect(panel.getByRole("button", { name: "Terapkan migrasi" })).toBeDisabled(); // wajib dry-run dulu
+  await panel.getByRole("button", { name: "Periksa (dry-run)" }).click();
+  await expect(page.getByTestId("migrasi-ringkasan")).toContainText("DRY-RUN (belum ditulis)");
+  await expect(panel.getByRole("button", { name: "Terapkan migrasi" })).toBeEnabled();
+  expect((await dbGet("profiles/111"))?.aktifSejak, "dry-run tidak menulis").toBeUndefined();
+  await panel.getByRole("button", { name: "Terapkan migrasi" }).click();
+  await expect(page.getByTestId("migrasi-ringkasan")).toContainText("Selesai:");
+  const aktif = (await dbGet("profiles/111")).aktifSejak;
+  expect(aktif).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(aktif <= T.kemarin, "aktifSejak = tanggal efektif pertama").toBe(true);
+  // kedua kali: tidak ada yang berubah
+  await panel.getByRole("button", { name: "Periksa (dry-run)" }).click();
+  await panel.getByRole("button", { name: "Terapkan migrasi" }).click();
+  await expect(page.getByTestId("migrasi-ringkasan")).toContainText("0 tanggal ditulis");
+  await expect(page.getByTestId("migrasi-ringkasan")).toContainText("untuk 0 siswa");
+  // admin tidak boleh menimpa aktifSejak lewat nama/kelas (data profil tetap)
+  expect((await dbGet("profiles/111")).nama).toBe("ANDI TEST");
+  bersih(lap, "admin (migrasi kalender)");
+});
+
 test("panduan: menu Panduan di setiap peran (statis) + tautan di portal orang tua", async ({ page, browser }) => {
   const lap = await siapkan(page);
   await loginStaf(page, "waka");

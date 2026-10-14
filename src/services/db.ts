@@ -7,6 +7,7 @@ import {
 import { emailOrtu, fb, getSecondaryAuth } from "../lib/firebase";
 import type { Ack, CommandName, DayRecord, KetHarian, ScheduleRow, Student } from "../lib/types";
 import { kirimUpdate, setOffsetServer, sisipkanAktivitas } from "./aktivitas";
+import { todayWIB } from "../lib/time";
 
 export const r = (path: string) => ref(fb().db, path);
 
@@ -116,7 +117,8 @@ export async function tambahSiswa(s: { uid: string } & Student, pin: string, exi
   const akun = await buatAkunOrtu(s.nis, pin);
   await update(r("/"), {
     [`config/students/${s.uid}`]: { nis: s.nis, nama: s.nama, kelas: s.kelas },
-    [`profiles/${s.nis}`]: { nama: s.nama, kelas: s.kelas },
+    // aktifSejak = tanggal siswa ditambahkan: hari efektif sebelum tanggal ini tidak dihitung untuk siswa baru
+    [`profiles/${s.nis}`]: { nama: s.nama, kelas: s.kelas, aktifSejak: todayWIB() },
     [`parents/${s.nis}`]: akun,
     "config/version": Date.now(),
   });
@@ -127,7 +129,9 @@ export async function ubahSiswa(oldUid: string, old: Student, s: { uid: string }
   if (s.nis !== old.nis) throw new Error("NIS tidak bisa diubah (terikat ke riwayat & akun orang tua). Hapus lalu daftarkan ulang bila perlu.");
   const paths: Record<string, unknown> = {
     [`config/students/${s.uid}`]: { nis: s.nis, nama: s.nama, kelas: s.kelas },
-    [`profiles/${s.nis}`]: { nama: s.nama, kelas: s.kelas },
+    // per-field: JANGAN menimpa aktifSejak
+    [`profiles/${s.nis}/nama`]: s.nama,
+    [`profiles/${s.nis}/kelas`]: s.kelas,
     "config/version": Date.now(),
   };
   if (s.uid !== oldUid) paths[`config/students/${oldUid}`] = null; // ganti kartu (hilang/rusak)

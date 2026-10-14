@@ -6,6 +6,7 @@ import { batasJam, initials, maskUid, toneOf } from "../lib/attendance";
 import { namaHari, nowHM } from "../lib/time";
 import type { KetHarian, StudentRow } from "../lib/types";
 import { aturIzin, buatPin, hapusSiswa, normalisasiSiswa, resetPin, tambahSiswa, ubahSiswa, validasiPin } from "../services/db";
+import { useStatusHari } from "../kesiswaan/useKalender";
 import { statusHariIni, useAdminData } from "./AdminData";
 import { usePanelMode, useToast } from "./AdminLayout";
 
@@ -18,7 +19,9 @@ type Dialog =
   | null;
 
 export default function Students() {
-  const { students, byNis, kelasList, schedule, today, now, ready } = useAdminData();
+  const { students, byNis, kelasList, schedule, today, now, ready, log, manualToday, buktiSiap } = useAdminData();
+  // hari ini bukan hari efektif (belum ada bukti/override libur) -> tidak ada siswa berstatus Alpha
+  const efektifHariIni = useStatusHari(today, log, manualToday, buktiSiap).efektif !== false;
   const kepala = usePanelMode() !== "admin"; // mode pantau: tanpa tambah/edit/hapus/PIN, UID disamarkan
   const [params, setParams] = useSearchParams();
   const [q, setQ] = useState("");
@@ -33,11 +36,11 @@ export default function Students() {
     const qq = q.trim().toLowerCase();
     return students.map((s) => {
       const lewat = nowHM(now) > batasJam(schedule, s.kelas, namaHari(today)).Terlambat[1];
-      return { ...s, e: byNis[s.nis], st: statusHariIni(byNis[s.nis], lewat) };
+      return { ...s, e: byNis[s.nis], st: statusHariIni(byNis[s.nis], lewat && efektifHariIni) };
     }).filter((s) =>
       (!kelas || s.kelas === kelas) && (!status || s.st === status) &&
       (!qq || `${s.nama} ${s.nis} ${kepala ? "" : s.uid}`.toLowerCase().includes(qq)));
-  }, [students, byNis, q, kelas, status, schedule, today, now, kepala]);
+  }, [students, byNis, q, kelas, status, schedule, today, now, kepala, efektifHariIni]);
 
   return (
     <section className="data-page">

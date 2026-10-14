@@ -35,6 +35,14 @@ Untuk: Administrator / TU sekolah
 3. Ikon kunci (key) = kirim email reset password. Ikon sampah = cabut akses.
 4. Ganti password admin di kartu "Ganti password admin".
 
+## Kalender akademik dan hari efektif
+
+1. Hari efektif ditentukan oleh BUKTI: ada tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti (libur, alat mati seharian, sistem belum dipakai) bukan hari efektif dan siswa tidak dihitung Alpha.
+2. Menu Kalender: klik tanggal, pilih Libur atau Efektif, isi alasan, lalu Simpan override. Override menang atas hitungan otomatis.
+3. Override Efektif pada tanggal tanpa bukti membuat semua siswa tanpa data tercatat Alpha: isi dulu presensi manual (mode alat bermasalah), lalu centang pernyataan.
+4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).
+5. Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal "aktif sejak" siswa lama.
+
 ## Log aktivitas dan backup
 
 1. Menu Log aktivitas: pilih tanggal, lihat siapa (nama petugas yang dipilih sendiri), perangkat, dan aksinya. Perangkat baru diberi tanda.

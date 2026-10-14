@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "rules": "node scripts/build-rules.mjs",
-    "test:unit": "node tests/perjam.test.mjs && node tests/saran.test.mjs && node tests/attendance.test.mjs && node tests/piket.test.mjs && node tests/perangkat.test.mjs && node tests/rekapjam.test.mjs && node tests/tanggal.test.mjs && node tests/manual.test.mjs && node tests/panduan.test.mjs",
+    "test:unit": "node tests/perjam.test.mjs && node tests/saran.test.mjs && node tests/attendance.test.mjs && node tests/piket.test.mjs && node tests/perangkat.test.mjs && node tests/rekapjam.test.mjs && node tests/tanggal.test.mjs && node tests/manual.test.mjs && node tests/panduan.test.mjs && node tests/hariEfektif.test.mjs",
     "test:mutation": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs\"",
     "test:mutation:manual": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs --grup=manual\"",
     "test:mutation:piket": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs --grup=piket\"",
     "test:mutation:saran": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs --grup=saran\"",
+    "test:mutation:kalender": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs --grup=kalender\"",
     "test:mutation:dasar": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/mutation.mjs --grup=dasar\"",
     "test:migrasi": "npm run rules && npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"node tests/migrasi.test.mjs\"",
     "test:e2e": "npx firebase-tools emulators:exec --only auth,database --project demo-presensi \"npx playwright test\"",

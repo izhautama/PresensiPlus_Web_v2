@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { get, orderByKey, query, startAt, endAt } from "firebase/database";
 import Icon from "../components/Icon";
 import { Empty, Spinner, StatusBadge } from "../components/ui";
-import { downloadCSV, maskUid, persenWarna, rekapBulan } from "../lib/attendance";
-import { formatTanggal, monthKey, monthLabel } from "../lib/time";
-import { gabungSemua, gabungTap, type ManualTap } from "../lib/manual";
+import { downloadCSV, maskUid, persenWarna } from "../lib/attendance";
+import { rekapSiswa } from "../lib/hariEfektif";
+import { formatTanggal, lastDayOfMonth, monthKey, monthLabel } from "../lib/time";
+import { gabungTap, type ManualTap } from "../lib/manual";
+import { useKalenderRentang } from "../kesiswaan/useKalender";
 import type { DayRecord, LogEntry } from "../lib/types";
 import { r, useLive } from "../services/db";
 import { useAdminData } from "./AdminData";
@@ -30,7 +32,7 @@ export default function Reports() {
 }
 
 function Bulanan() {
-  const { students, schedule, today, kelasList } = useAdminData();
+  const { students, schedule, today, kelasList, aktifSejak } = useAdminData();
   const [bulan, setBulan] = useState(monthKey(today));
   const [kelas, setKelas] = useState("");
   const [att, setAtt] = useState<Record<string, Record<string, DayRecord>> | null>(null);
@@ -49,20 +51,26 @@ function Bulanan() {
     get(query(r("manualTap"), orderByKey(), startAt(`${bulan}-01`), endAt(`${bulan}-31`)))
       .then((x) => setManualBulan((x.val() ?? {}) as Record<string, Record<string, ManualTap>>)).catch((e) => setErr(e.message));
   }, [muat, bulan]);
-  // fungsi tunggal lib/manual.ts: alat menang, manual mengisi yang kosong
-  const data = useMemo(() => (att && manualBulan ? gabungSemua(att, manualBulan) : null), [att, manualBulan]);
+  // hari efektif berbasis bukti (kalenderEfektif) bulan terpilih; SATU rumus untuk semua: rekapSiswa (alat menang, manual mengisi yang kosong)
+  const kal = useKalenderRentang(`${bulan}-01`, lastDayOfMonth(bulan));
+  const data = att && manualBulan && !kal.loading ? att : null;
 
   const rows = useMemo(() => {
     if (!data) return [];
-    return students.filter((s) => !kelas || s.kelas === kelas).map((s) => ({ ...s, ...rekapBulan(data[s.nis], bulan, schedule, s.kelas) }));
-  }, [data, students, kelas, bulan, schedule]);
+    return students.filter((s) => !kelas || s.kelas === kelas).map((s) => {
+      const manualSiswa: Record<string, ManualTap> = {};
+      for (const [tgl, per] of Object.entries(manualBulan ?? {})) if (per[s.nis]) manualSiswa[tgl] = per[s.nis];
+      return { ...s, ...rekapSiswa({ hariEfektif: kal.peta, attendance: data[s.nis], manualTap: manualSiswa, schedule, kelas: s.kelas, aktifSejak: aktifSejak[s.nis], awal: `${bulan}-01`, akhir: lastDayOfMonth(bulan) }) };
+    });
+  }, [data, manualBulan, students, kelas, bulan, schedule, kal.peta, aktifSejak]);
 
-  const efektif = rows.reduce((m, x) => Math.max(m, x.Efektif), 0);
-  const rata = rows.length ? Math.round((rows.reduce((t, x) => t + (x.Persen ?? 0), 0) / rows.length) * 10) / 10 : null;
+  const hariSekolah = rows.reduce((m, x) => Math.max(m, x.HariSekolah), 0);
+  const denganData = rows.filter((x) => x.Persen != null);
+  const rata = denganData.length ? Math.round((denganData.reduce((t, x) => t + (x.Persen ?? 0), 0) / denganData.length) * 10) / 10 : null;
 
   const csv = () => downloadCSV(`rekap_${bulan}${kelas ? `_${kelas.replace(/\s+/g, "")}` : ""}.csv`,
-    ["NIS", "Nama", "Kelas", "Hari Efektif", "Hadir", "Terlambat", "Izin", "Sakit", "Dispensasi", "Alpha", "% Kehadiran"],
-    rows.map((x) => [x.nis, x.nama, x.kelas, x.Efektif, x.Hadir, x.Terlambat, x.Izin, x.Sakit, x.Dispensasi, x.Alpha, x.Persen]));
+    ["NIS", "Nama", "Kelas", "Hari Efektif (siswa)", "Hadir", "Terlambat", "Izin", "Sakit", "Dispensasi", "Alpha", "% Kehadiran"],
+    rows.map((x) => [x.nis, x.nama, x.kelas, x.Efektif, x.Hadir, x.Terlambat, x.Izin, x.Sakit, x.Dispensasi, x.Alpha, x.Persen ?? ""]));
 
   return (
     <>
@@ -73,10 +81,10 @@ function Bulanan() {
         <button className="primary-button" onClick={csv} disabled={!rows.length}><Icon name="download" size={15} />Unduh CSV</button>
         <button className="secondary-button" onClick={() => window.print()} disabled={!rows.length}><Icon name="printer" size={15} />Cetak</button>
       </div>
-      <p className="caption-text">{monthLabel(bulan)} · {efektif} hari efektif (Senin–Sabtu) · rata-rata kehadiran {rata ?? "-"}% · % = (Hadir + Terlambat + Dispensasi) ÷ hari efektif</p>
+      <p className="caption-text" data-testid="caption-rekap">{monthLabel(bulan)} · {hariSekolah} hari efektif (hari dengan bukti presensi atau ditetapkan di Kalender) · rata-rata kehadiran {rata ?? "-"}{rata == null ? "" : "%"} · % = (Hadir + Terlambat + Dispensasi) ÷ hari efektif siswa; hari tanpa kegiatan presensi tidak dihitung Alpha</p>
       <div className="table-panel">
         <div className="table-head report-grid"><span>Siswa</span><span>Kelas</span><span>Hadir</span><span>Telat</span><span>Izin</span><span>Sakit</span><span>Disp.</span><span>Alpha</span><span>%</span></div>
-        {err ? <Empty icon="alert" title="Gagal memuat" text={err} /> : !data ? <div className="page-loader"><Spinner dark /></div> : rows.length === 0 ? <Empty title="Tidak ada data" /> : rows.map((x) => (
+        {err || kal.error ? <Empty icon="alert" title="Gagal memuat" text={err || kal.error || ""} /> : !data ? <div className="page-loader"><Spinner dark /></div> : rows.length === 0 ? <Empty title="Tidak ada data" /> : rows.map((x) => (
           <div className="table-row report-grid" key={x.uid}>
             <span className="student-cell"><span><b>{x.nama}</b><small>NIS {x.nis}</small></span></span>
             <span>{x.kelas}</span><span className="num good">{x.Hadir}</span><span className="num warn">{x.Terlambat}</span>

@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { get } from "firebase/database";
+import { endAt, get, orderByKey, query, startAt } from "firebase/database";
 import Icon from "../components/Icon";
 import { Spinner, StatusBadge } from "../components/ui";
-import { batasJam, initials, kategori, persenWarna, rekap, rekapBulan, toneOf } from "../lib/attendance";
+import { batasJam, initials, persenWarna, toneOf } from "../lib/attendance";
+import { rekapSiswa, type BarisHari, type PetaHari, type RekapSiswa } from "../lib/hariEfektif";
 import {
   BULAN, addDays, formatTanggal, lastDayOfMonth, monthKey, monthLabel, namaHari, tahunAjaran, todayWIB, weekday,
 } from "../lib/time";
 import { daftarRecord, labelTa, levelDari, poinBertanda, ringkas, urutLevel, type DiscRecord, type Level } from "../lib/discipline";
 import { KODE_LABEL, type LessonsSiswa } from "../lib/perjam";
 import type { DayRecord, Kategori, ScheduleRow } from "../lib/types";
-import { gabungRec, type ManualTapAnak } from "../lib/manual";
+import type { ManualTapAnak } from "../lib/manual";
 import { logout } from "../services/auth";
 import { r } from "../services/db";
 import { bacaSekali } from "../services/koneksi";
 
 type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level> };
 type PerJamData = { jam: Record<string, Record<string, LessonsSiswa>>; alfa: Record<string, { status: "Alfa" }> };
-/** manualDipakai: tanggal -> alasan, hanya bila presensi manual DIPAKAI (tidak ada tap alat pada bagian itu) */
-type Data = { profil: { nama: string; kelas: string }; records: Record<string, DayRecord>; manualDipakai: Record<string, string>; schedule: ScheduleRow[]; disiplin: Disiplin; perJam: PerJamData };
+/** `alat` = attendance/{nis} MENTAH (tap alat + keterangan); `manual` = salinan presensi manual; `hariEfektif` = kalenderEfektif (agregat, tanpa data siswa).
+ *  Semua rekap memakai SATU rumus: rekapSiswa() (lib/hariEfektif.ts). */
+type Data = { profil: { nama: string; kelas: string; aktifSejak?: string }; alat: Record<string, DayRecord>; manual: Record<string, ManualTapAnak>; hariEfektif: PetaHari; schedule: ScheduleRow[]; disiplin: Disiplin; perJam: PerJamData; validasi: Record<string, { status: "Alfa" }> };
 
 const LABEL: Partial<Record<Kategori, string>> = { Hadir: "Tepat waktu", Alpha: "Tanpa keterangan", "Belum Tap": "Belum tap" };
 
@@ -35,23 +37,21 @@ export default function StudentPage() {
   const muat = useCallback(async () => {
     try {
       // Data kedisiplinan bersifat tambahan: gagal memuat tidak boleh merusak halaman presensi
-      const [p, a, s, dr, dl, lj, va, mn] = await bacaSekali(() => Promise.all([
+      const mulaiTa = `${tahunAjaran(todayWIB()) - 1}-07-01`; // dua tahun ajaran terakhir cukup untuk rekap & pilihan TA
+      const [p, a, s, dr, dl, lj, va, mn, he] = await bacaSekali(() => Promise.all([
         get(r(`profiles/${nis}`)), get(r(`attendance/${nis}`)), get(r("config/schedule")),
         get(r(`discipline/records/${nis}`)).catch(() => null), get(r("discipline/levels")).catch(() => null),
         get(r(`lessonsByStudent/${nis}`)).catch(() => null), get(r(`validasiByStudent/${nis}`)).catch(() => null),
         get(r(`manualTapByStudent/${nis}`)).catch(() => null),
+        get(query(r("kalenderEfektif"), orderByKey(), startAt(mulaiTa), endAt(todayWIB()))).catch(() => null),
       ]));
       if (!p.exists()) { setErr("Data siswa tidak ditemukan. Hubungi TU sekolah."); return; }
-      // presensi manual digabung dengan data alat lewat fungsi tunggal (alat menang)
-      const alat = (a.val() ?? {}) as Record<string, DayRecord>;
-      const manual = (mn?.val() ?? {}) as Record<string, ManualTapAnak>;
-      const records: Record<string, DayRecord> = { ...alat };
-      const manualDipakai: Record<string, string> = {};
-      for (const [tgl, m] of Object.entries(manual)) {
-        const g = gabungRec(alat[tgl], m);
-        if (g) { records[tgl] = g; if (g !== alat[tgl] && (m.masuk && !alat[tgl]?.status ? true : Boolean(m.pulang && !alat[tgl]?.pulang))) manualDipakai[tgl] = m.alasan; }
-      }
-      setData({ profil: p.val(), records, manualDipakai, schedule: Object.values(s.val() ?? {}) as ScheduleRow[], disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} } });
+      setData({
+        profil: p.val(), alat: (a.val() ?? {}) as Record<string, DayRecord>, manual: (mn?.val() ?? {}) as Record<string, ManualTapAnak>,
+        hariEfektif: (he?.val() ?? {}) as PetaHari, schedule: Object.values(s.val() ?? {}) as ScheduleRow[],
+        disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} },
+        validasi: (va?.val() ?? {}) as Record<string, { status: "Alfa" }>,
+      });
       setUpdated(new Date());
       setErr("");
     } catch (e) {
@@ -102,46 +102,56 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
   nis: string; data: Data; updated: Date | null; onRefresh: () => void; onLogout: () => void;
   ta: number | null; setTa: (n: number) => void; mode: "minggu" | "bulan"; setMode: (m: "minggu" | "bulan") => void;
 }) {
-  const { profil, records, manualDipakai, schedule, disiplin, perJam } = data;
+  const { profil, alat, manual, hariEfektif, schedule, disiplin, perJam, validasi } = data;
   const today = todayWIB();
   const now = new Date();
   const hari = namaHari(today);
   const batas = batasJam(schedule, profil.kelas, hari);
-  const recToday = records[today];
-  const kToday = kategori(recToday, today, schedule, profil.kelas, now);
+  // SATU rumus untuk semua tampilan: hari efektif berbasis bukti (kalenderEfektif) + data alat/manual/izin siswa ini
+  const hit = (awal: string, akhir: string): RekapSiswa => rekapSiswa({ hariEfektif, attendance: alat, manualTap: manual, validasi, schedule, kelas: profil.kelas, aktifSejak: profil.aktifSejak, awal, akhir, now });
+  const rowToday: BarisHari = hit(today, today).hari[0];
+  const recToday = { masuk: rowToday?.masuk, pulang: rowToday?.pulang, ket: rowToday?.ket, catatan: rowToday?.catatan };
+  const manualToday = rowToday?.manualAlasan;
+  // kToday: kategori tampilan kartu hari ini. Hari tanpa kegiatan presensi (libur/alat belum merekam) = "Libur", bukan Alpha.
+  const kToday: Kategori = rowToday?.kategori === "BelumTap" ? "Belum Tap" : rowToday?.kategori === "TidakEfektif" || !rowToday ? "Libur" : (rowToday.kategori as Kategori);
+  const tanpaKegiatan = kToday === "Libur";
   const ym = monthKey(today);
-  const bulanIni = rekapBulan(records, ym, schedule, profil.kelas, now);
+  const bulanIni = hit(`${ym}-01`, lastDayOfMonth(ym));
 
   const taNow = tahunAjaran(today);
-  const taOpsi = useMemo(() => [...new Set([taNow, ...Object.keys(records).map(tahunAjaran)])].sort((a, b) => b - a), [records, taNow]);
+  const taOpsi = useMemo(() => [...new Set([taNow, ...Object.keys(alat).map(tahunAjaran)])].sort((a, b) => b - a), [alat, taNow]);
   const taPilih = ta ?? taNow;
 
   const tahunan = useMemo(() => {
-    const out: { ym: string; r: ReturnType<typeof rekap> }[] = [];
+    const out: { ym: string; r: RekapSiswa }[] = [];
     for (let i = 0; i < 12; i++) {
       const y = i < 6 ? taPilih : taPilih + 1;
       const m = i < 6 ? 7 + i : i - 5;
       const key = `${y}-${String(m).padStart(2, "0")}`;
       if (key > ym) break;
-      out.push({ ym: key, r: rekapBulan(records, key, schedule, profil.kelas, now) });
+      out.push({ ym: key, r: rekapSiswa({ hariEfektif, attendance: alat, manualTap: manual, validasi, schedule, kelas: profil.kelas, aktifSejak: profil.aktifSejak, awal: `${key}-01`, akhir: lastDayOfMonth(key), now }) });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records, schedule, profil.kelas, taPilih, ym]);
-  const totalTa = tahunan.reduce((t, x) => ({ h: t.h + x.r.Hadir + x.r.Terlambat + x.r.Dispensasi, e: t.e + x.r.Efektif }), { h: 0, e: 0 });
+  }, [alat, manual, hariEfektif, validasi, schedule, profil.kelas, profil.aktifSejak, taPilih, ym]);
+  // TOTAL = jumlah semua kolom; persen dihitung dari total (bukan rata-rata persen bulan)
+  const totalTa = tahunan.reduce((t, x) => ({ h: t.h + x.r.Hadir + x.r.Terlambat + x.r.Dispensasi, e: t.e + x.r.Efektif, hs: t.hs + x.r.HariSekolah, tepat: t.tepat + x.r.Hadir, telat: t.telat + x.r.Terlambat, iz: t.iz + x.r.Izin + x.r.Sakit, disp: t.disp + x.r.Dispensasi, alpha: t.alpha + x.r.Alpha }), { h: 0, e: 0, hs: 0, tepat: 0, telat: 0, iz: 0, disp: 0, alpha: 0 });
 
-  // Grafik minggu ini: jam masuk Senin–Sabtu
+  // Grafik minggu ini: jam masuk Senin–Sabtu (hari tanpa kegiatan = "—")
   const senin = addDays(today, -((weekday(today) + 6) % 7));
+  const mingguHit = hit(senin, addDays(senin, 5));
   const minggu = Array.from({ length: 6 }, (_, i) => {
     const d = addDays(senin, i);
-    return { d, hari: namaHari(d).slice(0, 3), rec: records[d], k: kategori(records[d], d, schedule, profil.kelas, now) };
+    const b = mingguHit.hari.find((x) => x.tanggal === d);
+    const k: string = d > today ? "Mendatang" : !b || b.kategori === "TidakEfektif" ? "Libur" : b.kategori === "BelumTap" ? "Belum Tap" : b.kategori;
+    return { d, hari: namaHari(d).slice(0, 3), rec: { masuk: b?.masuk }, k };
   });
-  // Grafik bulan ini: per minggu
-  const perMinggu: { label: string; tepat: number; telat: number; tidak: number }[] = [];
+  // Grafik bulan ini: per minggu; penyebut = hari efektif minggu itu (minggu tanpa hari efektif tampil "–")
+  const perMinggu: { label: string; tepat: number; telat: number; tidak: number; efektif: number }[] = [];
   for (let d = `${ym}-01`, ke = 1; d <= lastDayOfMonth(ym); ke++) {
     const akhir = [addDays(d, 6 - ((weekday(d) + 6) % 7)), lastDayOfMonth(ym)].sort()[0];
-    const x = rekap(records, d, akhir, schedule, profil.kelas, now);
-    perMinggu.push({ label: `Mg ${ke}`, tepat: x.Hadir + x.Dispensasi, telat: x.Terlambat, tidak: x.Izin + x.Sakit + x.Alpha }); // dispensasi dihitung hadir
+    const x = hit(d, akhir);
+    perMinggu.push({ label: `Mg ${ke}`, tepat: x.Hadir + x.Dispensasi, telat: x.Terlambat, tidak: x.Izin + x.Sakit + x.Alpha, efektif: x.Efektif }); // dispensasi dihitung hadir
     d = addDays(akhir, 1);
   }
   const maxMinggu = Math.max(6, ...perMinggu.map((x) => x.tepat + x.telat + x.tidak));
@@ -152,7 +162,8 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
     return toM(batas.Masuk[1]) - toM(recToday.masuk);
   })();
 
-  const riwayat = Object.entries(records).filter(([d]) => d <= today).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10);
+  // Riwayat: 10 hari kalender terakhir (s.d. hari ini). Hari tanpa kegiatan presensi TIDAK tampil sebagai Alpha.
+  const riwayat = hit(addDays(today, -9), today).hari.slice().reverse();
 
   return (
     <main className="student-page">
@@ -175,21 +186,22 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
         <div className="today-grid no-print">
           <article className="today-card">
             <div className="today-head"><span>Tap kartu masuk</span><StatusBadge status={LABEL[kToday] ?? kToday} /></div>
-            {manualDipakai[today] && <p className="muted small" data-testid="ortu-manual-hari-ini">Hadir (dicatat manual: {manualDipakai[today]})</p>}
-            <div className="today-main"><span className="today-icon green"><Icon name="arrow" /></span><div><strong>{recToday?.masuk ? `${recToday.masuk.slice(0, 5)} WIB` : "--:--"}</strong><small>{kToday === "Libur" ? "Hari Minggu — libur" : recToday?.ket ? `Tercatat ${recToday.ket}${recToday.catatan ? ` · ${recToday.catatan}` : ""}` : recToday?.masuk ? (manualDipakai[today] ? `Dicatat manual (${manualDipakai[today]})` : "Tap kartu RFID tercatat") : kToday === "Alpha" ? "Tidak ada tap masuk hari ini" : "Menunggu tap kartu"}</small></div></div>
-            <div className="today-foot"><span>{kToday === "Libur" ? "Libur" : `Batas masuk ${batas.Masuk[1]} WIB`}</span>{selisih != null && <b className={selisih >= 0 ? "good" : "warn"}>{selisih >= 0 ? `${selisih} menit sebelum batas` : `Terlambat ${-selisih} menit`}</b>}</div>
+            {manualToday && <p className="muted small" data-testid="ortu-manual-hari-ini">Hadir (dicatat manual: {manualToday})</p>}
+            <div className="today-main"><span className="today-icon green"><Icon name="arrow" /></span><div><strong>{recToday?.masuk ? `${recToday.masuk.slice(0, 5)} WIB` : "--:--"}</strong><small>{tanpaKegiatan ? (weekday(today) === 0 ? "Hari Minggu — libur" : "Libur / tidak ada kegiatan presensi hari ini") : recToday?.ket && !recToday?.masuk ? `Tercatat ${recToday.ket}${recToday.catatan ? ` · ${recToday.catatan}` : ""}` : recToday?.masuk ? (manualToday ? `Dicatat manual (${manualToday})` : "Tap kartu RFID tercatat") : kToday === "Alpha" ? "Tidak ada tap masuk hari ini" : "Menunggu tap kartu"}</small></div></div>
+            <div className="today-foot"><span>{tanpaKegiatan ? "Libur" : `Batas masuk ${batas.Masuk[1]} WIB`}</span>{selisih != null && <b className={selisih >= 0 ? "good" : "warn"}>{selisih >= 0 ? `${selisih} menit sebelum batas` : `Terlambat ${-selisih} menit`}</b>}</div>
           </article>
           <article className="today-card">
-            <div className="today-head"><span>Tap kartu pulang</span><StatusBadge status={kToday === "Libur" ? "Libur" : recToday?.pulang ? "Pulang" : "Belum tap"} /></div>
-            <div className="today-main"><span className="today-icon blue"><Icon name="logout" /></span><div><strong>{recToday?.pulang ? `${recToday.pulang.slice(0, 5)} WIB` : "--:--"}</strong><small>{recToday?.pulang ? "Tap kartu RFID tercatat" : kToday === "Libur" ? "Hari Minggu — libur" : "Menunggu jam kepulangan"}</small></div></div>
-            <div className="today-foot"><span>{kToday === "Libur" ? "Libur" : `Jadwal pulang ${batas.Pulang[0]}–${batas.Pulang[1]} WIB`}</span></div>
+            <div className="today-head"><span>Tap kartu pulang</span><StatusBadge status={tanpaKegiatan ? "Libur" : recToday?.pulang ? "Pulang" : "Belum tap"} /></div>
+            <div className="today-main"><span className="today-icon blue"><Icon name="logout" /></span><div><strong>{recToday?.pulang ? `${recToday.pulang.slice(0, 5)} WIB` : "--:--"}</strong><small>{recToday?.pulang ? "Tap kartu RFID tercatat" : tanpaKegiatan ? "Libur / tidak ada kegiatan presensi" : "Menunggu jam kepulangan"}</small></div></div>
+            <div className="today-foot"><span>{tanpaKegiatan ? "Libur" : `Jadwal pulang ${batas.Pulang[0]}–${batas.Pulang[1]} WIB`}</span></div>
           </article>
         </div>
 
         <h2 className="section-title no-print"><Icon name="grid" size={18} />Rekap {monthLabel(ym)}</h2>
         <div className="recap-grid no-print">
           <article className="panel recap-card">
-            <p className="panel-title">{bulanIni.Efektif} hari efektif</p>
+            <p className="panel-title" data-testid="hari-efektif-ke">{bulanIni.HariSekolah === 0 ? "Belum ada hari efektif bulan ini" : `Hari efektif ke-${bulanIni.HariSekolah}`}</p>
+            <small className="muted block">{bulanIni.HariSekolah === 0 ? "Belum ada kegiatan presensi yang tercatat bulan ini." : `dari ${bulanIni.HariSekolah} hari efektif bulan ini`}</small>
             {([["Tepat waktu", bulanIni.Hadir, "hadir"], ["Terlambat", bulanIni.Terlambat, "terlambat"], ["Dispensasi (dihitung hadir)", bulanIni.Dispensasi, "hadir"], ["Izin / sakit", bulanIni.Izin + bulanIni.Sakit, "izin"], ["Tanpa keterangan", bulanIni.Alpha, "alpha"]] as const).map(([l, n, c]) => (
               <div className="recap-row" key={l}><span className={`legend-dot ${c}`} /><span>{l}</span><b>{n} hari</b></div>
             ))}
@@ -220,8 +232,8 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
             ) : (
               <div className="bar-chart" role="img" aria-label="Grafik kehadiran per minggu">
                 {perMinggu.map((x) => (
-                  <div className="bar-col" key={x.label} title={`${x.label}: ${x.tepat} tepat, ${x.telat} telat, ${x.tidak} tidak hadir`}>
-                    <span className="bar-val">{x.tepat + x.telat}/{x.tepat + x.telat + x.tidak}</span>
+                  <div className="bar-col" key={x.label} title={x.efektif === 0 ? `${x.label}: tidak ada hari efektif` : `${x.label}: ${x.tepat} tepat, ${x.telat} telat, ${x.tidak} tidak hadir`}>
+                    <span className="bar-val">{x.efektif === 0 ? "–" : `${x.tepat + x.telat}/${x.efektif}`}</span>
                     <div className="bar-track stack">
                       <span className="bar bad" style={{ height: `${(x.tidak / maxMinggu) * 100}%` }} />
                       <span className="bar warn" style={{ height: `${(x.telat / maxMinggu) * 100}%` }} />
@@ -242,7 +254,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
             <span>{profil.nama} · NIS {nis} · Kelas {profil.kelas} · Tahun Ajaran {taPilih}/{taPilih + 1}</span>
           </div>
           <div className="panel-header">
-            <div><p className="panel-title">Rekap tahunan</p><span>Per bulan, tahun ajaran Juli–Juni · hari efektif Senin–Sabtu</span></div>
+            <div><p className="panel-title">Rekap tahunan</p><span>Per bulan, tahun ajaran Juli–Juni · hanya hari yang benar-benar ada kegiatan presensi</span></div>
             <div className="heading-actions no-print">
               <select className="text-input auto" value={taPilih} onChange={(e) => setTa(Number(e.target.value))} aria-label="Tahun ajaran">
                 {taOpsi.map((t) => <option key={t} value={t}>TA {t}/{t + 1}</option>)}
@@ -256,17 +268,22 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
               <tbody>
                 {tahunan.length === 0 ? <tr><td colSpan={8} className="muted">Belum ada data</td></tr> : tahunan.map(({ ym: k, r: x }) => (
                   <tr key={k}>
-                    <td><b>{BULAN[Number(k.slice(5)) - 1]} {k.slice(0, 4)}</b></td><td>{x.Efektif}</td>
-                    <td className="good">{x.Hadir}</td><td className="warn">{x.Terlambat}</td><td>{x.Izin + x.Sakit}</td><td className="good">{x.Dispensasi}</td>
-                    <td className={x.Alpha ? "bad" : ""}>{x.Alpha}</td>
-                    <td><span className={`pct pct-${persenWarna(x.Persen)}`}>{x.Persen == null ? "-" : `${x.Persen}%`}</span></td>
+                    <td><b>{BULAN[Number(k.slice(5)) - 1]} {k.slice(0, 4)}</b></td>
+                    {x.HariSekolah === 0 ? <td colSpan={7} className="muted" data-testid={`bulan-kosong-${k}`}>Belum ada kegiatan presensi</td> : (
+                      <>
+                        <td>{x.Efektif}</td>
+                        <td className="good">{x.Hadir}</td><td className="warn">{x.Terlambat}</td><td>{x.Izin + x.Sakit}</td><td className="good">{x.Dispensasi}</td>
+                        <td className={x.Alpha ? "bad" : ""}>{x.Alpha}</td>
+                        <td><span className={`pct pct-${persenWarna(x.Persen)}`}>{x.Persen == null ? "-" : `${x.Persen}%`}</span></td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
-              {tahunan.length > 0 && <tfoot><tr><td>Total</td><td>{totalTa.e}</td><td colSpan={5} /><td><b>{totalTa.e ? `${Math.round((totalTa.h / totalTa.e) * 1000) / 10}%` : "-"}</b></td></tr></tfoot>}
+              {tahunan.length > 0 && <tfoot><tr data-testid="total-tahunan"><td>Total</td><td>{totalTa.e}</td><td>{totalTa.tepat}</td><td>{totalTa.telat}</td><td>{totalTa.iz}</td><td>{totalTa.disp}</td><td>{totalTa.alpha}</td><td><b>{totalTa.e ? `${Math.round((totalTa.h / totalTa.e) * 1000) / 10}%` : "-"}</b></td></tr></tfoot>}
             </table>
           </div>
-          <p className="caption-text">% = (Tepat + Terlambat + Dispensasi) ÷ hari efektif. Dispensasi = mewakili sekolah, dihitung hadir. Alpha = tidak tap masuk & tidak ada keterangan izin/sakit dari sekolah.</p>
+          <p className="caption-text">Hari efektif = hari ketika sekolah benar-benar menjalankan presensi (ada tap kartu atau dicatat guru) atau ditetapkan sekolah di kalender. Libur dan hari tanpa kegiatan presensi <b>tidak dihitung</b> dan tidak dianggap Alpha. Persentase = (Tepat + Terlambat + Dispensasi) ÷ hari efektif. Dispensasi = mewakili sekolah, dihitung hadir. Alpha = pada hari efektif tidak tap masuk dan tidak ada keterangan izin/sakit dari sekolah. Baris Total menjumlahkan semua bulan.</p>
         </section>
 
         <KehadiranPerJam data={perJam} today={today} />
@@ -274,14 +291,20 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
         <Kedisiplinan disiplin={disiplin} ta={`${taPilih}-${taPilih + 1}`} />
 
         <section className="panel no-print">
-          <div className="panel-header"><div><p className="panel-title">Riwayat terbaru</p><span>10 hari tercatat terakhir</span></div></div>
-          {riwayat.length === 0 ? <p className="muted small">Belum ada riwayat.</p> : (
-            <div className="simple-list">
-              {riwayat.map(([d, x]) => (
-                <div key={d}><b>{formatTanggal(d)}</b><small>{x.masuk ? `Masuk ${x.masuk.slice(0, 5)}` : x.ket ?? ""}{manualDipakai[d] ? ` (dicatat manual: ${manualDipakai[d]})` : ""}{x.pulang ? ` · Pulang ${x.pulang.slice(0, 5)}` : ""}</small><StatusBadge status={LABEL[(x.status ?? x.ket ?? "Alpha") as Kategori] ?? x.status ?? x.ket ?? "Alpha"} /></div>
-              ))}
-            </div>
-          )}
+          <div className="panel-header"><div><p className="panel-title">Riwayat terbaru</p><span>10 hari terakhir</span></div></div>
+          <div className="simple-list">
+            {riwayat.map((x) => (
+              <div key={x.tanggal} data-tgl={x.tanggal} className={x.kategori === "TidakEfektif" ? "riwayat-libur" : ""}>
+                <b>{formatTanggal(x.tanggal)}</b>
+                <small>
+                  {x.kategori === "TidakEfektif"
+                    ? `${x.diHariLibur ? `Tap tercatat di hari libur (${x.masuk?.slice(0, 5) ?? ""}), tidak masuk rekap` : "Libur / tidak ada kegiatan presensi"}`
+                    : `${x.masuk ? `Masuk ${x.masuk.slice(0, 5)}` : x.ket ?? ""}${x.manualAlasan ? ` (dicatat manual: ${x.manualAlasan})` : ""}${x.pulang ? ` · Pulang ${x.pulang.slice(0, 5)}` : ""}${x.alfaTerverifikasi ? " · Alfa terverifikasi" : ""}`}
+                </small>
+                {x.kategori === "TidakEfektif" ? <StatusBadge status="Libur" /> : <StatusBadge status={LABEL[(x.kategori === "BelumTap" ? "Belum Tap" : x.kategori) as Kategori] ?? (x.kategori === "BelumTap" ? "Belum tap" : x.kategori)} />}
+              </div>
+            ))}
+          </div>
         </section>
       </section>
     </main>

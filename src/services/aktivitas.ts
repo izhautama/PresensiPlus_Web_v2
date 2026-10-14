@@ -9,7 +9,7 @@ import { idPerangkat, labelPerangkatSekarang, namaPerangkat } from "../lib/peran
 export type PeranLog = "admin" | "kepala" | "waka" | "piket";
 export type AksiLog =
   | "login" | "logout" | "pilih-petugas" | "izin-harian" | "izin-jam" | "hapus-izin" | "pelanggaran" | "hapus-pelanggaran"
-  | "remisi" | "ubah-pelanggaran" | "pulihkan-pelanggaran" | "presensi-jam" | "presensi-manual" | "hapus-manual" | "validasi-alfa" | "batal-alfa" | "saran-setuju" | "saran-abaikan"
+  | "remisi" | "ubah-pelanggaran" | "pulihkan-pelanggaran" | "presensi-jam" | "presensi-manual" | "hapus-manual" | "atur-kalender" | "hapus-kalender" | "hitung-kalender" | "normal-kalender" | "ambang-kalender" | "migrasi-kalender" | "validasi-alfa" | "batal-alfa" | "saran-setuju" | "saran-abaikan"
   | "kunci-akun" | "buka-kunci";
 type Konteks = { uid: string; peran: PeranLog; email: string };
 type Updates = Record<string, unknown>;

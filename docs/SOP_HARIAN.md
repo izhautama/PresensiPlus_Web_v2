@@ -7,6 +7,7 @@ Untuk: Admin/TU, piket, dan waka
 1. Admin/TU: buka Dashboard, pastikan alat Online dan jam terakhir terlihat baru.
 2. Bila Offline: periksa listrik dan WiFi, tekan Restart di menu Perangkat, tunggu 1 sampai 2 menit.
 3. Bila tetap Offline: beri tahu piket dan waka agar memakai Presensi manual (lihat bagian Jika alat mati).
+4. Hari tanpa satu pun tap atau presensi manual bukan hari efektif: siswa tidak dihitung Alpha.
 
 ## Siang: izin dan dispensasi
 
@@ -19,6 +20,8 @@ Untuk: Admin/TU, piket, dan waka
 1. Waka: buka Validasi harian setelah batas keterlambatan; beri Izin/Sakit/Dispensasi atau Konfirmasi Alfa.
 2. Waka: buka Perlu ditinjau, Setujui atau Abaikan saran pelanggaran (terlambat, tidak tap pulang, bolos jam, Lupa/Hilang KTM).
 3. Waka: isi Presensi per jam bila ada siswa bolos pelajaran (sel A).
+4. Waka: lihat banner Tap rendah di Dashboard; isi Presensi manual atau tekan Konfirmasi hari ini normal.
+5. Waka/Admin: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H).
 
 ## Sabtu: backup
 

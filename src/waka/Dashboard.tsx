@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import Icon from "../components/Icon";
 import { Empty, StatusBadge } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
+import BannerTapRendah from "../kesiswaan/BannerTapRendah";
+import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { initials, toneOf } from "../lib/attendance";
 import { labelTa, levelDari, perluTindakLanjut, poinBertanda, ringkas, taKey } from "../lib/discipline";
 import { addDays, formatTanggal, salam, weekday } from "../lib/time";
@@ -13,6 +15,7 @@ import { rentang, useSaran } from "../kesiswaan/useSaran";
 /** Dashboard kesiswaan. */
 export default function Dashboard() {
   const { students, byNis, today, now, ready } = useAdminData();
+  useKalenderOtomatis(); // hitung hari efektif (kemarin & hari-hari yang belum punya ringkasan; hari ini bila berubah)
   const d = useDiscipline();
   const ta = taKey(today);
   const valLive = useLive<Record<string, unknown>>(`validasi/${today}`);
@@ -39,6 +42,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <BannerTapRendah />
       <section className="welcome">
         <div>
           <p className="eyebrow">KESISWAAN · {labelTa(ta).toUpperCase()}</p>

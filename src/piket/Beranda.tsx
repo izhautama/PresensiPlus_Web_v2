@@ -14,6 +14,7 @@ import { catatManual } from "../services/manual";
 import { hapusIzinHarianPiket, izinHarianPiket, pesanPiket } from "../services/piket";
 import KeteranganDialog from "./KeteranganDialog";
 import { ManualDialog } from "./PresensiManual";
+import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { usePiketCtx, usePiketMundur } from "./useJendela";
 
 type Aksi = { siswa?: StudentRow; ket: KetPiket; bebas: boolean };
@@ -22,6 +23,7 @@ type Aksi = { siswa?: StudentRow; ket: KetPiket; bebas: boolean };
 export default function Beranda() {
   const { students, byNis, kelasList, today, now, schedule, ready } = useAdminData();
   const mundur = usePiketMundur();
+  useKalenderOtomatis(); // piket juga menghitung hari efektif (log aktivitas 'hitung-kalender' wajib untuk piket)
   const ctx = usePiketCtx();
   const notify = useToast();
   const libur = weekday(today) === 0;

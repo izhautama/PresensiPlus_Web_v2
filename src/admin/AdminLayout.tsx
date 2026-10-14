@@ -24,6 +24,7 @@ const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
 const Panduan = lazy(() => import("../pages/Panduan"));
+const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 
 export type PanelMode = "admin" | "kepala" | "waka" | "piket";
@@ -32,6 +33,7 @@ type NavItem = { to: string; label: string; icon: IconName; title: string; secti
 /** Menu Kesiswaan dipakai bersama tiga peran; hak ubah ditegakkan Security Rules (admin hanya baca). */
 const harian = (base: string): NavItem[] => [
   { to: `${base}/presensi-manual`, label: "Presensi manual", icon: "check", title: "Presensi manual" },
+  { to: `${base}/kalender`, label: "Kalender", icon: "calendar", title: "Kalender akademik" },
   { to: `${base}/validasi`, label: "Validasi harian", icon: "check", title: "Validasi harian" },
   { to: `${base}/per-jam`, label: "Presensi per jam", icon: "clock", title: "Presensi per jam" },
   { to: `${base}/saran`, label: "Perlu ditinjau", icon: "bell", title: "Perlu ditinjau (saran otomatis)" },
@@ -129,6 +131,7 @@ export default function AdminLayout() {
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="kalender" element={<Kalender />} />
           <Route path="panduan" element={<Panduan peran="admin" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />
           <Route path="petugas-piket" element={<PetugasPiket />} />

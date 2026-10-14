@@ -38,6 +38,13 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Ikon kunci (key) = kirim email reset password. Ikon sampah = cabut akses.",
         "Ganti password admin di kartu \"Ganti password admin\".",
       ] },
+      { judul: "Kalender akademik dan hari efektif", langkah: [
+        "Hari efektif ditentukan oleh BUKTI: ada tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti (libur, alat mati seharian, sistem belum dipakai) bukan hari efektif dan siswa tidak dihitung Alpha.",
+        "Menu Kalender: klik tanggal, pilih Libur atau Efektif, isi alasan, lalu Simpan override. Override menang atas hitungan otomatis.",
+        "Override Efektif pada tanggal tanpa bukti membuat semua siswa tanpa data tercatat Alpha: isi dulu presensi manual (mode alat bermasalah), lalu centang pernyataan.",
+        "Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).",
+        "Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal \"aktif sejak\" siswa lama.",
+      ] },
       { judul: "Log aktivitas dan backup", langkah: [
         "Menu Log aktivitas: pilih tanggal, lihat siapa (nama petugas yang dipilih sendiri), perangkat, dan aksinya. Perangkat baru diberi tanda.",
         "Pengaturan, kartu Backup terakhir: tekan Buka Firebase Console, pilih Realtime Database, menu titik tiga, Ekspor JSON, simpan berkas di tempat aman.",
@@ -66,6 +73,10 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Pelanggaran: catat pelanggaran atau remisi, lihat saldo poin dan level pembinaan siswa.",
         "Tata tertib: ubah aturan, remisi, ambang pembinaan, dan Pemetaan saran. Aturan tidak dihapus, cukup dinonaktifkan.",
         "Laporan kesiswaan: poin per siswa/kelas, kehadiran per jam, izin dan surat. Jejak audit: siapa mengubah apa.",
+      ] },
+      { judul: "Kalender akademik", langkah: [
+        "Menu Kalender: lihat hari efektif tiap tanggal (otomatis dari bukti tap/presensi manual atau override libur/efektif).",
+        "Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.",
       ] },
       { judul: "Yang tidak dapat dilakukan", langkah: [
         "Mengelola akun staf, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.",
@@ -100,6 +111,12 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Centang saran lalu Setujui terpilih (poin tercatat) atau Abaikan. Tidak ada poin tercatat tanpa persetujuan Anda.",
         "Jenis saran yang belum dipetakan ke aturan diberi peringatan. Atur di Tata tertib, tab Pemetaan saran.",
       ] },
+      { judul: "Kalender dan tap rendah", langkah: [
+        "Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; Efektif tanpa bukti memberi peringatan karena semua siswa tanpa data menjadi Alpha.",
+        "Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa dan saran Alfa hari itu ditahan.",
+        "Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.",
+        "Ambang hari efektif dan Hitung ulang rentang tanggal ada di halaman Kalender.",
+      ] },
       { judul: "Pelanggaran, piket, dan pengawasan", langkah: [
         "Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (dengan alasan), atau pulihkan.",
         "Petugas piket: tambah atau nonaktifkan nama petugas, atur jendela input mundur (0 sampai 14 hari, bawaan 2). Di sini juga tombol Kunci akun piket untuk keadaan darurat.",
@@ -130,6 +147,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Pilih alasan, isi jam masuk. Hadir atau Terlambat dihitung otomatis dari jadwal kelas.",
         "Alat mati atau WiFi putus: menu Presensi manual, kotak Mode alat bermasalah, pilih kelas, centang yang TIDAK hadir, tekan Tandai hadir.",
         "Salah catat: tombol Hapus pada daftar Presensi manual tercatat. Catat pulang manual tersedia untuk siswa yang sudah masuk.",
+        "Hari tanpa satu pun tap alat bukan hari efektif. Presensi manual dihitung sebagai bukti hadir, jadi hari itu menjadi hari efektif setelah ada yang dicatat.",
       ] },
       { judul: "Izin per jam dan pelanggaran ringan", langkah: [
         "Izin per jam: pilih kelas, isi sel S, I, atau D pada jam pelajaran (siswa pulang awal dll), beri keterangan. Sel A (Alfa) hanya Waka.",
@@ -160,11 +178,12 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Dispensasi: anak mewakili sekolah (lomba dll). Dihitung HADIR.",
         "Tanpa keterangan (Alfa): tidak tap dan tidak ada keterangan.",
         "Belum tap: belum tap kartu dan batas keterlambatan belum lewat.",
-        "Libur: hari Minggu.",
+        "Libur / tidak ada kegiatan presensi: hari Minggu, tanggal merah, atau hari ketika sekolah belum menjalankan presensi. Hari ini tidak dihitung dan tidak dianggap Alpha.",
         "\"Hadir (dicatat manual: Lupa KTM)\": anak hadir tetapi tap tidak tercatat alat (KTM lupa/hilang atau alat bermasalah), sehingga guru piket mencatat langsung.",
       ] },
       { judul: "Yang dapat dilihat", langkah: [
         "Presensi hari ini (jam masuk dan pulang), grafik minggu dan bulan ini, serta persen kehadiran.",
+        "Kartu rekap menulis Hari efektif ke-N: hanya hari yang benar-benar ada kegiatan presensi. Bulan tanpa kegiatan tertulis Belum ada kegiatan presensi, bukan 0 persen.",
         "Riwayat 10 hari terakhir dan rekap per bulan dalam satu tahun ajaran.",
         "Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level).",
         "Data diperbarui otomatis tiap 1 menit; tekan tulisan \"Diperbarui\" untuk memuat ulang sekarang.",
@@ -185,6 +204,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Admin/TU: buka Dashboard, pastikan alat Online dan jam terakhir terlihat baru.",
         "Bila Offline: periksa listrik dan WiFi, tekan Restart di menu Perangkat, tunggu 1 sampai 2 menit.",
         "Bila tetap Offline: beri tahu piket dan waka agar memakai Presensi manual (lihat bagian Jika alat mati).",
+        "Hari tanpa satu pun tap atau presensi manual bukan hari efektif: siswa tidak dihitung Alpha.",
       ] },
       { judul: "Siang: izin dan dispensasi", langkah: [
         "Piket: catat siswa yang tidak masuk lewat Beranda piket (Izin, Sakit, Dispensasi) lengkap dengan keterangan.",
@@ -195,6 +215,8 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Waka: buka Validasi harian setelah batas keterlambatan; beri Izin/Sakit/Dispensasi atau Konfirmasi Alfa.",
         "Waka: buka Perlu ditinjau, Setujui atau Abaikan saran pelanggaran (terlambat, tidak tap pulang, bolos jam, Lupa/Hilang KTM).",
         "Waka: isi Presensi per jam bila ada siswa bolos pelajaran (sel A).",
+        "Waka: lihat banner Tap rendah di Dashboard; isi Presensi manual atau tekan Konfirmasi hari ini normal.",
+        "Waka/Admin: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H).",
       ] },
       { judul: "Sabtu: backup", langkah: [
         "Admin: Pengaturan, kartu Backup terakhir, Buka Firebase Console, Ekspor JSON, simpan berkas di tempat aman (bukan hanya di laptop sekolah).",

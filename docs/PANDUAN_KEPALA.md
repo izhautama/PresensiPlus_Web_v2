@@ -23,6 +23,11 @@ Untuk: Kepala Madrasah
 5. Tata tertib: ubah aturan, remisi, ambang pembinaan, dan Pemetaan saran. Aturan tidak dihapus, cukup dinonaktifkan.
 6. Laporan kesiswaan: poin per siswa/kelas, kehadiran per jam, izin dan surat. Jejak audit: siapa mengubah apa.
 
+## Kalender akademik
+
+1. Menu Kalender: lihat hari efektif tiap tanggal (otomatis dari bukti tap/presensi manual atau override libur/efektif).
+2. Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.
+
 ## Yang tidak dapat dilakukan
 
 1. Mengelola akun staf, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.

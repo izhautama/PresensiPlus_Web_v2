@@ -1,6 +1,7 @@
 // Logika saran pelanggaran otomatis. Fungsi MURNI (tanpa Firebase) agar dapat diuji unit; impor memakai ekstensi .ts
 // supaya Node dapat mengeksekusinya langsung (tsconfig: allowImportingTsExtensions).
 import type { AutoMap, Rule } from "./discipline.ts";
+import { tertahan, type RingkasanHari } from "./hariEfektif.ts";
 import { gabungTap, type ManualTap } from "./manual.ts";
 import { namaHari, weekday } from "./time.ts";
 
@@ -33,6 +34,7 @@ export type DataHari = {
   validasi?: Record<string, unknown> | null;
   lessons?: Lessons | null;
   manual?: Record<string, ManualTap> | null; // manualTap/{tgl}
+  hari?: RingkasanHari | null; // kalenderEfektif/{tgl} (hold Alfa pada hari tap rendah / bukan hari efektif)
 };
 
 export type SiswaMin = { nis: string; nama: string; kelas: string };
@@ -127,7 +129,8 @@ export function hitungSaran(a: {
       if (manualEfektif?.masuk && manualEfektif.alasan === "Lupa KTM") tambah("lupaKtm", `Presensi manual (${manualEfektif.masuk.slice(0, 5)}): lupa membawa KTM`);
       if (manualEfektif?.masuk && manualEfektif.alasan === "KTM hilang") tambah("ktmHilang", `Presensi manual (${manualEfektif.masuk.slice(0, 5)}): KTM hilang`);
 
-      if (d.validasi?.[s.nis]) tambah("alfa", "Alfa dikonfirmasi waka/kepala (tidak masuk tanpa keterangan)");
+      // saran Alfa DITAHAN pada hari ber-tap rendah (belum dikonfirmasi normal) dan pada hari yang bukan hari efektif
+      if (d.validasi?.[s.nis] && !tertahan(d.hari) && d.hari?.efektif !== false) tambah("alfa", "Alfa dikonfirmasi waka/kepala (tidak masuk tanpa keterangan)");
     }
   }
   return out.sort((x, y) => y.tanggal.localeCompare(x.tanggal) || x.nama.localeCompare(y.nama) || x.tipe.localeCompare(y.tipe));

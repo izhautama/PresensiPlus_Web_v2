@@ -1093,6 +1093,106 @@ await izin("autoMap: waka memetakan lupaKtm", waka, "PUT", "discipline/autoMap/l
 await izin("autoMap: waka memetakan ktmHilang", waka, "PUT", "discipline/autoMap/ktmHilang", "rg15");
 await tolak("autoMap: kunci tak dikenal DITOLAK", waka, "PUT", "discipline/autoMap/bebas", "rg14");
 
+seksi("KALENDER HARI EFEKTIF — kalender (override), kalenderEfektif (ringkasan agregat), ambang, aktifSejak");
+const OV = (u, o = {}) => ({ status: "libur", alasan: "Tanggal merah nasional", oleh: u.uid, ts: SV, ...o });
+const KE = (o = {}) => ({ efektif: true, tap: 5, manual: 0, sumber: "otomatis", dihitung: SV, ...o });
+const keBody = (u, t, o = {}, a = {}) => ({ ...(PERAN.get(u.uid) === "piket" ? act(u, a.aksi ?? "hitung-kalender", a.act ?? {}).body : {}), [`kalenderEfektif/${t}`]: KE(o) });
+
+// ---- override kalender (waka & admin)
+await izin("kalender: waka mengatur libur", waka, "PUT", "kalender/2026-11-02", OV(waka));
+await izin("kalender: admin mengatur efektif", admin, "PUT", "kalender/2026-11-03", OV(admin, { status: "efektif", alasan: "Masuk menggantikan Sabtu" }));
+for (const [nama, who] of [["kepala", kepala], ["piket", piket], ["ortu", ortu1], ["alat", dev], ["orang tanpa peran", orang]]) await tolak(`kalender: ${nama} TIDAK bisa mengatur override`, who, "PUT", "kalender/2026-11-04", OV(who));
+await tolak("kalender: anonim TIDAK bisa mengatur override", null, "PUT", "kalender/2026-11-04", OV(waka));
+const kbad = (nama, o, t = "2026-11-04") => tolak(`kalender: ${nama} ditolak`, waka, "PUT", `kalender/${t}`, OV(waka, o));
+await kbad("status tak dikenal", { status: "cuti" });
+await kbad("alasan 2 karakter", { alasan: "ab" });
+await kbad("alasan > 200 karakter", { alasan: "x".repeat(201) });
+await kbad("alasan hilang", { alasan: undefined });
+await kbad("oleh bukan pengguna", { oleh: admin.uid });
+await kbad("ts basi", { ts: 1000 });
+await kbad("field asing", { rahasia: 1 });
+await kbad("kunci tanggal salah", {}, "04-11-2026");
+await izin("kalender: semua pengguna login membaca (ortu)", ortu1, "GET", "kalender");
+await izin("kalender: kepala membaca", kepala, "GET", "kalender/2026-11-02");
+await izin("kalender: piket membaca", piket, "GET", "kalender/2026-11-02");
+await tolak("kalender: anonim TIDAK bisa membaca", null, "GET", "kalender");
+await tolak("kalender: kepala TIDAK bisa menghapus override", kepala, "DELETE", "kalender/2026-11-03");
+await izin("kalender: admin menghapus override (11-03)", admin, "DELETE", "kalender/2026-11-03");
+
+// ---- kalenderEfektif: siapa boleh menulis
+await izin("kalenderEfektif: waka menulis ringkasan otomatis", waka, "PUT", "kalenderEfektif/2026-11-05", KE());
+await izin("kalenderEfektif: admin menulis", admin, "PUT", "kalenderEfektif/2026-11-06", KE());
+await izin("kalenderEfektif: kepala menulis", kepala, "PUT", "kalenderEfektif/2026-11-09", KE({ tap: 40 }));
+for (const [nama, who] of [["ortu", ortu1], ["alat", dev], ["orang tanpa peran", orang]]) await tolak(`kalenderEfektif: ${nama} TIDAK bisa menulis`, who, "PUT", "kalenderEfektif/2026-11-10", KE());
+await tolak("kalenderEfektif: anonim TIDAK bisa menulis", null, "PUT", "kalenderEfektif/2026-11-10", KE());
+await uji("kalenderEfektif: piket + log 'hitung-kalender' menulis", piket, "PATCH", "", keBody(piket, "2026-11-10"), "izin");
+await uji("kalenderEfektif: piket TANPA log DITOLAK", piket, "PATCH", "", keBody(piket, "2026-11-11", {}, { act: { tanpa: true } }), "tolak");
+await uji("kalenderEfektif: piket log aksi salah ('izin-harian') DITOLAK", piket, "PATCH", "", keBody(piket, "2026-11-11", {}, { aksi: "izin-harian" }), "tolak");
+await uji("kalenderEfektif: piket penanda log tanpa ENTRI DITOLAK", piket, "PATCH", "", keBody(piket, "2026-11-11", {}, { act: { tanpaEntri: true } }), "tolak");
+await izin("kalenderEfektif: semua pengguna login membaca (ortu)", ortu1, "GET", "kalenderEfektif/2026-11-05");
+await tolak("kalenderEfektif: anonim TIDAK bisa membaca", null, "GET", "kalenderEfektif");
+
+// ---- isi & konsistensi bukti
+const kebad = (nama, o, t = "2026-11-12", who = waka) => tolak(`kalenderEfektif: ${nama} ditolak`, who, "PUT", `kalenderEfektif/${t}`, KE(o));
+await kebad("efektif TANPA bukti (tap 0 + manual 0, otomatis)", { tap: 0, manual: 0 });
+await izin("kalenderEfektif: tidak efektif walau ada tap (mis. Minggu) diterima", waka, "PUT", "kalenderEfektif/2026-11-13", KE({ efektif: false, tap: 40 }));
+await izin("kalenderEfektif: bukti hanya dari manual (tap 0, manual 1) -> efektif", waka, "PUT", "kalenderEfektif/2026-11-14", KE({ tap: 0, manual: 1 }));
+await kebad("tap negatif", { tap: -1 });
+await kebad("tap pecahan", { tap: 1.5 });
+await kebad("tap 5001", { tap: 5001 });
+await kebad("manual negatif", { manual: -1 });
+await kebad("efektif bukan boolean", { efektif: "ya" });
+await kebad("sumber tak dikenal", { sumber: "manual" });
+await kebad("dihitung basi", { dihitung: 1000 });
+await kebad("rendah bukan boolean", { rendah: "ya" });
+await kebad("field asing", { rahasia: 1 });
+await kebad("tanpa tap (field wajib)", { tap: undefined });
+await kebad("kunci tanggal salah", {}, "12-11-2026");
+await izin("kalenderEfektif: rendah=true diterima", waka, "PUT", "kalenderEfektif/2026-11-16", KE({ rendah: true }));
+
+// ---- ambang (sistem/ambangHariEfektif): dibaca semua staf, diubah waka/admin, int 1..500
+await izin("ambang: waka mengubah menjadi 5", waka, "PUT", "sistem/ambangHariEfektif", 5);
+await izin("ambang: admin membaca", admin, "GET", "sistem/ambangHariEfektif");
+await izin("ambang: piket membaca", piket, "GET", "sistem/ambangHariEfektif");
+await izin("ambang: kepala membaca", kepala, "GET", "sistem/ambangHariEfektif");
+await tolak("ambang: ortu TIDAK bisa membaca", ortu1, "GET", "sistem/ambangHariEfektif");
+await tolak("ambang: waka TIDAK bisa membaca node sistem lain (backup)", waka, "GET", "sistem");
+for (const [nama, who] of [["kepala", kepala], ["piket", piket], ["ortu", ortu1], ["alat", dev]]) await tolak(`ambang: ${nama} TIDAK bisa mengubah`, who, "PUT", "sistem/ambangHariEfektif", 3);
+for (const v of [0, 501, 2.5, "5", -1]) await tolak(`ambang: nilai ${JSON.stringify(v)} ditolak`, waka, "PUT", "sistem/ambangHariEfektif", v);
+await tolak("ambang: waka TIDAK bisa menulis backupTerakhir (hanya admin)", waka, "PUT", "sistem/backupTerakhir", SV);
+await kebad("ambang 5: efektif dengan 4 bukti (3 tap + 1 manual)", { tap: 3, manual: 1 }, "2026-11-17");
+await izin("ambang 5: efektif dengan 5 bukti (3 tap + 2 manual)", waka, "PUT", "kalenderEfektif/2026-11-17", KE({ tap: 3, manual: 2 }));
+await izin("ambang: admin mengembalikan ke 1", admin, "PUT", "sistem/ambangHariEfektif", 1);
+await izin("ambang 1: 1 bukti sudah cukup", waka, "PUT", "kalenderEfektif/2026-11-18", KE({ tap: 1 }));
+
+// ---- override menang atas hitungan otomatis
+await izin("override: waka mengatur LIBUR untuk 2026-11-19", waka, "PUT", "kalender/2026-11-19", OV(waka));
+await kebad("override libur: ringkasan 'otomatis' ditolak (tidak boleh menimpa override)", { efektif: false, tap: 40 }, "2026-11-19");
+await kebad("override libur: ringkasan 'override' tetapi efektif=true ditolak", { sumber: "override", efektif: true, tap: 40 }, "2026-11-19");
+await izin("override libur: ringkasan 'override' efektif=false diterima", waka, "PUT", "kalenderEfektif/2026-11-19", KE({ sumber: "override", efektif: false, tap: 40 }));
+await kebad("tanpa override: sumber 'override' ditolak", { sumber: "override", efektif: false }, "2026-11-20");
+await uji("override efektif TANPA bukti + ringkasan dalam SATU update diterima (hari pengganti)", waka, "PATCH", "", { "kalender/2026-11-20": OV(waka, { status: "efektif", alasan: "Hari pengganti" }), "kalenderEfektif/2026-11-20": KE({ sumber: "override", efektif: true, tap: 0, manual: 0 }) }, "izin");
+await kebad("override efektif: ringkasan efektif=false ditolak", { sumber: "override", efektif: false, tap: 0 }, "2026-11-20");
+await uji("override dihapus + ringkasan otomatis dalam satu update diterima", waka, "PATCH", "", { "kalender/2026-11-20": null, "kalenderEfektif/2026-11-20": KE({ efektif: false, tap: 0, manual: 0 }) }, "izin");
+// per-field (cara klien memperbarui tanpa menghapus 'normal')
+await izin("kalenderEfektif: pembaruan per-field (tap & dihitung)", waka, "PATCH", "", { "kalenderEfektif/2026-11-05/tap": 6, "kalenderEfektif/2026-11-05/dihitung": SV });
+
+// ---- konfirmasi "hari ini normal"
+await izin("normal: waka menandai", waka, "PUT", "kalenderEfektif/2026-11-16/normal", true);
+await izin("normal: admin menandai", admin, "PUT", "kalenderEfektif/2026-11-05/normal", true);
+await tolak("normal: kepala TIDAK bisa menandai", kepala, "PUT", "kalenderEfektif/2026-11-09/normal", true);
+await uji("normal: piket (dengan log) TIDAK bisa menandai", piket, "PATCH", "", { ...act(piket, "hitung-kalender").body, "kalenderEfektif/2026-11-10/normal": true }, "tolak");
+await tolak("normal: nilai false ditolak", waka, "PUT", "kalenderEfektif/2026-11-14/normal", false);
+
+// ---- aktifSejak (profiles/{nis}/aktifSejak): admin menulis, ortu membaca milik anak
+await izin("aktifSejak: admin menulis", admin, "PUT", "profiles/111/aktifSejak", "2026-10-14");
+await tolak("aktifSejak: format salah ditolak", admin, "PUT", "profiles/111/aktifSejak", "14-10-2026");
+await tolak("aktifSejak: bukan teks ditolak", admin, "PUT", "profiles/111/aktifSejak", 20261014);
+await tolak("aktifSejak: waka TIDAK bisa menulis", waka, "PUT", "profiles/111/aktifSejak", "2026-10-14");
+await tolak("aktifSejak: ortu TIDAK bisa menulis", ortu1, "PUT", "profiles/111/aktifSejak", "2026-01-01");
+await cek("aktifSejak: ortu membaca profil anak sendiri berikut aktifSejak", ortu1, "profiles/111", (j) => j?.aktifSejak === "2026-10-14" && j.nama);
+await tolak("aktifSejak: ortu TIDAK bisa membaca profil anak lain", ortu1, "GET", "profiles/222/aktifSejak");
+
 seksi("PERANGKAT PIKET — piketPerangkat (create-only)");
 {
   const dev1 = `perangkat-${Date.now().toString(36)}-01`;

@@ -18,6 +18,7 @@ const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
 const Panduan = lazy(() => import("../pages/Panduan"));
+const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 
 /** Panel Kepala Madrasah. AdminDataProvider hanya berlangganan path yang diizinkan Security Rules untuk kepala. */
 export default function KepalaLayout() {
@@ -38,6 +39,7 @@ export default function KepalaLayout() {
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="kalender" element={<Kalender />} />
           <Route path="panduan" element={<Panduan peran="kepala" />} />
           <Route path="*" element={<Navigate to="/kepala" replace />} />
         </Routes>

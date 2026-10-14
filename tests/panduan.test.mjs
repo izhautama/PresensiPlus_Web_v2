@@ -24,6 +24,11 @@ assert.match(teks("piket"), /Mode alat bermasalah/); assert.match(teks("piket"),
 assert.match(teks("waka"), /Pemetaan saran/); assert.match(teks("waka"), /Kunci akun piket/);
 assert.match(teks("admin"), /Backup/); assert.match(teks("admin"), /Ekspor JSON/);
 assert.match(teks("kepala"), /Tata tertib/);
+// hari efektif berbasis bukti & kalender
+assert.match(teks("admin"), /Kalender/); assert.match(teks("admin"), /Hitung ulang/); assert.match(teks("admin"), /dry-run/); assert.match(teks("admin"), /Ambang/);
+assert.match(teks("waka"), /Tap rendah/); assert.match(teks("waka"), /Konfirmasi hari ini normal/); assert.match(teks("waka"), /bukan hari efektif/);
+assert.match(teks("kepala"), /Kalender/); assert.match(teks("ortu"), /Hari efektif ke-N/); assert.match(teks("ortu"), /tidak ada kegiatan presensi/);
+assert.match(teks("sop"), /bukan hari efektif/); assert.match(teks("piket"), /hari efektif/);
 // tidak ada rahasia/URL nyata di panduan
 for (const k of URUTAN_PANDUAN) assert.doesNotMatch(teks(k), /AIza|firebaseio|password-uji|@gmail/i);
 console.log("panduan.test: OK");

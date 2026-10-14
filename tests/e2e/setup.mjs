@@ -82,6 +82,12 @@ async function siapkan(nama, { ns, ver }) {
     parents: { 111: { ver, uid: id.ortu1 }, 222: { ver, uid: id.ortu2 } },
     config: { version: 1, students: siswa },
     profiles: Object.fromEntries(Object.values(siswa).map((s) => [s.nis, { nama: s.nama, kelas: s.kelas }])),
+    // ringkasan hari efektif (agregat) untuk hari-hari ber-tap pada seed; hari lain dihitung otomatis oleh klien staf saat Dashboard dibuka
+    kalenderEfektif: {
+      [T.kemarin]: { efektif: true, tap: 6, manual: 0, sumber: "otomatis", dihitung: now },
+      [T.hariIni]: { efektif: true, tap: 5, manual: 0, sumber: "otomatis", dihitung: now },
+      [T.minggu]: { efektif: false, tap: 2, manual: 0, sumber: "otomatis", dihitung: now }, // Minggu: libur walau ada tap
+    },
     piketAkun: { [id.piket]: { email: `piket.${nama}@e2e.test`, nama: "Meja Piket", terkunci: false } },
     piketRoster: { p1: { nama: "Bu Rina", aktif: true }, p2: { nama: "Pak Joko", aktif: false } },
     device: { status: { lastSeen: now, firmware: "e2e", rfid: true, ntp: true } },

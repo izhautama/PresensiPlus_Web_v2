@@ -147,4 +147,19 @@ assert.deepEqual(hitung({ tanggal: ["2026-10-15"], data: { "2026-10-15": { log: 
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan: "Lainnya" }) }, lessons: lessons({ 1: { 3: "A" } }) } } })), [`${T}:bolosJam:1`]);
 }
 
+// ---- HOLD saran Alfa: hari tap rendah (belum dikonfirmasi normal) dan hari yang bukan hari efektif
+{
+  const R3 = { ...RULES, rAlfa: { kategori: "Sedang", nama: "Tidak masuk tanpa keterangan", poin: 30, aktif: true } };
+  const T = "2026-10-13";
+  const alfa = (hari) => ringkas(hitung({ rules: R3, autoMap: { ...AUTO, alfa: "rAlfa" }, data: { [T]: { validasi: { 1: { status: "Alfa" } }, hari } } }));
+  assert.deepEqual(alfa(undefined), [`${T}:alfa:1`], "tanpa informasi hari: saran Alfa tetap muncul");
+  assert.deepEqual(alfa({ efektif: true, tap: 50, manual: 0, sumber: "otomatis" }), [`${T}:alfa:1`], "hari efektif normal");
+  assert.deepEqual(alfa({ efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true }), [], "tap rendah belum dikonfirmasi: saran Alfa DITAHAN");
+  assert.deepEqual(alfa({ efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true, normal: true }), [`${T}:alfa:1`], "dikonfirmasi normal: saran Alfa dibuka");
+  assert.deepEqual(alfa({ efektif: false, tap: 0, manual: 0, sumber: "otomatis" }), [], "bukan hari efektif: tidak ada saran Alfa");
+  // saran lain (terlambat) tidak ikut ditahan pada hari rendah
+  const lain = hitung({ rules: R3, autoMap: AUTO, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, hari: { efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true } } } });
+  assert.deepEqual(ringkas(lain), [`${T}:terlambat:1`]);
+}
+
 console.log("saran.test: OK");

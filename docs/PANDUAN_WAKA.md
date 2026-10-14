@@ -29,6 +29,13 @@ Untuk: Waka Kesiswaan
 3. Centang saran lalu Setujui terpilih (poin tercatat) atau Abaikan. Tidak ada poin tercatat tanpa persetujuan Anda.
 4. Jenis saran yang belum dipetakan ke aturan diberi peringatan. Atur di Tata tertib, tab Pemetaan saran.
 
+## Kalender dan tap rendah
+
+1. Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; Efektif tanpa bukti memberi peringatan karena semua siswa tanpa data menjadi Alpha.
+2. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa dan saran Alfa hari itu ditahan.
+3. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.
+4. Ambang hari efektif dan Hitung ulang rentang tanggal ada di halaman Kalender.
+
 ## Pelanggaran, piket, dan pengawasan
 
 1. Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (dengan alasan), atau pulihkan.

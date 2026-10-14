@@ -1,7 +1,7 @@
 // Uji unit presensi manual: statusHarian (alat > manual > izin), Terlambat dari jadwal, gabungSemua + rekap.
 import assert from "node:assert/strict";
 import { gabungRec, gabungSemua, gabungTap, statusDariJam, statusHarian } from "../src/lib/manual.ts";
-import { rekapBulan } from "../src/lib/attendance.ts";
+import { rekapSiswa } from "../src/lib/hariEfektif.ts";
 
 const now = new Date("2026-10-14T09:00:00Z"); // Rabu 16:00 WIB
 const T = "2026-10-13"; // Selasa (lampau)
@@ -86,10 +86,12 @@ const g = gabungSemua(att, man);
 assert.equal(g[111]["2026-10-13"].status, "Terlambat");
 assert.equal(g[222]["2026-10-12"].status, "Hadir");
 assert.equal(att[111]["2026-10-13"], undefined, "input tidak diubah");
-// Sunday ignored in rekap automatically; 2026-10-12 Senin, 13 Selasa
-const rk0 = rekapBulan({}, "2026-10", schedule, kelas, now);
-const rk1 = rekapBulan(g[222], "2026-10", schedule, kelas, now);
-assert.ok(rk1.Alpha < rk0.Alpha && rk1.Hadir === 2, `manual mengurangi Alpha (Alpha ${rk0.Alpha} -> ${rk1.Alpha}, Hadir ${rk1.Hadir})`);
-assert.equal(rekapBulan(g[111], "2026-10", schedule, kelas, now).Terlambat, 1);
+// rekapSiswa (hari efektif: 12 & 13 Okt, Senin-Selasa): manual mengurangi Alpha menjadi Hadir
+const peta = { "2026-10-12": { efektif: true, tap: 5, manual: 0, sumber: "otomatis" }, "2026-10-13": { efektif: true, tap: 5, manual: 0, sumber: "otomatis" } };
+const hit = (att) => rekapSiswa({ hariEfektif: peta, attendance: att, schedule, kelas, awal: "2026-10-12", akhir: "2026-10-13", now });
+const rk0 = hit({});
+const rk1 = hit(g[222]);
+assert.ok(rk0.Alpha === 2 && rk1.Alpha === 0 && rk1.Hadir === 2, `manual mengurangi Alpha (Alpha ${rk0.Alpha} -> ${rk1.Alpha}, Hadir ${rk1.Hadir})`);
+assert.equal(hit(g[111]).Terlambat, 1);
 
 console.log("manual.test: OK");

@@ -46,7 +46,7 @@ const hariIni = "((now + 25200000) / 86400000)";
 const mundurN = "(root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2)";
 /** hariKe sah: bilangan bulat dalam [hariIni - N, hariIni + batasDepan]. hariIni dihitung desimal (>= lantai), sehingga batas bawah efektif tepat N hari. */
 const hariKeSah = (ex, depan) => `${ex}.isNumber() && ${ex}.val() % 1 === 0 && ${ex}.val() >= ${hariIni} - ${mundurN} - 1 && ${ex}.val() <= ${hariIni} + ${depan}`;
-const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
+const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
 const KET_IZIN = "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')";
 const nisRe = "/^[0-9]{1,20}$/";
 const KODE_JAM = "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'";
@@ -89,6 +89,9 @@ const ENT = (n) => `${nav(n)}.child('activity').child(${ACT(n)}.child('tgl').val
 const actOk = (n, aksi) => `${ACT(n)}.child('ts').val() === now && ${ENT(n)}.child('ts').val() === now && ${ENT(n)}.child('uid').val() === auth.uid && (${aksi.map((a) => `${ENT(n)}.child('aksi').val() === '${a}'`).join(" || ")})`;
 /** izinMeta baru (ts === now) berkunci "<activityId>_<sufiks>" untuk (tgl, nis) pada update yang sama. */
 const metaBaruPiket = (n, tgl, nis, sufiks) => `${nav(n)}.child('izinMeta').child(${tgl}).child(${nis}).child(${ACT(n)}.child('id').val() + '_' + ${sufiks}).child('ts').val() === now`;
+
+/** override kalender untuk $tgl dari node kalenderEfektif/$tgl (n tingkat ke root). */
+const KAL_OVR = (n) => `${nav(n)}.child('kalender').child($tgl)`;
 
 // ---- presensi manual: pasangan manualTap <-> manualTapByStudent (n = tingkat dari node yang ditulis sampai root)
 const waktuRe = "/^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/";
@@ -189,6 +192,8 @@ export function buildRules() {
       $nis: {
         ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
         ".write": adminSaja,
+        // tanggal mulai dihitung hari efektif untuk siswa ini (siswa baru / pindahan); terbaca orang tua milik anak
+        aktifSejak: { ".validate": `newData.isString() && newData.val().matches(${tglRe})` },
       },
     },
 
@@ -496,9 +501,44 @@ export function buildRules() {
     // Pengingat backup manual (Export JSON di Firebase Console). Hanya admin.
     sistem: {
       ".read": adminSaja,
-      ".write": adminSaja,
-      backupTerakhir: { ".validate": "newData.isNumber() && newData.val() <= now" },
+      backupTerakhir: { ".write": adminSaja, ".validate": "newData.isNumber() && newData.val() <= now" },
+      // ambang hari efektif (bukti hadir minimal agar tanggal menjadi hari efektif); dibaca semua staf, diubah waka/admin
+      ambangHariEfektif: { ".read": pembacaPiket, ".write": anyOf(isAdmin, isWaka), ".validate": bulat(1, 500) },
       $other: { ".validate": false },
+    },
+
+    // ------------------------------------------------------------------ KALENDER HARI EFEKTIF (berbasis bukti)
+    // kalender/{tgl}: OVERRIDE manual (libur | efektif + alasan) oleh waka/admin. Menang atas semua aturan otomatis.
+    kalender: {
+      ".read": "auth != null",
+      $tgl: {
+        ".write": anyOf(isAdmin, isWaka),
+        ".validate": `$tgl.matches(${tglRe}) && newData.hasChildren(['status', 'alasan', 'oleh', 'ts'])`,
+        status: { ".validate": "newData.val() === 'libur' || newData.val() === 'efektif'" },
+        alasan: { ".validate": str(200, 3) },
+        oleh: { ".validate": "newData.val() === auth.uid" },
+        ts: { ".validate": "newData.val() === now" },
+        $other: { ".validate": false },
+      },
+    },
+    // kalenderEfektif/{tgl}: RINGKASAN AGREGAT per tanggal (tanpa data siswa; ortu boleh membaca). Dihitung klien staf (tanpa Cloud Functions).
+    // Konsistensi ditegakkan rules: bila ada override -> sumber 'override' dan efektif sama dengan override (override TIDAK dapat ditimpa
+    // hitungan otomatis); bila tidak -> sumber 'otomatis' dan efektif=true hanya bila tap+manual >= ambang. Piket: log aktivitas wajib.
+    kalenderEfektif: {
+      ".read": "auth != null",
+      $tgl: {
+        ".write": `auth != null && (${isAdmin} || ${isWaka} || ${isKepala} || (${isPiket} && ${actOk(2, ["hitung-kalender"])}))`,
+        ".validate": `$tgl.matches(${tglRe}) && newData.hasChildren(['efektif', 'tap', 'manual', 'sumber', 'dihitung']) && (${KAL_OVR(2)}.exists() ? (newData.child('sumber').val() === 'override' && newData.child('efektif').val() === (${KAL_OVR(2)}.child('status').val() === 'efektif')) : (newData.child('sumber').val() === 'otomatis' && (newData.child('efektif').val() === false || newData.child('tap').val() + newData.child('manual').val() >= (${nav(2)}.child('sistem').child('ambangHariEfektif').val() != null ? ${nav(2)}.child('sistem').child('ambangHariEfektif').val() : 1))))`,
+        efektif: { ".validate": "newData.isBoolean()" },
+        tap: { ".validate": bulat(0, 5000) },
+        manual: { ".validate": bulat(0, 5000) },
+        sumber: { ".validate": "newData.val() === 'otomatis' || newData.val() === 'override'" },
+        rendah: { ".validate": "newData.isBoolean()" },
+        // konfirmasi "hari ini normal": hanya waka/admin
+        normal: { ".validate": `newData.val() === true && (${isWaka} || ${isAdmin})` },
+        dihitung: { ".validate": "newData.val() === now" },
+        $other: { ".validate": false },
+      },
     },
 
     // ------------------------------------------------------------------ presensi per jam pelajaran

@@ -184,7 +184,9 @@ def migrasi_siswa(induk_rows: list, csv_path: str, dry_run: bool = True) -> dict
     paths = {}
     for uid, s in siswa.items():
         paths[f"config/students/{uid}"] = s
-        paths[f"profiles/{s['nis']}"] = {"nama": s["nama"], "kelas": s["kelas"]}
+        # per-field: JANGAN menimpa profiles/{nis}/aktifSejak (tanggal mulai dihitung hari efektif)
+        paths[f"profiles/{s['nis']}/nama"] = s["nama"]
+        paths[f"profiles/{s['nis']}/kelas"] = s["kelas"]
     _update_batch(paths, "siswa & profil", dry_run)
 
     # Akun ortu: hanya dibuat jika belum ada -> PIN lama tidak berubah saat skrip diulang

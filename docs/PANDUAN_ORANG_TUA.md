@@ -17,15 +17,16 @@ Untuk: Orang tua atau wali siswa
 4. Dispensasi: anak mewakili sekolah (lomba dll). Dihitung HADIR.
 5. Tanpa keterangan (Alfa): tidak tap dan tidak ada keterangan.
 6. Belum tap: belum tap kartu dan batas keterlambatan belum lewat.
-7. Libur: hari Minggu.
+7. Libur / tidak ada kegiatan presensi: hari Minggu, tanggal merah, atau hari ketika sekolah belum menjalankan presensi. Hari ini tidak dihitung dan tidak dianggap Alpha.
 8. "Hadir (dicatat manual: Lupa KTM)": anak hadir tetapi tap tidak tercatat alat (KTM lupa/hilang atau alat bermasalah), sehingga guru piket mencatat langsung.
 
 ## Yang dapat dilihat
 
 1. Presensi hari ini (jam masuk dan pulang), grafik minggu dan bulan ini, serta persen kehadiran.
-2. Riwayat 10 hari terakhir dan rekap per bulan dalam satu tahun ajaran.
-3. Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level).
-4. Data diperbarui otomatis tiap 1 menit; tekan tulisan "Diperbarui" untuk memuat ulang sekarang.
+2. Kartu rekap menulis Hari efektif ke-N: hanya hari yang benar-benar ada kegiatan presensi. Bulan tanpa kegiatan tertulis Belum ada kegiatan presensi, bukan 0 persen.
+3. Riwayat 10 hari terakhir dan rekap per bulan dalam satu tahun ajaran.
+4. Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level).
+5. Data diperbarui otomatis tiap 1 menit; tekan tulisan "Diperbarui" untuk memuat ulang sekarang.
 
 ## Lupa PIN atau tidak bisa masuk
 

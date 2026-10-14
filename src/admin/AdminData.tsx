@@ -9,6 +9,10 @@ export type TodayEntry = { masuk?: LogEntry; pulang?: LogEntry; ket?: KetHarian;
 
 type AdminData = {
   ready: boolean;
+  /** log & presensi manual HARI INI sudah termuat (hitungan hari efektif tidak boleh dibuat sebelum ini) */
+  buktiSiap: boolean;
+  /** profiles/{nis}/aktifSejak (hanya admin/kepala/waka; piket tidak punya akses profiles) */
+  aktifSejak: Record<string, string>;
   today: string;
   now: Date;
   students: StudentRow[];
@@ -39,6 +43,7 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
   const izinLive = useLive<Record<string, KetHarian>>(`izin/${today}`);
   const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${today}`);
   const deviceLive = useLive<DeviceStatus>(tanpaAlat ? null : "device/status");
+  const profilLive = useLive<Record<string, { aktifSejak?: string }>>(tanpaAlat ? null : "profiles");
 
   const value = useMemo<AdminData>(() => {
     const studentMap = studentsLive.data ?? {};
@@ -66,15 +71,17 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
     const device = deviceLive.data;
     return {
       ready: !studentsLive.loading && !scheduleLive.loading,
+      buktiSiap: !logLive.loading && !manualLive.loading,
+      aktifSejak: Object.fromEntries(Object.entries(profilLive.data ?? {}).filter(([, p]) => p?.aktifSejak).map(([nis, p]) => [nis, p.aktifSejak as string])),
       today, now, students, studentMap,
       schedule: Object.values(scheduleLive.data ?? {}),
       log, izinToday, manualToday, byNis, device,
       online: Boolean(device?.lastSeen && serverNow() - device.lastSeen < ONLINE_MS),
       serverNow,
       kelasList: [...new Set(students.map((s) => s.kelas))].sort(),
-      errors: [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive].map((l) => l.error).filter((e): e is string => Boolean(e)),
+      errors: [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, profilLive].map((l) => l.error).filter((e): e is string => Boolean(e)),
     };
-  }, [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, offset, today, now]);
+  }, [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, profilLive, offset, today, now]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -739,3 +739,25 @@ button.kode:disabled { cursor: default; }
 .panduan-isi .panduan-bagian:first-of-type { border-top: 0; }
 .panduan-isi h3 { margin: 12px 0 6px; font-size: 14px; color: #1e3b2b; }
 .panduan-isi ol { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 13.5px; line-height: 1.5; color: #33463a; }
+
+/* Kalender akademik (hari efektif berbasis bukti) */
+.kal-wrap { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.kal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.kal-head { text-align: center; font-size: 11.5px; font-weight: 800; color: #6a776f; padding: 4px 0; }
+.kal-hari { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; border: 1.5px solid transparent; border-radius: 10px; background: #f3f5f4; color: #33463a; font: inherit; cursor: pointer; }
+.kal-hari b { font-size: 14px; }
+.kal-hari small { font-size: 10.5px; font-weight: 700; opacity: .85; }
+.kal-hari.dipilih { border-color: #1d6b4a; box-shadow: 0 0 0 2px rgba(29,107,74,.18); }
+.kal-hari.hari-ini b { text-decoration: underline; }
+.kal-efektif { background: #e1f3e8; color: #1d6b4a; }
+.kal-libur { background: #eceeed; color: #7b8680; }
+.kal-ovr-libur { background: #fbe9d6; color: #9a5a14; }
+.kal-ovr-efektif { background: #d9e8fb; color: #1e4f94; }
+.kal-berjalan { background: #fff6d6; color: #8a6a00; }
+.kal-rendah { background: #fde0dd; color: #a23a2c; }
+.kal-belum { background: #fafafa; color: #8c9690; border-style: dashed; border-color: #d6dcd8; }
+.kal-mendatang { background: #fff; color: #5c6a62; border: 1px solid #e3e9e5; }
+.kal-legenda { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; font-size: 12px; color: #4f5f55; }
+.kal-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
+.riwayat-libur { opacity: .7; }
+@media (max-width: 880px) { .kal-wrap { grid-template-columns: 1fr; } .kal-hari { min-height: 46px; } }
