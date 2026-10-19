@@ -677,7 +677,7 @@ const mutasi = [
     r.lessons.$tgl.$kelas.absenInfo.$nis.$jam.hariKe[".validate"] = "newData.isNumber()";
     const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_BARU_T}.child('hariKe')`)})`, ")");
   } },
-  { nama: "alfa-jam: piket mengisi A tanpa info (hariKe tak terbukti)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${INFO_BARU_T}.exists()`, ""); } },
+  { nama: "alfa-jam: piket mengisi A tanpa info (hariKe tak terbukti; exists() dan HARI_INI(info.hariKe) di sel, keduanya saling menutup)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${INFO_BARU_T}.exists() && ${HARI_INI_T(`${INFO_BARU_T}.child('hariKe')`)})`, ")"); } },
   { nama: "alfa-jam: piket mengisi A tanpa penanda 'piket' (sel + absenInfo.write)", ubah: (r) => {
     const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `${actOk(6, ["alfa-jam"])} && ${MARK_BARU_T}.val() === 'piket' && `, `${actOk(6, ["alfa-jam"])} && `);
     const m = r.lessons.$tgl.$kelas.absenInfo.$nis.$jam; m[".write"] = ganti(m[".write"], `${MARK_BARU_T}.val() === 'piket' && ${CELL_LAMA_T}`, `${CELL_LAMA_T}`);
@@ -692,6 +692,7 @@ const mutasi = [
   { nama: "alfa-jam: piket mengisi A tanpa log lewat jalur ganti S->A (log 'izin-jam' diterima untuk A)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(newData.val() === 'A' && ${actOk(6, ["alfa-jam"])}`, `(newData.val() === 'A' && ${actOk(6, ["alfa-jam", "izin-jam"])}`); } },
   { nama: "alfa-jam: peran lain (wali) dapat mengisi A (sel + penanda + info + salinan)", ubah: (r) => {
     const sw = (n) => { n[".write"] = ganti(n[".write"], `auth != null && ${PIKET} && (`, `auth != null && (${PIKET} || ${WALI}) && (`); };
+    const sel = r.lessons.$tgl.$kelas.absen.$nis.$jam; sel[".validate"] = ganti(sel[".validate"], ` && (${PIKET} || ${MARK_BARU_T}.val() !== 'piket')`, ""); // validate sel: penanda 'piket' hanya dari peran piket
     sw(r.lessons.$tgl.$kelas.absen.$nis.$jam); sw(r.lessons.$tgl.$kelas.absenOleh.$nis.$jam); sw(r.lessons.$tgl.$kelas.absenInfo.$nis.$jam);
     const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(${PIKET} && (`, `((${PIKET} || ${WALI}) && (`);
   } },
