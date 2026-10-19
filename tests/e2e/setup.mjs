@@ -73,6 +73,17 @@ async function siapkan(nama, { ns, ver }) {
   // Minggu 2026-10-18 (libur): data sengaja ada -> HARUS diabaikan (tidak ada saran, tidak ada daftar belum tap)
   const log18 = { ...M("AAAA1111", "111", "07:30:00", "Terlambat"), ...M("BBBB2222", "222", "07:00:00") };
 
+  const attendanceDariLog = (perTanggal) => {
+    const out = {};
+    for (const [tgl, log] of Object.entries(perTanggal)) {
+      for (const [kunci, e] of Object.entries(log)) {
+        const rec = ((out[e.nis] ??= {})[tgl] ??= {});
+        if (kunci.endsWith("_M")) { rec.masuk = e.jam; rec.status = e.status; } else rec.pulang = e.jam;
+      }
+    }
+    return out;
+  };
+
   const seed = {
     roles: { [id.admin]: "admin", [id.waka]: "waka", [id.kepala]: "kepala", [id.piket]: "piket", [id.wali]: "wali" },
     staff: {
@@ -96,6 +107,9 @@ async function siapkan(nama, { ns, ver }) {
     piketRoster: { p1: { nama: "Bu Rina", aktif: true }, p2: { nama: "Pak Joko", aktif: false } },
     device: { status: { lastSeen: now, firmware: "e2e", rfid: true, ntp: true } },
     log: { [T.kemarin]: log13, [T.hariIni]: log14, [T.minggu]: log18 },
+    // attendance/{nis}/{tgl} SELALU berpasangan dengan log tap (firmware menulis keduanya). Portal ortu & rekap membaca attendance, jadi seed harus konsisten
+    // dengan log; tanpa ini siswa yang "tap" kemarin dianggap Alfa seharian (v2.3.1: sel per jam siswa Alfa seharian diturunkan, bukan dipakai).
+    attendance: attendanceDariLog({ [T.kemarin]: log13, [T.hariIni]: log14, [T.minggu]: log18 }),
     izin: { [T.kemarin]: { 444: "Sakit" } },
     validasi: { [T.kemarin]: { 555: { status: "Alfa", oleh: id.waka, ts: now } }, [T.minggu]: { 555: { status: "Alfa", oleh: id.waka, ts: now } } },
     lessons: {

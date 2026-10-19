@@ -344,23 +344,23 @@ test("orang tua: kedisiplinan tanpa data staf/terhapus, per jam & Alfa terverifi
 test("waka: perlu ditinjau — saran otomatis (setujui, abaikan, massal, permanen)", async ({ page }) => {
   const lap = await siapkan(page);
   await loginStaf(page, "waka");
-  // dashboard menghitung saran: ANDI×2 (terlambat + tanpa tap pulang), BUDI (bolos jam), FANI, GITA (terlambat)
-  await expect(page.getByTestId("jumlah-saran")).toHaveText("5");
+  // dashboard menghitung saran: ANDI×3 (terlambat + tanpa tap pulang + bolos jam 3 dari uji per jam), BUDI (bolos jam), FANI, GITA (terlambat)
+  await expect(page.getByTestId("jumlah-saran")).toHaveText("6");
 
   await menu(page, "Perlu ditinjau");
   await expect(judul(page)).toHaveText("Perlu ditinjau (saran otomatis)");
   const baris = page.locator(".saran-row");
-  await expect(baris).toHaveCount(5);
+  await expect(baris).toHaveCount(6);
   // yang TIDAK boleh disarankan: izin pulang awal (sel S), ket harian Sakit, Alfa tanpa autoMap
   for (const n of ["CITRA TEST", "DINA TEST", "EKO TEST"]) await expect(baris.filter({ hasText: n })).toHaveCount(0); // nama lengkap: "EKO" saja cocok dengan "sEKOlah"
-  await expect(baris.filter({ hasText: "ANDI TEST" })).toHaveCount(2);
+  await expect(baris.filter({ hasText: "ANDI TEST" })).toHaveCount(3);
   await expect(baris.filter({ hasText: "BUDI TEST" })).toContainText("jam ke-2 (Matematika)");
-  await expect(page.locator('.saran-row[data-tipe="bolosJam"]')).toHaveCount(1); // bolos hanya dari sel A
+  await expect(page.locator('.saran-row[data-tipe="bolosJam"]')).toHaveCount(2); // bolos hanya dari sel A siswa yang HADIR (BUDI jam 2, ANDI jam 3)
 
   // setujui satu
   await page.locator('.saran-row[data-tipe="terlambat"]', { hasText: "ANDI TEST" }).getByRole("button", { name: "Setujui" }).click();
   await expect(toast(page)).toContainText("1 saran disetujui");
-  await expect(baris).toHaveCount(4);
+  await expect(baris).toHaveCount(5);
 
   // abaikan satu dengan alasan
   await page.locator('.saran-row[data-tipe="tanpaTapPulang"]', { hasText: "ANDI TEST" }).getByRole("button", { name: "Abaikan" }).click();
@@ -368,7 +368,7 @@ test("waka: perlu ditinjau — saran otomatis (setujui, abaikan, massal, permane
   await dlg.getByLabel("Alasan (opsional)").fill("sudah ditangani wali kelas");
   await dlg.getByRole("button", { name: "Abaikan", exact: true }).click();
   await expect(toast(page)).toContainText("1 saran diabaikan");
-  await expect(baris).toHaveCount(3);
+  await expect(baris).toHaveCount(4);
 
   // setujui massal: FANI + GITA
   await page.getByLabel("Pilih FANI TEST Terlambat").check();
@@ -376,12 +376,13 @@ test("waka: perlu ditinjau — saran otomatis (setujui, abaikan, massal, permane
   await expect(page.getByText("2 dipilih")).toBeVisible();
   await page.getByRole("button", { name: "Setujui terpilih" }).click();
   await expect(toast(page)).toContainText("2 saran disetujui");
-  await expect(baris).toHaveCount(1); // tersisa BUDI (bolos jam)
+  await expect(baris).toHaveCount(2); // tersisa bolos jam BUDI dan ANDI
 
   // keputusan permanen: tidak muncul lagi setelah muat ulang
   await page.reload();
-  await expect(page.locator(".saran-row")).toHaveCount(1);
-  await expect(page.locator(".saran-row")).toContainText("BUDI TEST");
+  await expect(page.locator(".saran-row")).toHaveCount(2);
+  await expect(page.locator(".saran-row").filter({ hasText: "BUDI TEST" })).toHaveCount(1);
+  await expect(page.locator(".saran-row").filter({ hasText: "ANDI TEST" })).toHaveCount(1);
 
   // poin benar & berasal dari saran: ANDI 50 + 5 = 55; FANI & GITA masing-masing 5
   await menu(page, "Pelanggaran");
@@ -414,8 +415,8 @@ test("dua staf menyetujui saran yang sama bersamaan: hanya 1 record tercipta", a
   await expect(tombol(p2)).toBeVisible();
   // klik hampir bersamaan; bila baris sudah hilang di salah satu sisi (sinkron realtime) itu pun hasil yang sah
   await Promise.all([tombol(page).click({ timeout: 4000 }).catch(() => "hilang"), tombol(p2).click({ timeout: 4000 }).catch(() => "hilang")]);
-  await expect(page.locator(".saran-row")).toHaveCount(0);
-  await expect(p2.locator(".saran-row")).toHaveCount(0);
+  await expect(page.locator(".saran-row", { hasText: "BUDI TEST" })).toHaveCount(0);
+  await expect(p2.locator(".saran-row", { hasText: "BUDI TEST" })).toHaveCount(0); // tersisa bolos jam ANDI (tidak ikut diuji)
 
   // pesan: tepat satu keberhasilan (toast "1 saran disetujui")
   const teks = [...(await toastTerekam(page)), ...(await toastTerekam(p2))].join(" | ");
@@ -651,7 +652,7 @@ test("piket: izin per jam (S/I/D), sel A terkunci, aksi cepat, keterangan wajib"
   await dlg.getByLabel("Keterangan (wajib)").fill("Pulang awal dijemput orang tua; ANDI latihan lomba");
   await dlg.getByLabel("Surat fisik diterima").check();
   await dlg.getByRole("button", { name: "Simpan" }).click();
-  await expect(toast(page)).toContainText("Izin per jam tersimpan");
+  await expect(toast(page)).toContainText("Presensi per jam tersimpan");
 
   // bertahan setelah muat ulang; sel A tetap terkunci
   await page.reload();
@@ -2101,8 +2102,9 @@ test("per jam: piket mengisi A HARI INI (konfirmasi sekali, tanpa keterangan); A
   // saran bolosJam tetap berlaku untuk A dari piket (perlu persetujuan waka seperti biasa; poin tidak tercatat otomatis)
   await menu(pw, "Perlu ditinjau");
   const barisSaran = pw.locator(".saran-row", { hasText: "CITRA TEST" });
-  await expect(barisSaran).toContainText("jam ke-4");
-  await expect(pw.locator(".saran-row", { hasText: "DINA TEST" })).toContainText("jam ke-4");
+  // CITRA juga punya A piket KEMARIN (jam 5) yang sah menjadi saran bolos pada tanggal itu: hanya yang jam 4 (hari ini) yang diperiksa
+  await expect(barisSaran.filter({ hasText: "jam ke-4" })).toHaveCount(1);
+  await expect(pw.locator(".saran-row", { hasText: "DINA TEST" }).filter({ hasText: "jam ke-4" })).toHaveCount(1);
 
   // revisi waka: A piket CITRA jam 4 -> Izin: penanda menjadi 'waka' (titik hilang), kartu Dashboard turun
   await menu(pw, "Presensi per jam");
@@ -2192,6 +2194,7 @@ test("per jam: Alfa seharian & keterangan harian DITURUNKAN (terkunci, tidak dit
 
   await menu(page, "Presensi per jam");
   await page.locator("select[aria-label=Kelas]").selectOption("XII IPS");
+  await page.locator("input[type=date]").first().fill(T.hariIni); // halaman masih memegang tanggal KEMARIN dari langkah EKO
   await expect(page.locator("tbody tr", { hasText: "LINA UJI" }).getByTestId("label-turunan")).toHaveText("Izin seharian (otomatis)");
   await expect(page.getByLabel("LINA UJI jam 1: Izin seharian (otomatis, terkunci)")).toBeDisabled();
   bersih(lap, "waka (turunan Alfa/Izin seharian)");
