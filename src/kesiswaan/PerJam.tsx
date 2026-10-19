@@ -4,7 +4,7 @@ import Icon from "../components/Icon";
 import { Empty, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
-import { gabungTap, type ManualTap } from "../lib/manual";
+import { gabungTap, hitungStatusJadwal, type ManualTap } from "../lib/manual";
 import type { DayRecord, KetHarian, LogEntry } from "../lib/types";
 import { JAM, KODE_LABEL, SIKLUS_WAKA, berikutnya, berikutnyaPiket, encodeKelas, pengisiSel, selATerkunciPiket, type KodeJam, type LessonsKelas, type MetaJam } from "../lib/perjam";
 import { kodeTampil, turunanSiswa } from "../lib/turunan";
@@ -92,11 +92,13 @@ export default function PerJam() {
       const slot = (m[e.nis] ??= {});
       if (key.endsWith("_M")) slot.masuk = e; else slot.pulang = e;
     }
-    // presensi manual: alat menang; manual hanya mengisi yang kosong
+    // presensi manual: masuk = bukti PALING AWAL; pulang: alat menang, manual mengisi yang kosong
+    const kelasNis = Object.fromEntries(students.map((s) => [s.nis, s.kelas]));
     for (const [nis, tapM] of Object.entries(manualLive.data ?? {})) {
       const slot = (m[nis] ??= {});
-      const g = gabungTap({ masuk: slot.masuk, pulang: slot.pulang }, tapM);
-      if (g.masuk && !slot.masuk) slot.masuk = { jam: g.masuk.jam, nis, status: g.masuk.status, manual: g.masuk.manual };
+      const g = gabungTap({ masuk: slot.masuk, pulang: slot.pulang }, tapM, kelasNis[nis] ? hitungStatusJadwal(schedule, kelasNis[nis], tanggal) : undefined);
+      if (g.masuk && (!slot.masuk || g.manual?.dipakai.includes("masuk"))) slot.masuk = { jam: g.masuk.jam, nis, status: g.masuk.status, manual: g.masuk.manual };
+      else if (g.masuk && slot.masuk && g.masuk.status !== slot.masuk.status) slot.masuk = { ...slot.masuk, status: g.masuk.status };
       if (g.pulang && !slot.pulang) slot.pulang = { jam: g.pulang.jam, nis, status: "Pulang", manual: g.pulang.manual };
     }
     return m;

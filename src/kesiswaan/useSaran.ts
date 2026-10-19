@@ -57,7 +57,7 @@ export function useSaran(tanggal: string[]) {
 
   const saran: Saran[] = useMemo(() => hitungSaran({
     tanggal, today, nowHM: nowHM(now), siswa: students, data, autoMap: d.autoMap, rules: d.rules, putusan,
-    records: d.records, batasPulang: (kelas, hari) => batasJam(schedule, kelas, hari).Pulang[1],
+    records: d.records, batasPulang: (kelas, hari) => batasJam(schedule, kelas, hari).Pulang[1], batasMasuk: (kelas, hari) => batasJam(schedule, kelas, hari).Masuk[1],
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [kunci, today, now, students, data, d.autoMap, d.rules, putusan, d.records, schedule]);
 

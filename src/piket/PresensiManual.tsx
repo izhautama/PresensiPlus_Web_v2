@@ -5,9 +5,9 @@ import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { batasJam, initials, toneOf } from "../lib/attendance";
-import { ALASAN_MANUAL, gabungTap, statusDariJam, type AlasanManual, type ManualTap } from "../lib/manual";
+import { ALASAN_MANUAL, gabungTap, hitungStatusJadwal, infoGabung, periksaJamManual, statusDariJam, type AlasanManual, type ManualTap } from "../lib/manual";
 import { rentangPiket } from "../lib/piket";
-import { formatTanggal, namaHari, nowHM, weekday } from "../lib/time";
+import { formatTanggal, jamDariMs, namaHari, nowHM, weekday } from "../lib/time";
 import type { KetHarian, LogEntry, StudentRow } from "../lib/types";
 import { useLive } from "../services/db";
 import { catatManual, catatManualMassal, hapusManual, type PencatatManual } from "../services/manual";
@@ -34,7 +34,7 @@ const jamPenuh = (hm: string) => (hm.length === 5 ? `${hm}:00` : hm);
 export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }) {
   const mode = usePanelMode();
   const bisaTulis = mode === "piket" || mode === "waka";
-  const { students, kelasList, today, now, schedule, ready } = useAdminData();
+  const { students, kelasList, today, now, schedule, ready, serverNow } = useAdminData();
   const mundur = usePiketMundur();
   const pencatat = usePencatat();
   const notify = useToast();
@@ -67,7 +67,7 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
     }
     return students.map((s) => {
       const a = alat[s.nis];
-      const g = gabungTap({ masuk: a?.masuk, pulang: a?.pulang }, manualLive.data?.[s.nis]);
+      const g = gabungTap({ masuk: a?.masuk, pulang: a?.pulang }, manualLive.data?.[s.nis], hitungStatusJadwal(schedule, s.kelas, tanggal));
       return { s, g, ket: izinLive.data?.[s.nis], alat: a };
     });
   }, [students, logLive.data, manualLive.data, izinLive.data]);
@@ -77,7 +77,8 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
     return (!kelas || s.kelas === kelas) && (!qq || `${s.nama} ${s.nis}`.toLowerCase().includes(qq));
   };
   const belumHadir = baris.filter((b) => !b.g.masuk && cocok(b.s));
-  const tercatat = baris.filter((b) => b.g.manual && cocok(b.s));
+  const hanyaMundur = params.get("mundur") === "1";
+  const tercatat = baris.filter((b) => b.g.manual && cocok(b.s) && (!hanyaMundur || b.g.manual.tap.mundur));
   const belumPulang = baris.filter((b) => b.g.masuk && !b.g.pulang && cocok(b.s));
 
   const hapus = async (s: StudentRow) => {
@@ -89,7 +90,7 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
   return (
     <section className="data-page">
       <div className="section-heading">
-        <div><p>Presensi manual</p><span>{formatTanggal(tanggal)} · untuk siswa yang HADIR tetapi tidak tercatat alat (KTM lupa/hilang, kartu rusak, alat bermasalah). Data alat selalu diutamakan.</span></div>
+        <div><p>Presensi manual</p><span>{formatTanggal(tanggal)} · untuk siswa yang HADIR tetapi tidak tercatat alat (KTM lupa/hilang, kartu rusak, alat bermasalah). Bukti masuk paling awal (alat atau manual) yang dipakai.</span></div>
       </div>
       {!bisaTulis && <div className="notice warn"><Icon name="eye" size={17} /><span>Hanya piket dan waka yang dapat mencatat. Halaman ini untuk melihat.</span></div>}
 
@@ -106,7 +107,7 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
             <MassalPanel tanggal={tanggal} kelasList={kelasList} baris={baris} kelas={kelasAktif} setKelas={setKelasMassal}
               schedule={schedule} alfaSet={alfaSet}
               onOk={async (masuk, siswa, ket, batalAlfa) => {
-                await catatManualMassal({ tanggal, masuk, kelas: kelasAktif, siswa, alasan: "Alat bermasalah", keterangan: ket, batalAlfa }, pencatat, schedule);
+                await catatManualMassal({ tanggal, masuk, kelas: kelasAktif, siswa, alasan: "Alat bermasalah", keterangan: ket, batalAlfa, sekarangMs: serverNow(), hariIni: today, awalJendelaMasuk: batasJam(schedule, kelasAktif, namaHari(tanggal)).Masuk[0] }, pencatat, schedule);
                 notify(`${siswa.length} siswa kelas ${kelasAktif} ditandai hadir`);
               }} />
           )}
@@ -123,14 +124,16 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
           </div>
 
           <article className="panel master-group" style={{ marginTop: 16 }} data-testid="manual-tercatat">
-            <div className="panel-header"><div><p className="panel-title">Presensi manual tercatat</p><span>{tercatat.length} siswa pada tanggal ini</span></div></div>
+            <div className="panel-header"><div><p className="panel-title">Presensi manual tercatat</p><span>{tercatat.length} siswa pada tanggal ini{hanyaMundur ? " · hanya yang jam masuknya dimundurkan" : ""}</span></div></div>
             {tercatat.length === 0 ? <p className="modal-note">Belum ada presensi manual.</p> : (
               <div className="simple-list">
                 {tercatat.map(({ s, g }) => (
                   <div key={s.nis} data-nis={s.nis}>
                     <span><b>{s.nama}</b><small>{s.kelas} · {g.manual!.tap.alasan} · {g.manual!.tap.masuk ? `masuk ${g.manual!.tap.masuk.slice(0, 5)} (${g.manual!.tap.status})` : ""}{g.manual!.tap.pulang ? ` pulang ${g.manual!.tap.pulang.slice(0, 5)}` : ""} · oleh {g.manual!.tap.petugas ?? "-"}</small></span>
                     <span className="badge badge-ubah">Manual</span>
-                    {g.manual!.diabaikan && <span className="badge badge-tanpa">diabaikan (ada tap alat)</span>}
+                    {g.manual!.tap.mundur && <span className="badge badge-tanpa" data-testid="badge-mundur" title="Jam masuk dimundurkan lebih dari 15 menit dari waktu dicatat">jam dimundurkan</span>}
+                    {g.manual!.tap.ts ? <small className="muted" data-testid="jam-dicatat">dicatat {jamDariMs(g.manual!.tap.ts).slice(0, 5)}</small> : null}
+                    {infoGabung(g.manual) && <small className={g.manual!.diabaikan ? "badge badge-tanpa" : "muted"} data-testid="info-gabung">{infoGabung(g.manual)}</small>}
                     {bisaTulis && g.manual!.tap.masuk && !g.pulang && <button className="ghost-button" onClick={() => setDialog({ s, mode: "pulang", awal: g.manual!.tap })}>Catat pulang</button>}
                     {bisaTulis && <button className="ghost-button" aria-label={`Hapus presensi manual ${s.nama}`} onClick={() => hapus(s)}>Hapus</button>}
                   </div>
@@ -156,7 +159,7 @@ export default function PresensiManual({ tanggalAwal }: { tanggalAwal?: string }
       {dialog && (
         <ManualDialog dialog={dialog} tanggal={tanggal} today={today} now={now} schedule={schedule} alfa={alfaSet.has(dialog.s.nis)} onClose={() => setDialog(null)}
           onOk={async (a) => {
-            const status = await catatManual({ tanggal, nis: dialog.s.nis, kelas: dialog.s.kelas, ...a }, pencatat, schedule, { batalAlfa: alfaSet.has(dialog.s.nis) });
+            const status = await catatManual({ tanggal, nis: dialog.s.nis, kelas: dialog.s.kelas, ...a, sekarangMs: serverNow(), hariIni: today, awalJendelaMasuk: batasJam(schedule, dialog.s.kelas, namaHari(tanggal)).Masuk[0] }, pencatat, schedule, { batalAlfa: alfaSet.has(dialog.s.nis) });
             notify(`${dialog.s.nama}: ${a.masuk ? `hadir manual (${status})` : "pulang manual"} tercatat`);
             setDialog(null);
           }} />
@@ -182,10 +185,15 @@ export function ManualDialog({ dialog, tanggal, today, now, schedule, alfa = fal
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const pratinjau = mode === "masuk" && jam ? statusDariJam(jamPenuh(jam), schedule, s.kelas, tanggal) : null;
+  // jam diketik: tidak boleh melewati waktu pencatatan; > 15 menit dari waktu dicatat = ditandai "jam dimundurkan" untuk ditinjau waka
+  const cekJam = mode === "masuk" && jam
+    ? periksaJamManual({ masuk: jamPenuh(jam), tanggal, hariIni: today, sekarangMs: now.getTime(), awalJendelaMasuk: batasJam(schedule, s.kelas, namaHari(tanggal)).Masuk[0] })
+    : null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!jam) { setErr("Isi jam."); return; }
+    if (cekJam && !cekJam.ok) { setErr(cekJam.pesan); return; }
     if (alasan === "Lainnya" && ket.trim().length < 3) { setErr("Alasan 'Lainnya' wajib dijelaskan di keterangan (minimal 3 karakter)."); return; }
     setBusy(true); setErr("");
     try {
@@ -207,6 +215,12 @@ export function ManualDialog({ dialog, tanggal, today, now, schedule, alfa = fal
         <Field label={mode === "masuk" ? "Jam masuk" : "Jam pulang"} hint={pratinjau ? `Status dihitung dari jadwal kelas: ${pratinjau}` : undefined}>
           <input className="text-input" type="time" value={jam} onChange={(e) => setJam(e.target.value)} aria-label={mode === "masuk" ? "Jam masuk" : "Jam pulang"} />
         </Field>
+        {cekJam && !cekJam.ok && <div className="login-error-box" role="alert" data-testid="galat-jam-manual"><Icon name="warning" size={17} /><div><span>{cekJam.pesan}</span></div></div>}
+        {cekJam?.ok && cekJam.mundur && (
+          <div className="notice warn" role="status" data-testid="peringatan-mundur"><Icon name="warning" size={17} />
+            <span>{cekJam.selisihMenit === Infinity ? "Tanggal lampau" : `Jam ini ${cekJam.selisihMenit} menit lebih awal dari waktu pencatatan sekarang`}: entri ditandai <b>jam dimundurkan</b> dan muncul di Dashboard Waka untuk ditinjau.</span>
+          </div>
+        )}
         {mode === "masuk" && (
           <Field label="Keterangan (opsional)" hint={alasan === "Lainnya" ? "Wajib untuk alasan 'Lainnya'." : undefined}>
             <textarea className="text-input area" rows={2} maxLength={200} value={ket} onChange={(e) => setKet(e.target.value)} />

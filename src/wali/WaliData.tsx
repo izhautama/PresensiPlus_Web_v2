@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { equalTo, onValue, orderByValue, query } from "firebase/database";
 import { useAuth } from "../auth/AuthContext";
 import { AdminDataCtx, type AdminDataValue, type TodayEntry } from "../admin/AdminData";
-import { gabungTap, type ManualTap } from "../lib/manual";
+import { gabungTap, hitungStatusJadwal, type ManualTap } from "../lib/manual";
 import { kelasBinaan, decodeKelas, type PetaKelasWali } from "../lib/wali";
 import { todayWIB } from "../lib/time";
 import type { DayRecord, ScheduleRow, StudentRow } from "../lib/types";
@@ -75,8 +75,9 @@ export function WaliDataProvider({ children }: { children: ReactNode }) {
       if (rec?.ket) e.ket = rec.ket;
       const m = manual[s.nis];
       if (m) {
-        const g = gabungTap({ masuk: e.masuk, pulang: e.pulang }, { ...m, oleh: "", ts: 0, hariKe: 0 } as ManualTap);
-        if (g.masuk && !e.masuk) e.masuk = { jam: g.masuk.jam, nis: s.nis, status: g.masuk.status, manual: g.masuk.manual };
+        const g = gabungTap({ masuk: e.masuk, pulang: e.pulang }, { ...m, oleh: "", ts: 0, hariKe: 0 } as ManualTap, hitungStatusJadwal(Object.values(scheduleLive.data ?? {}), s.kelas, today));
+        if (g.masuk && (!e.masuk || g.manual?.dipakai.includes("masuk"))) e.masuk = { jam: g.masuk.jam, nis: s.nis, status: g.masuk.status, manual: g.masuk.manual };
+        else if (g.masuk && e.masuk && g.masuk.status !== e.masuk.status) e.masuk = { ...e.masuk, status: g.masuk.status };
         if (g.pulang && !e.pulang) e.pulang = { jam: g.pulang.jam, nis: s.nis, status: "Pulang", manual: g.pulang.manual };
         e.manual = g.manual;
       }

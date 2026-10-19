@@ -717,8 +717,37 @@ const mutasi = [
   { nama: "alfa-jam: salinan A tanpa log aktivitas (lessonsByStudent)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(newData.child('k').val() === 'A' && ${actOk(4, ["alfa-jam"])} && `, "(newData.child('k').val() === 'A' && "); } },
   { nama: "alfa-jam: piket mengubah/menghapus salinan A milik waka (penanda lama tidak diperiksa)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(data.child('k').val() === 'A' && ${MARK_S_LAMA_T}.val() === 'piket' && `, "(data.child('k').val() === 'A' && "); } },
   { nama: "alfa-jam: piket mengubah/menghapus salinan A piket kemarin (hariKe tersimpan tidak diperiksa)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_LAMA_T}.child('hariKe')`)} && (`, " && ("); } },
+  // ---- v2.4: jam manual diketik piket (masukDetik / mundur) dan KUNCI TAP PERTAMA alat
+  { nama: "manual: jam masukDetik tidak diwajibkan (seluruh pemeriksaan jam manual dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; const a = n[".validate"].indexOf(" && (!newData.child('masuk').exists() ? (!newData.child('masukDetik')"); const b = n[".validate"].indexOf(" && (!(" + PIKET + ") ||", a); if (a < 0 || b < 0) throw new Error("pola tidak ditemukan"); n[".validate"] = n[".validate"].slice(0, a) + n[".validate"].slice(b); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan JAM pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(0, 2\) !== '\d\d' \|\| \(newData\.child\('masukDetik'\)\.val\(\) >= \d+ && newData\.child\('masukDetik'\)\.val\(\) < \d+\)\) && /g); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan MENIT pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(3, 5\) !== '\d\d' \|\| \(newData\.child\('masukDetik'\)\.val\(\) % 3600 >= \d+ && newData\.child\('masukDetik'\)\.val\(\) % 3600 < \d+\)\) && /g); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan DETIK pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(6, 8\) !== '\d\d' \|\| newData\.child\('masukDetik'\)\.val\(\) % 60 === \d+\) && /g); } },
+  { nama: "manual: jam masuk boleh melewati waktu dicatat (batas masa depan dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "newData.child('masukDetik').val() <= (((now + 25200000) % 86400000) / 1000) + 60 && ", ""); } },
+  { nama: "manual: mundur TIDAK wajib bila selisih > 15 menit", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "> 960 ? newData.child('mundur').val() === true :", "> 960 ? true :"); } },
+  { nama: "manual: mundur boleh dipasang walau selisih < 14 menit", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "< 840 ? !newData.child('mundur').exists() : true", "< 840 ? true : true"); } },
+  { nama: "manual: mundur TIDAK wajib pada tanggal lampau", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " : newData.child('mundur').val() === true)))) && (!(" + PIKET + ")", " : true)))) && (!(" + PIKET + ")"); } },
+  { nama: "manual: waka ikut dibatasi aturan jam (pengecualian koreksi waka dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "&& (" + WAKA + " || (newData.child('hariKe').isNumber()", "&& (false || (newData.child('hariKe').isNumber()"); } },
+  { nama: "manual: mundur boleh bernilai false", ubah: (r) => { r.manualTap.$tgl.$nis.mundur[".validate"] = "newData.isBoolean()"; } },
+  { nama: "manual: masukDetik/mundur boleh ada tanpa masuk (entri hanya-pulang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "(!newData.child('masukDetik').exists() && !newData.child('mundur').exists())", "true"); } },
+  { nama: "manual: masukDetik wajib berupa angka (isNumber dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "newData.child('masukDetik').isNumber() && ", ""); } },
+  { nama: "manual: masukDetik tanpa batas rentang 0..86399 (hanya lapisan ini; pencocokan jam/menit/detik menahan)", ekuivalen: true, ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() >= 0 && newData.child('masukDetik').val() < 86400", ""); } },
+  { nama: "manual: masukDetik boleh pecahan (hanya lapisan bilangan bulat; pencocokan detik menahan)", ekuivalen: true, ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() % 1 === 0", ""); } },
+  { nama: "alat-kunci: attendance/masuk dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.masuk; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
+  { nama: "alat-kunci: attendance/pulang dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.pulang; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
+  { nama: "alat-kunci: attendance/status dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.status; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
+  { nama: "alat-kunci: log _M/_P dapat ditimpa tap kedua (seluruh pemeriksaan dibuang)", ubah: (r) => { const n = r.log.$date.$key; const a = n[".write"].indexOf(" && (!data.exists() || (data.child('jam')"); if (a < 0) throw new Error("pola tidak ditemukan"); n[".write"] = n[".write"].slice(0, a) + ")))"; } },
+  { nama: "alat-kunci: log retry tidak mencocokkan JAM", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('jam').val() === newData.child('jam').val() && ", ""); } },
+  { nama: "alat-kunci: log retry tidak mencocokkan NIS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('nis').val() === newData.child('nis').val() && ", ""); } },
+  { nama: "alat-kunci: log retry tidak mencocokkan STATUS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], " && data.child('status').val() === newData.child('status').val()", ""); } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
+
+/** Hapus semua kemunculan pola dari teks; melempar bila tidak ada yang cocok. */
+function hapusSemua(teks, re) {
+  const hasil = teks.replace(re, "");
+  if (hasil === teks) throw new Error(`mutasi tidak menemukan pola: ${re}`);
+  return hasil;
+}
 
 function ganti(teks, dari, ke) {
   if (!teks.includes(dari)) throw new Error(`mutasi tidak menemukan teks target: ${dari.slice(0, 60)}`);
@@ -731,9 +760,9 @@ const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
 // Kelompok: manual | piket | saran | kalender | wali | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^alfa-jam/.test(nama) ? "perjam" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+const GRUP = (nama) => /^alfa-jam/.test(nama) ? "perjam" : /^alat-kunci/.test(nama) ? "alat" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "alat", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 // ---- Pengelola emulator: mutasi memakai emulator SENDIRI (bukan firebase emulators:exec) supaya dapat direstart ----
 // Penyebab macet sebelumnya: satu emulator Java melayani ratusan run suite; memorinya menumpuk (+-3 GB) hingga tiap suite timeout.

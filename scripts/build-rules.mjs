@@ -268,6 +268,30 @@ const SEL_SID = "(newData.val() === 'S' || newData.val() === 'I' || newData.val(
 const SEL_SID_K = "(newData.child('k').val() === 'S' || newData.child('k').val() === 'I' || newData.child('k').val() === 'D')";
 /** x (node hariKe) adalah bilangan bulat tepat hari server saat ini: (hariIni-1, hariIni]. */
 const HARI_INI = (x) => `${x}.isNumber() && ${x}.val() % 1 === 0 && ${x}.val() > ${hariIni} - 1 && ${x}.val() <= ${hariIni}`;
+/**
+ * Presensi manual v2.4: `masuk` ("HH:MM:SS") dan `masukDetik` (detik sejak tengah malam) HARUS sama. Rules tidak dapat mengubah string menjadi angka,
+ * jadi setiap bagian jam/menit/detik dicocokkan dengan daftar pasangan yang dibangkitkan di sini (24 + 60 + 60 klausa).
+ */
+const dd = (n) => String(n).padStart(2, "0");
+const MASUK_STR = (a, b) => `newData.child('masuk').val().substring(${a}, ${b})`;
+const MASUK_DETIK = "newData.child('masukDetik').val()";
+const MASUK_KONSISTEN = [
+  ...Array.from({ length: 24 }, (_, h) => `(${MASUK_STR(0, 2)} !== '${dd(h)}' || (${MASUK_DETIK} >= ${h * 3600} && ${MASUK_DETIK} < ${h * 3600 + 3600}))`),
+  ...Array.from({ length: 60 }, (_, m) => `(${MASUK_STR(3, 5)} !== '${dd(m)}' || (${MASUK_DETIK} % 3600 >= ${m * 60} && ${MASUK_DETIK} % 3600 < ${m * 60 + 60}))`),
+  ...Array.from({ length: 60 }, (_, s) => `(${MASUK_STR(6, 8)} !== '${dd(s)}' || ${MASUK_DETIK} % 60 === ${s})`),
+].join(" && ");
+/** Detik sejak tengah malam WIB pada saat server menerima tulisan. */
+const SEKARANG_DETIK = "(((now + 25200000) % 86400000) / 1000)";
+/** Toleransi (detik) antara perkiraan jam server di klien dan jam server sebenarnya. */
+const TOLERANSI_DETIK = 60;
+const BATAS_MUNDUR = 900;
+/**
+ * Piket: bila tanggal data = hari ini, jam masuk tidak boleh melewati waktu dicatat (`now`) dan `mundur` WAJIB true bila selisih > 15 menit (+toleransi),
+ * dilarang bila < 15 menit (-toleransi); tanggal lampau: `mundur` WAJIB true. Waka bebas (koreksi tanpa batas), `mundur` hanya boleh bernilai true.
+ */
+const MASUK_MANUAL_SAH = `(!newData.child('masuk').exists() ? (!newData.child('masukDetik').exists() && !newData.child('mundur').exists()) : (newData.child('masukDetik').isNumber() && ${MASUK_DETIK} % 1 === 0 && ${MASUK_DETIK} >= 0 && ${MASUK_DETIK} < 86400 && ${MASUK_KONSISTEN} && (${isWaka} || (${HARI_INI("newData.child('hariKe')")} ? (${MASUK_DETIK} <= ${SEKARANG_DETIK} + ${TOLERANSI_DETIK} && (${SEKARANG_DETIK} - ${MASUK_DETIK} > ${BATAS_MUNDUR + TOLERANSI_DETIK} ? newData.child('mundur').val() === true : (${SEKARANG_DETIK} - ${MASUK_DETIK} < ${BATAS_MUNDUR - TOLERANSI_DETIK} ? !newData.child('mundur').exists() : true))) : newData.child('mundur').val() === true))))`;
+
+const BELUM_ADA_ATAU_SAMA = "(!data.exists() || data.val() === newData.val())";
 const KELAS_BARU = `${nav(6)}.child('lessons').child($tgl).child($kelas)`; // dari sel/penanda (6 tingkat ke root)
 const KELAS_LAMA = "root.child('lessons').child($tgl).child($kelas)";
 const MARK_BARU = `${KELAS_BARU}.child('absenOleh').child($nis).child($jam)`;
@@ -424,16 +448,18 @@ export function buildRules() {
           // Tidak ada penghapusan oleh alat: node tanggal tidak dapat ditimpa/dihapus karena !data.exists().
           ".write": `auth != null && (${isAdmin} || (${isDevice} && newData.exists() && !data.exists()))`,
           ".validate": `$date.matches(${tglRe})`,
+          // KUNCI TAP PERTAMA (v2.4): alat hanya boleh menulis bila belum ada ATAU nilainya identik (retry antrian tetap lolos);
+          // tap kedua di hari yang sama tidak dapat menimpa tap pertama. Penghapusan oleh alat tetap tidak ada (newData.exists()).
           masuk: {
-            ".write": `auth != null && ${isDevice} && newData.exists()`,
+            ".write": `auth != null && ${isDevice} && newData.exists() && ${BELUM_ADA_ATAU_SAMA}`,
             ".validate": "newData.isString() && newData.val().matches(/^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)",
           },
           pulang: {
-            ".write": `auth != null && ${isDevice} && newData.exists()`,
+            ".write": `auth != null && ${isDevice} && newData.exists() && ${BELUM_ADA_ATAU_SAMA}`,
             ".validate": "newData.isString() && newData.val().matches(/^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/)",
           },
           status: {
-            ".write": `auth != null && ${isDevice} && newData.exists()`,
+            ".write": `auth != null && ${isDevice} && newData.exists() && ${BELUM_ADA_ATAU_SAMA}`,
             ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'",
           },
           // Keterangan harian Izin/Sakit/Dispensasi: waka & kepala (admin lewat $date). Piket hanya bila belum ada validasi Alfa
@@ -457,7 +483,8 @@ export function buildRules() {
         ".read": anyOf(isPiket), // piket membaca satu tanggal (status tap), bukan seluruh log
         ".indexOn": ["jam"],
         $key: {
-          ".write": `auth != null && (${isAdmin} || (${isDevice} && newData.exists()))`,
+          // KUNCI TAP PERTAMA (v2.4): entri log (kartu+M/P) hanya ditulis alat bila belum ada ATAU inti entrinya identik (retry antrian)
+          ".write": `auth != null && (${isAdmin} || (${isDevice} && newData.exists() && (!data.exists() || (data.child('jam').val() === newData.child('jam').val() && data.child('nis').val() === newData.child('nis').val() && data.child('status').val() === newData.child('status').val()))))`,
           ".validate": "$key.matches(/^[0-9A-F]{8,20}_(M|P)$/) && newData.hasChildren(['jam', 'nis', 'status'])",
         },
       },
@@ -921,7 +948,7 @@ export function buildRules() {
         ".validate": `$tgl.matches(${tglRe})`,
         $nis: {
           ".write": `auth != null && (${isWaka} || (${isPiket} && !root.child('validasi').child($tgl).child($nis).exists() && (!data.exists() || root.child('roles').child(data.child('oleh').val()).val() === 'piket') && (newData.exists() ? ${actOk(3, ["presensi-manual"])} : ${actOk(3, ["hapus-manual"])}))) && (newData.exists() ? (${MS_COPY(3)}.child('status').val() === newData.child('status').val() && ${MS_COPY(3)}.child('masuk').val() === newData.child('masuk').val() && ${MS_COPY(3)}.child('pulang').val() === newData.child('pulang').val() && ${MS_COPY(3)}.child('alasan').val() === newData.child('alasan').val()) : !${MS_COPY(3)}.exists())`,
-          ".validate": `$nis.matches(${nisRe}) && newData.hasChildren(['status', 'alasan', 'oleh', 'ts', 'hariKe']) && (newData.child('masuk').exists() || newData.child('pulang').exists()) && (!(${isPiket}) || (newData.child('petugas').exists() && ${hariKeSah("newData.child('hariKe')", 0)})) && newData.child('hariKe').val() <= ${hariIni} && (newData.child('hariKe').val() + 4) % 7 !== 0`,
+          ".validate": `$nis.matches(${nisRe}) && newData.hasChildren(['status', 'alasan', 'oleh', 'ts', 'hariKe']) && (newData.child('masuk').exists() || newData.child('pulang').exists()) && ${MASUK_MANUAL_SAH} && (!(${isPiket}) || (newData.child('petugas').exists() && ${hariKeSah("newData.child('hariKe')", 0)})) && newData.child('hariKe').val() <= ${hariIni} && (newData.child('hariKe').val() + 4) % 7 !== 0`,
           masuk: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
           pulang: { ".validate": `newData.isString() && newData.val().matches(${waktuRe})` },
           status: { ".validate": "newData.val() === 'Hadir' || newData.val() === 'Terlambat'" },
@@ -931,6 +958,8 @@ export function buildRules() {
           petugas: { ".validate": str(60) },
           ts: { ".validate": "newData.val() === now" },
           hariKe: { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
+          masukDetik: { ".validate": "newData.isNumber()" },
+          mundur: { ".validate": "newData.val() === true" },
           $other: { ".validate": false },
         },
       },

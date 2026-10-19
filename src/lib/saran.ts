@@ -67,6 +67,8 @@ export function hitungSaran(a: {
   putusan: Record<string, Record<string, unknown> | null | undefined>; // suggest/{tgl}
   records: Record<string, Record<string, unknown> | undefined>; // discipline/records
   batasPulang: (kelas: string, hari: string) => string; // "HH:MM" akhir jendela pulang
+  /** "HH:MM" akhir jendela Masuk (Hadir); bila diberikan, status gabungan alat+manual dihitung ulang dari jam masuk TERPILIH (bukti paling awal). */
+  batasMasuk?: (kelas: string, hari: string) => string;
 }): Saran[] {
   const out: Saran[] = [];
   const aturan = (tipe: TipeSaran): string | null => {
@@ -86,10 +88,11 @@ export function hitungSaran(a: {
     }
 
     for (const s of a.siswa) {
-      // presensi manual: alat MENANG; manual hanya mengisi tap masuk/pulang yang kosong
+      // presensi manual: masuk = bukti PALING AWAL (alat/manual); pulang: alat menang, manual mengisi yang kosong
       const gb = gabungTap(
         { masuk: masuk[s.nis] ? { jam: masuk[s.nis].jam, status: masuk[s.nis].status } : undefined, pulang: pulang[s.nis] ? { jam: "" } : undefined },
         d.manual?.[s.nis],
+        a.batasMasuk ? (jam) => (jam.slice(0, 5) <= a.batasMasuk!(s.kelas, namaHari(tgl)) ? "Hadir" : "Terlambat") : undefined,
       );
       const m = gb.masuk ? { jam: gb.masuk.jam, status: gb.masuk.status } : undefined;
       const adaPulang = Boolean(gb.pulang);

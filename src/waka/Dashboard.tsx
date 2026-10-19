@@ -22,6 +22,9 @@ export default function Dashboard() {
   const valLive = useLive<Record<string, unknown>>(`validasi/${today}`);
   // A per jam yang diisi guru piket HARI INI (penanda lessons/{tgl}/{kelas}/absenOleh): untuk ditinjau waka
   const lessonsHariIni = useLive<Record<string, LessonsKelas>>(`lessons/${today}`);
+  // presensi manual dengan jam DIMUNDURKAN (> 15 menit dari waktu dicatat) hari ini: untuk ditinjau waka
+  const manualHariIni = useLive<Record<string, { mundur?: boolean }>>(`manualTap/${today}`);
+  const jumlahMundur = Object.values(manualHariIni.data ?? {}).filter((x) => x.mundur).length;
   const aPiket = useMemo(() => {
     const perKelas: Record<string, Set<string>> = {};
     for (const [kelasKey, k] of Object.entries(lessonsHariIni.data ?? {})) {
@@ -69,6 +72,7 @@ export default function Dashboard() {
         <article className="stat-card"><div className="stat-icon coral"><Icon name="clock" /></div><div><p>Belum tap hari ini</p><strong>{belumTap}</strong><span className="trend neutral">{libur ? "Hari Minggu — libur" : `dari ${students.length} siswa`}</span></div></article>
         <article className="stat-card"><div className="stat-icon amber"><Icon name="warning" /></div><div><p>Perlu tindak lanjut</p><strong>{perlu.length}</strong><span className="trend warn">mencapai ambang / sangat berat</span></div></article>
         <article className="stat-card"><div className="stat-icon green"><Icon name="check" /></div><div><p>Belum divalidasi</p><strong>{belumValidasi}</strong><span className="trend neutral"><Link to="/waka/validasi">Buka validasi harian</Link></span></div></article>
+        <article className="stat-card" data-testid="kartu-manual-mundur"><div className="stat-icon amber"><Icon name="clock" /></div><div><p>Presensi manual dengan jam dimundurkan</p><strong data-testid="jumlah-manual-mundur">{manualHariIni.loading ? "…" : jumlahMundur}</strong><span className="trend neutral">{jumlahMundur > 0 ? <Link to={`/waka/presensi-manual?tanggal=${today}&mundur=1`}>({jumlahMundur} siswa) Tinjau</Link> : "tidak ada"}</span></div></article>
         <article className="stat-card" data-testid="kartu-a-piket"><div className="stat-icon coral"><Icon name="alert" /></div><div><p>A dari piket hari ini</p><strong data-testid="jumlah-a-piket">{lessonsHariIni.loading ? "…" : aPiket.jumlah}</strong><span className="trend neutral">{aPiket.jumlah > 0 ? <Link to={`/waka/per-jam?tanggal=${today}&kelas=${encodeURIComponent(aPiket.kelasPertama)}&a=piket`}>({aPiket.jumlah} siswa) Tinjau di grid</Link> : "tidak ada"}</span></div></article>
         <article className="stat-card"><div className="stat-icon teal"><Icon name="bell" /></div><div><p>Saran perlu ditinjau</p><strong data-testid="jumlah-saran">{saranHari.loading ? "…" : saranHari.saran.length}</strong><span className="trend neutral"><Link to="/waka/saran">Buka daftar saran</Link></span></div></article>
       </section>

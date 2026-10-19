@@ -12,6 +12,7 @@
     "test:mutation:piket": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=piket",
     "test:mutation:saran": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=saran",
     "test:mutation:kalender": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=kalender",
+    "test:mutation:alat": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=alat",
     "test:mutation:perjam": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=perjam",
     "test:mutation:pembinaan": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=pembinaan",
     "test:mutation:wali": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs --grup=wali",

@@ -33,7 +33,7 @@ Untuk: Admin/TU, piket, dan waka
 1. Piket: menu Presensi manual, kotak Mode alat bermasalah.
 2. Pilih kelas, atur jam masuk (bawaan awal jam masuk kelas), centang siswa yang TIDAK hadir.
 3. Tekan Tandai hadir. Alasan otomatis "Alat bermasalah"; tidak menimbulkan saran pelanggaran Lupa KTM.
-4. Setelah alat pulih: bila siswa ternyata sempat tap, data alat yang dipakai dan entri manual ditandai diabaikan; tidak ada hitungan ganda.
+4. Setelah alat pulih: bila siswa ternyata sempat tap, bukti masuk yang paling awal (manual atau alat) yang dipakai; tidak ada hitungan ganda.
 5. Catat kejadian (jam mati, penyebab) untuk laporan ke admin.
 
 ---

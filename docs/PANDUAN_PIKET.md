@@ -22,10 +22,11 @@ Untuk: Guru piket (akun bersama meja piket)
 ## Siswa hadir tetapi tidak tercatat alat
 
 1. Satu siswa (lupa KTM, KTM hilang, kartu rusak): tombol Hadir manual pada namanya, atau menu Presensi manual.
-2. Pilih alasan, isi jam masuk. Hadir atau Terlambat dihitung otomatis dari jadwal kelas.
-3. Alat mati atau WiFi putus: menu Presensi manual, kotak Mode alat bermasalah, pilih kelas, centang yang TIDAK hadir, tekan Tandai hadir.
-4. Salah catat: tombol Hapus pada daftar Presensi manual tercatat. Catat pulang manual tersedia untuk siswa yang sudah masuk.
-5. Hari tanpa satu pun tap alat bukan hari efektif. Presensi manual dihitung sebagai bukti hadir, jadi hari itu menjadi hari efektif setelah ada yang dicatat.
+2. Pilih alasan, isi jam masuk (jam sebenarnya siswa datang; tidak boleh melewati waktu sekarang). Hadir atau Terlambat dihitung otomatis dari jadwal kelas.
+3. Jam yang dimundurkan lebih dari 15 menit dari waktu dicatat ditandai "jam dimundurkan" dan ditinjau waka. Bila siswa tap alat setelahnya, jam masuk resmi tetap yang paling awal. LCD alat dapat menampilkan Terlambat, status resmi mengikuti web.
+4. Alat mati atau WiFi putus: menu Presensi manual, kotak Mode alat bermasalah, pilih kelas, centang yang TIDAK hadir, tekan Tandai hadir.
+5. Salah catat: tombol Hapus pada daftar Presensi manual tercatat. Catat pulang manual tersedia untuk siswa yang sudah masuk.
+6. Hari tanpa satu pun tap alat bukan hari efektif. Presensi manual dihitung sebagai bukti hadir, jadi hari itu menjadi hari efektif setelah ada yang dicatat.
 
 ## Izin per jam dan pelanggaran ringan
 

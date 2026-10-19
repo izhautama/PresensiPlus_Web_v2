@@ -7,7 +7,8 @@ import { useAdminData } from "../admin/AdminData";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { initials, toneOf } from "../lib/attendance";
 import { opsiKet, rentangPiket, tanggalDiJendela, type KetPiket } from "../lib/piket";
-import { formatTanggal, weekday } from "../lib/time";
+import { formatTanggal, namaHari, weekday } from "../lib/time";
+import { batasJam } from "../lib/attendance";
 import type { StudentRow } from "../lib/types";
 import { r } from "../services/db";
 import { catatManual } from "../services/manual";
@@ -21,7 +22,7 @@ type Aksi = { siswa?: StudentRow; ket: KetPiket; bebas: boolean };
 
 /** Beranda piket: siswa belum tap hari ini + aksi cepat Izin / Sakit / Dispensasi seharian. */
 export default function Beranda() {
-  const { students, byNis, kelasList, today, now, schedule, ready } = useAdminData();
+  const { students, byNis, kelasList, today, now, schedule, ready, serverNow } = useAdminData();
   const mundur = usePiketMundur();
   const wali = usePanelMode() === "wali"; // wali kelas: hanya Izin/Sakit, tanpa Dispensasi/presensi manual, tanpa hitung kalender
   useKalenderOtomatis(!wali); // piket juga menghitung hari efektif (log aktivitas 'hitung-kalender' wajib untuk piket)
@@ -102,7 +103,7 @@ export default function Beranda() {
       {manual && (
         <ManualDialog dialog={{ s: manual, mode: "masuk" }} tanggal={today} today={today} now={now} schedule={schedule} onClose={() => setManual(null)}
           onOk={async (a) => {
-            const status = await catatManual({ tanggal: today, nis: manual.nis, kelas: manual.kelas, ...a }, ctx, schedule);
+            const status = await catatManual({ tanggal: today, nis: manual.nis, kelas: manual.kelas, ...a, sekarangMs: serverNow(), hariIni: today, awalJendelaMasuk: batasJam(schedule, manual.kelas, namaHari(today)).Masuk[0] }, ctx, schedule);
             notify(`${manual.nama}: hadir manual (${status}) tercatat`);
             setManual(null);
           }} />

@@ -128,8 +128,18 @@ assert.deepEqual(hitung({ tanggal: ["2026-10-15"], data: { "2026-10-15": { log: 
   assert.equal(hitung({ rules: R2, autoMap: { ...AUTO, lupaKtm: "rHilang" }, data: { [T]: { manual: { 1: man() } } } })[0].ruleId, "rHilang");
   // alasan lain (Kartu rusak / Alat bermasalah / Lainnya): tidak ada saran KTM, juga tidak ada saran pulang
   for (const alasan of ["Kartu rusak", "Alat bermasalah", "Lainnya"]) assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan }) } } } })), [], alasan);
-  // ALAT MENANG: ada tap alat -> manual diabaikan -> tidak ada saran KTM
+  // tap alat LEBIH AWAL (07:00 < manual 07:10) -> manual diabaikan -> tidak ada saran KTM
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:00:00"), ...P("A1", "1", "15:00:00") }, manual: { 1: man() } } } })), [], "alat ada -> manual diabaikan");
+  // BUKTI PALING AWAL (v2.4): manual 07:05 (Tepat) lalu tap alat 07:40 (Terlambat) -> TIDAK ada saran terlambat; lupaKtm tetap
+  {
+    const dataKasus = { [T]: { log: { ...M("A1", "1", "07:40:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ masuk: "07:05:00", status: "Hadir" }) } } };
+    assert.deepEqual(ringkas(hitung({ rules: R2, data: dataKasus, batasMasuk: () => "07:15" })), [`${T}:lupaKtm:1`], "tidak ada saran terlambat; lupaKtm tetap");
+    assert.deepEqual(ringkas(hitung({ rules: R2, data: dataKasus })), [`${T}:lupaKtm:1`], "tanpa batasMasuk: memakai status entri manual yang terpilih");
+    // tap alat 07:02 + manual 07:30: alat lebih awal -> Hadir, tidak ada saran apa pun (manual diabaikan)
+    assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:02:00"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ masuk: "07:30:00", status: "Terlambat" }) } } }, batasMasuk: () => "07:15" })), []);
+    // jadwal sebagai sumber tunggal: tap alat mencatat "Hadir" 07:20 padahal batas 07:15 -> saran terlambat
+    assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:20:00", "Hadir"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ masuk: "07:25:00", status: "Terlambat" }) } } }, batasMasuk: () => "07:15" })), [`${T}:terlambat:1`]);
+  }
   // manual Terlambat tetap memicu saran terlambat (jam dari jadwal)
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ status: "Terlambat", masuk: "08:00:00" }) } } } })), [`${T}:lupaKtm:1`, `${T}:terlambat:1`]);
   // Terlambat manual: saran "terlambat" untuk SEMUA alasan kecuali "Alat bermasalah" (bukan salah siswa)
@@ -137,8 +147,8 @@ assert.deepEqual(hitung({ tanggal: ["2026-10-15"], data: { "2026-10-15": { log: 
     assert.ok(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan, status: "Terlambat", masuk: "08:00:00" }) } } } })).includes(`${T}:terlambat:1`), `terlambat + ${alasan}`);
   }
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan: "Alat bermasalah", status: "Terlambat", masuk: "08:00:00" }) } } } })), [], "Alat bermasalah: tidak ada saran terlambat");
-  // tap alat Terlambat tetap disarankan walau ada manual 'Alat bermasalah' yang diabaikan
-  assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ alasan: "Alat bermasalah" }) } } } })), [`${T}:terlambat:1`]);
+  // tap alat Terlambat (07:30) tetap disarankan walau ada manual 'Alat bermasalah' yang LEBIH LAMBAT (08:00) dan diabaikan
+  assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, manual: { 1: man({ alasan: "Alat bermasalah", masuk: "08:00:00", status: "Terlambat" }) } } } })), [`${T}:terlambat:1`]);
   // hanya-pulang manual tidak memicu saran KTM
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { log: M("A1", "1", "07:00:00"), manual: { 1: man({ masuk: undefined, pulang: "15:01:00" }) } } } })), [], "masuk dari alat, pulang manual");
   // aturan nonaktif / tidak ada di master -> tidak ada saran

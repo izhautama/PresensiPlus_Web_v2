@@ -1,10 +1,10 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { DeviceStatus, KetHarian, LogEntry, ScheduleRow, Student, StudentRow } from "../lib/types";
-import { gabungTap, type ManualTap, type PemakaianManual } from "../lib/manual";
+import { gabungTap, hitungStatusJadwal, type ManualTap, type PemakaianManual } from "../lib/manual";
 import { todayWIB } from "../lib/time";
 import { ONLINE_MS, useLive, useNow, useServerClock } from "../services/db";
 
-/** `manual` = entri presensi manual hari ini + bagian mana yang dipakai (alat selalu menang; `diabaikan` bila ada tap alat). */
+/** `manual` = entri presensi manual hari ini + bagian mana yang dipakai (bukti masuk PALING AWAL menang; `diabaikan` bila tap alat lebih awal). */
 export type TodayEntry = { masuk?: LogEntry; pulang?: LogEntry; ket?: KetHarian; manual?: PemakaianManual };
 
 export type AdminDataValue = {
@@ -63,12 +63,15 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
       if (key.endsWith("_M")) slot.masuk = e; else slot.pulang = e;
     }
     for (const [nis, ket] of Object.entries(izinToday)) (byNis[nis] ??= {}).ket = ket;
-    // presensi manual: ALAT MENANG; manual hanya mengisi masuk/pulang yang kosong (lib/manual.ts)
+    // presensi manual: bukti masuk PALING AWAL menang (alat/manual); pulang: alat menang, manual mengisi yang kosong (lib/manual.ts)
     const manualToday = manualLive.data ?? {};
+    const jadwalRows = Object.values(scheduleLive.data ?? {});
+    const kelasNis = Object.fromEntries(Object.values(studentMap).map((s) => [s.nis, s.kelas]));
     for (const [nis, tap] of Object.entries(manualToday)) {
       const slot = (byNis[nis] ??= {});
-      const g = gabungTap({ masuk: slot.masuk, pulang: slot.pulang }, tap);
-      if (g.masuk && !slot.masuk) slot.masuk = { jam: g.masuk.jam, nis, status: g.masuk.status, manual: g.masuk.manual };
+      const g = gabungTap({ masuk: slot.masuk, pulang: slot.pulang }, tap, kelasNis[nis] ? hitungStatusJadwal(jadwalRows, kelasNis[nis], today) : undefined);
+      if (g.masuk && (!slot.masuk || g.manual?.dipakai.includes("masuk"))) slot.masuk = { jam: g.masuk.jam, nis, status: g.masuk.status, manual: g.masuk.manual };
+      else if (g.masuk && slot.masuk && g.masuk.status !== slot.masuk.status) slot.masuk = { ...slot.masuk, status: g.masuk.status };
       if (g.pulang && !slot.pulang) slot.pulang = { jam: g.pulang.jam, nis, status: "Pulang", manual: g.pulang.manual };
       slot.manual = g.manual;
     }

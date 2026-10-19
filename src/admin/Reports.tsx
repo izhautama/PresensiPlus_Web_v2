@@ -4,8 +4,8 @@ import Icon from "../components/Icon";
 import { Empty, Spinner, StatusBadge } from "../components/ui";
 import { downloadCSV, maskUid, persenWarna } from "../lib/attendance";
 import { rekapSiswa } from "../lib/hariEfektif";
-import { formatTanggal, lastDayOfMonth, monthKey, monthLabel } from "../lib/time";
-import { gabungTap, type ManualTap } from "../lib/manual";
+import { formatTanggal, jamDariMs, lastDayOfMonth, monthKey, monthLabel } from "../lib/time";
+import { gabungTap, hitungStatusJadwal, infoGabung, type ManualTap } from "../lib/manual";
 import { useKalenderRentang } from "../kesiswaan/useKalender";
 import type { DayRecord, LogEntry } from "../lib/types";
 import { r, useLive } from "../services/db";
@@ -98,7 +98,7 @@ function Bulanan() {
 }
 
 function Harian() {
-  const { today, studentMap } = useAdminData();
+  const { today, studentMap, schedule } = useAdminData();
   const kepala = usePanelMode() !== "admin";
   const tampilUid = (uid: string) => (kepala ? maskUid(uid) : uid);
   const [tanggal, setTanggal] = useState(today);
@@ -107,28 +107,30 @@ function Harian() {
   const manual = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
   const [q, setQ] = useState("");
 
-  type Baris = { key: string; uid: string; jam: string; nis: string; nama?: string; kelas?: string; status: string; infoManual?: { alasan: string; petugas?: string; diabaikan: boolean } };
+  type Baris = { key: string; uid: string; jam: string; nis: string; nama?: string; kelas?: string; status: string; catatan?: string; infoManual?: { alasan: string; petugas?: string; diabaikan: boolean; dicatat?: string; mundur?: boolean; info?: string } };
   const rows = useMemo<Baris[]>(() => {
     const qq = q.trim().toLowerCase();
     const alat: Baris[] = Object.entries(live.data ?? {}).map(([key, e]) => ({ key, uid: key.split("_")[0], ...e }));
-    // entri manual digabung dengan tap alat lewat gabungTap yang sama (alat menang); yang diabaikan tetap tampil bertanda
+    // entri manual digabung dengan tap alat lewat gabungTap yang sama (bukti masuk PALING AWAL menang); yang tidak dipakai tetap tampil bertanda
     const perNis: Record<string, { masuk?: LogEntry; pulang?: LogEntry }> = {};
     for (const x of alat) { const slot = (perNis[x.nis] ??= {}); if (x.key.endsWith("_M")) slot.masuk = x; else slot.pulang = x; }
     const tambahan: Baris[] = [];
     for (const [nis, tap] of Object.entries(manual.data ?? {})) {
-      const g = gabungTap({ masuk: perNis[nis]?.masuk, pulang: perNis[nis]?.pulang }, tap);
-      const info = { alasan: tap.alasan, petugas: tap.petugas, diabaikan: Boolean(g.manual?.diabaikan) };
       const s = studentMap[Object.keys(studentMap).find((u) => studentMap[u].nis === nis) ?? ""];
+      const g = gabungTap({ masuk: perNis[nis]?.masuk, pulang: perNis[nis]?.pulang }, tap, s?.kelas ? hitungStatusJadwal(schedule, s.kelas, tanggal) : undefined);
+      const info = { alasan: tap.alasan, petugas: tap.petugas, diabaikan: Boolean(g.manual?.diabaikan), dicatat: tap.ts ? jamDariMs(tap.ts).slice(0, 5) : undefined, mundur: Boolean(tap.mundur), info: infoGabung(g.manual) };
+      // tap alat yang datang SETELAH presensi manual dipakai: beri catatan pada barisnya (status resmi mengikuti jam manual)
+      if (g.manual?.alatSetelah && perNis[nis]?.masuk) { const r = alat.find((x) => x.nis === nis && x.key.endsWith("_M")); if (r) r.catatan = `Setelah presensi manual ${tap.masuk?.slice(0, 5)}; status resmi: ${g.masuk?.status}`; }
       const dasar = { uid: "—", nis, nama: s?.nama, kelas: s?.kelas, infoManual: info };
-      if (tap.masuk && (g.manual?.dipakai.includes("masuk") || perNis[nis]?.masuk)) tambahan.push({ ...dasar, key: `${nis}_manual_M`, jam: tap.masuk, status: tap.status, infoManual: { ...info, diabaikan: !g.manual?.dipakai.includes("masuk") } });
+      if (tap.masuk && (g.manual?.dipakai.includes("masuk") || perNis[nis]?.masuk)) tambahan.push({ ...dasar, key: `${nis}_manual_M`, jam: tap.masuk, status: g.manual?.dipakai.includes("masuk") ? (g.masuk?.status ?? tap.status) : tap.status, infoManual: { ...info, diabaikan: !g.manual?.dipakai.includes("masuk") } });
       if (tap.pulang) tambahan.push({ ...dasar, key: `${nis}_manual_P`, jam: tap.pulang, status: "Pulang", infoManual: { ...info, diabaikan: !g.manual?.dipakai.includes("pulang") } });
     }
     return [...alat, ...tambahan]
       .filter((x) => !qq || `${x.nama} ${x.nis}`.toLowerCase().includes(qq))
       .sort((a, b) => b.jam.localeCompare(a.jam));
-  }, [live.data, manual.data, studentMap, q]);
+  }, [live.data, manual.data, studentMap, q, schedule, tanggal]);
 
-  const sumber = (x: Baris) => (x.infoManual ? `Manual: ${x.infoManual.alasan}${x.infoManual.diabaikan ? " (diabaikan, ada tap alat)" : ""}` : "Alat");
+  const sumber = (x: Baris) => (x.infoManual ? `Manual: ${x.infoManual.alasan}${x.infoManual.diabaikan ? " (tidak dipakai, tap alat lebih awal)" : ""}${x.infoManual.dicatat ? ` · diketik ${x.jam.slice(0, 5)}, dicatat ${x.infoManual.dicatat}` : ""}${x.infoManual.mundur ? " · JAM DIMUNDURKAN" : ""}` : x.catatan ? `Alat (${x.catatan})` : "Alat");
   const csv = () => downloadCSV(`log_tap_${tanggal}.csv`, ["Tanggal", "Jam", "NIS", "Nama", "Kelas", "Status", "Sumber", "Petugas", "UID"],
     [...rows].reverse().map((x) => [tanggal, x.jam, x.nis, x.nama, x.kelas, x.status, sumber(x), x.infoManual?.petugas ?? "", tampilUid(x.uid)]));
   const nIzin = Object.keys(izin.data ?? {}).length;
@@ -149,7 +151,7 @@ function Harian() {
             <span className="mono">{x.jam}</span>
             <span className="student-cell"><span><b>{x.nama ?? studentMap[x.uid]?.nama ?? "—"}</b><small>NIS {x.nis}</small></span></span>
             <span>{x.kelas}</span>
-            <span><StatusBadge status={x.status} />{x.infoManual && <small className="block"><span className="badge badge-ubah">Manual</span> {x.infoManual.alasan}{x.infoManual.petugas ? ` · ${x.infoManual.petugas}` : ""}{x.infoManual.diabaikan ? " · diabaikan (ada tap alat)" : ""}</small>}</span>
+            <span><StatusBadge status={x.status} />{x.infoManual && <small className="block"><span className="badge badge-ubah">Manual</span> {x.infoManual.alasan}{x.infoManual.petugas ? ` · ${x.infoManual.petugas}` : ""}{x.infoManual.dicatat ? ` · diketik ${x.jam.slice(0, 5)}, dicatat ${x.infoManual.dicatat}` : ""}{x.infoManual.mundur ? " · JAM DIMUNDURKAN" : ""}{x.infoManual.diabaikan ? " · tidak dipakai (tap alat lebih awal)" : ""}{x.infoManual.info && !x.infoManual.diabaikan ? ` · ${x.infoManual.info}` : ""}</small>}{x.catatan && <small className="block">{x.catatan}</small>}</span>
             <span className="mono muted">{x.infoManual ? "—" : tampilUid(x.uid)}</span>
           </div>
         ))}
