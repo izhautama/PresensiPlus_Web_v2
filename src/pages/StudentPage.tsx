@@ -294,7 +294,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
           <p className="caption-text">Hari efektif = hari ketika sekolah benar-benar menjalankan presensi (ada tap kartu atau dicatat guru) atau ditetapkan sekolah di kalender. Libur dan hari tanpa kegiatan presensi <b>tidak dihitung</b> dan tidak dianggap Alpha. Persentase = (Tepat + Terlambat + Dispensasi) ÷ hari efektif. Dispensasi = mewakili sekolah, dihitung hadir. Alpha = pada hari efektif tidak tap masuk dan tidak ada keterangan izin/sakit dari sekolah. Baris Total menjumlahkan semua bulan.</p>
         </section>
 
-        <KehadiranPerJam data={perJam} today={today} />
+        <KehadiranPerJam data={perJam} today={today} kategori={Object.fromEntries(hit(addDays(today, -14), today).hari.map((h) => [h.tanggal, h.kategori]))} />
 
         <Kedisiplinan disiplin={disiplin} ta={`${taPilih}-${taPilih + 1}`} />
         {ekstra?.(nis, profil)}
@@ -370,9 +370,11 @@ function Kedisiplinan({ disiplin, ta }: { disiplin: Disiplin; ta: string }) {
 }
 
 /** Ketidakhadiran per jam pelajaran (14 hari terakhir) dan Alfa yang sudah diverifikasi sekolah. */
-function KehadiranPerJam({ data, today }: { data: PerJamData; today: string }) {
+function KehadiranPerJam({ data, today, kategori }: { data: PerJamData; today: string; kategori: Record<string, string> }) {
   const batas = addDays(today, -14);
-  const tanggal = [...new Set([...Object.keys(data.jam), ...Object.keys(data.alfa)])].filter((d) => d >= batas && d <= today).sort().reverse();
+  // Hari berstatus harian Alfa / Izin / Sakit / Dispensasi ditampilkan SATU baris (kode per jam diturunkan dari status harian, bukan 9 baris jam)
+  const SEHARI: Record<string, string> = { Alpha: "Alfa seharian", Izin: "Izin seharian", Sakit: "Sakit seharian", Dispensasi: "Dispensasi seharian" };
+  const tanggal = [...new Set([...Object.keys(data.jam), ...Object.keys(data.alfa), ...Object.entries(kategori).filter(([, k]) => k === "Alpha").map(([d]) => d)])].filter((d) => d >= batas && d <= today).sort().reverse();
   if (tanggal.length === 0) return null;
   return (
     <section className="panel no-print">
@@ -380,6 +382,16 @@ function KehadiranPerJam({ data, today }: { data: PerJamData; today: string }) {
       <div className="simple-list">
         {tanggal.map((d) => {
           const jam = Object.entries(data.jam[d] ?? {}).sort((a, b) => Number(a[0]) - Number(b[0]));
+          const sehari = SEHARI[kategori[d]];
+          if (sehari) {
+            return (
+              <div key={d} data-testid="baris-seharian">
+                <b>{formatTanggal(d)}</b>
+                <small>{kategori[d] === "Alpha" ? "Tidak masuk sekolah tanpa keterangan." : "Sesuai keterangan harian dari sekolah."}</small>
+                <StatusBadge status={data.alfa[d] ? "Alfa (terverifikasi)" : sehari} />
+              </div>
+            );
+          }
           return (
             <div key={d}>
               <b>{formatTanggal(d)}</b>

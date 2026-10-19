@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useBlocker } from "react-router";
+import { useBlocker, useSearchParams } from "react-router";
 import Icon from "../components/Icon";
 import { Empty, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { gabungTap, type ManualTap } from "../lib/manual";
-import type { KetHarian, LogEntry } from "../lib/types";
-import { JAM, KODE_LABEL, SIKLUS_WAKA, berikutnya, encodeKelas, type KodeJam, type LessonsKelas, type MetaJam } from "../lib/perjam";
+import type { DayRecord, KetHarian, LogEntry } from "../lib/types";
+import { JAM, KODE_LABEL, SIKLUS_WAKA, berikutnya, berikutnyaPiket, encodeKelas, pengisiSel, selATerkunciPiket, type KodeJam, type LessonsKelas, type MetaJam } from "../lib/perjam";
+import { kodeTampil, turunanSiswa } from "../lib/turunan";
+import type { RingkasanHari } from "../lib/hariEfektif";
+import { Modal } from "../components/ui";
 import { addDays, formatTanggal, weekday } from "../lib/time";
 import { rentangPiket, tanggalDiJendela, type KodeIzin } from "../lib/piket";
 import { useLive } from "../services/db";
@@ -32,7 +35,8 @@ const simpanDaftar = (k: string, tambah: (string | undefined)[]) => {
  * saat menyimpan (izinMeta); kepala dan admin melihat saja.
  */
 export default function PerJam() {
-  const { students, kelasList, today } = useAdminData();
+  const { students, kelasList, today, schedule, now, aktifSejak } = useAdminData();
+  const [qs] = useSearchParams();
   const mode = usePanelMode();
   const piket = mode === "piket";
   const wakaUbah = mode === "waka";
@@ -41,8 +45,11 @@ export default function PerJam() {
   const piketCtx = usePiketCtx();
   const actor = useActor();
   const notify = useToast();
-  const [tanggal, setTanggal] = useState(today);
-  const [kelas, setKelas] = useState("");
+  const tglQuery = qs.get("tanggal");
+  const [tanggal, setTanggal] = useState(tglQuery && /^\d{4}-\d{2}-\d{2}$/.test(tglQuery) && tglQuery <= today ? tglQuery : today);
+  const [kelas, setKelas] = useState(qs.get("kelas") ?? "");
+  const [hanyaAPiket, setHanyaAPiket] = useState(qs.get("a") === "piket"); // waka: hanya baris yang memuat A dari piket
+  const [konfirmAlfa, setKonfirmAlfa] = useState(false);
   const [draft, setDraft] = useState<Record<string, KodeJam | "">>({});
   const [metaDraft, setMetaDraft] = useState<Record<number, MetaJam>>({});
   const [busy, setBusy] = useState(false);
@@ -61,6 +68,7 @@ export default function PerJam() {
   const izinLive = useLive<Record<string, KetHarian>>(`izin/${tanggal}`);
   const valLive = useLive<Record<string, unknown>>(`validasi/${tanggal}`);
   const manualLive = useLive<Record<string, ManualTap>>(`manualTap/${tanggal}`);
+  const hariLive = useLive<RingkasanHari>(`kalenderEfektif/${tanggal}`);
   const server = live.data;
 
   const dirty = Object.keys(draft).length > 0 || Object.keys(metaDraft).length > 0;
@@ -103,18 +111,42 @@ export default function PerJam() {
     return { teks: tanggal < today ? "Tidak tap" : "Belum tap", masuk: false, tone: "muted" };
   };
 
+  // Kode TURUNAN dari status harian (Alfa seharian -> A; Izin/Sakit/Dispensasi seharian -> I/S/D): dihitung saat tampil, TIDAK ditulis ke database.
+  const alatHari = useMemo(() => {
+    const m: Record<string, DayRecord> = {};
+    for (const [key, e] of Object.entries(logLive.data ?? {})) {
+      const rec = (m[e.nis] ??= {});
+      if (key.endsWith("_M")) { rec.masuk = e.jam; rec.status = e.status === "Terlambat" ? "Terlambat" : "Hadir"; } else rec.pulang = e.jam;
+    }
+    return m;
+  }, [logLive.data]);
+  const petaHari = useMemo(() => (hariLive.data ? { [tanggal]: hariLive.data } : {}), [hariLive.data, tanggal]);
+  const turunan = useMemo(() => Object.fromEntries(anak.map((s) => [s.nis, turunanSiswa({
+    tanggal, kelas: s.kelas, schedule, hariEfektif: petaHari, aktifSejak: aktifSejak[s.nis], now,
+    alat: alatHari[s.nis] ?? null, manual: manualLive.data?.[s.nis] ?? null, izin: izinLive.data?.[s.nis] ?? null,
+  })])), [anak, tanggal, schedule, petaHari, aktifSejak, now, alatHari, manualLive.data, izinLive.data]);
+
   const kodeSel = (nis: string, jam: number): KodeJam | "" => {
     const k = `${nis}:${jam}`;
     return k in draft ? draft[k] : (server?.absen?.[nis]?.[jam] ?? "");
   };
   const metaVal = (jam: number): MetaJam => metaDraft[jam] ?? server?.meta?.[jam] ?? {};
 
-  // Piket: kosong → I → S → D → kosong; tanggal mendatang tidak boleh Sakit. Sel A terkunci (hanya Waka).
-  const siklusPiket: (KodeJam | "")[] = tanggal > today ? ["", "I", "D"] : ["", "I", "S", "D"];
-  const siklus = piket ? siklusPiket : SIKLUS_WAKA;
+  // Piket (v2.3.1): hari ini kosong → A → I → S → D; tanggal lampau kosong → I → S → D (A terkunci); mendatang kosong → I → D.
+  // Sel A milik Waka (atau tanpa penanda) selalu terkunci bagi piket; A milik piket hanya dapat diubah pada hari yang sama.
+  const pengisiLihat = (nis: string, jam: number) => (piket && `${nis}:${jam}` in draft ? "piket" as const : pengisiSel(server?.absenOleh, nis, jam));
+  const klikSel = (nis: string, jam: number, k: KodeJam | "") => {
+    if (turunan[nis]) return; // baris turunan terkunci untuk semua peran
+    if (piket) {
+      const nx = berikutnyaPiket(k, { pengisi: pengisiLihat(nis, jam), tanggal, hariIni: today });
+      if (nx !== null) setSel(nis, jam, nx);
+    } else setSel(nis, jam, berikutnya(k, SIKLUS_WAKA));
+  };
   const setSel = (nis: string, jam: number, kode: KodeJam | "") => {
+    if (turunan[nis]) return; // baris turunan tidak dapat diisi (nilai diturunkan dari status harian)
     const asli = server?.absen?.[nis]?.[jam] ?? "";
-    if (piket && (asli === "A" || kode === "A")) return; // rules juga menolak; ini hanya mencegah draf yang pasti ditolak
+    // rules juga menolak; ini hanya mencegah draf yang pasti ditolak
+    if (piket && (selATerkunciPiket(asli, pengisiSel(server?.absenOleh, nis, jam), tanggal, today) || (kode === "A" && tanggal !== today))) return;
     setDraft((d) => {
       const n = { ...d };
       if (kode === asli) delete n[`${nis}:${jam}`]; else n[`${nis}:${jam}`] = kode;
@@ -167,22 +199,45 @@ export default function PerJam() {
     finally { setBusy(false); }
   };
 
-  /** Piket: simpan S/I/D + izinMeta (keterangan, surat fisik, nama petugas) dalam satu update. */
+  /** Piket: simpan perubahan. S/I/D + izinMeta (keterangan, surat fisik, nama petugas); A (hari ini) tanpa keterangan, dengan penanda "piket". */
   const simpanPiket = async (keterangan: string, suratDiterima: boolean) => {
     if (!tanggalDiJendela(tanggal, today, mundur)) throw new Error(`Tanggal harus antara ${rentangPiket(today, mundur).min} dan ${rentangPiket(today, mundur).max}`);
     const sel = Object.entries(draft).map(([k, kode]) => {
       const [nis, jam] = k.split(":");
-      return { nis, jam: Number(jam), kode: (kode || null) as KodeIzin | null };
+      return { nis, jam: Number(jam), kode: (kode || null) as KodeIzin | "A" | null, lama: (server?.absen?.[nis]?.[Number(jam)] ?? "") as KodeJam | "" };
     });
     const mapelByJam: Record<number, string | undefined> = {};
     for (const j of JAM) mapelByJam[j] = server?.meta?.[j]?.mapel;
     try { await izinPerJamPiket({ tanggal, kelas, sel, mapelByJam, keterangan, suratDiterima }, piketCtx); }
     catch (e) { throw new Error(pesanPiket(e)); }
     setDraft({}); setDialogPiket(false);
-    notify("Izin per jam tersimpan");
+    notify("Presensi per jam tersimpan");
+  };
+  // Keterangan WAJIB bila ada perubahan S/I/D (termasuk mengosongkannya); perubahan A saja (hari ini) tidak berketerangan.
+  const perluKeterangan = Object.entries(draft).some(([k, kode]) => {
+    const [nis, jam] = k.split(":");
+    const lama = server?.absen?.[nis]?.[Number(jam)] ?? "";
+    return !(kode === "A" || (lama === "A" && kode === ""));
+  });
+  const adaAlfaBaru = Object.values(draft).some((k) => k === "A");
+  const alfaSudahDikonfirmasi = () => { try { return sessionStorage.getItem("alfa-jam-konfirmasi") === "1"; } catch { return false; } };
+  const lanjutSimpanPiket = async () => {
+    if (perluKeterangan) { setDialogPiket(true); return; }
+    setBusy(true); setErr("");
+    try { await simpanPiket("", false); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
+  const mulaiSimpanPiket = () => {
+    if (adaAlfaBaru && !alfaSudahDikonfirmasi()) { setKonfirmAlfa(true); return; } // konfirmasi ringan sekali per sesi
+    void lanjutSimpanPiket();
   };
 
   const libur = weekday(tanggal) === 0;
+  const jamPiket = (nis: string, jam: number) => {
+    const info = server?.absenInfo?.[nis]?.[jam];
+    return info ? `${info.petugas}, ${new Date(info.ts + 7 * 3_600_000).toISOString().slice(11, 16)} WIB` : "petugas piket";
+  };
+  const adaAPiket = (nis: string) => JAM.some((j) => server?.absen?.[nis]?.[j] === "A" && pengisiSel(server?.absenOleh, nis, j) === "piket" && server?.absenOleh?.[nis]?.[j] === "piket");
+  const tampil = hanyaAPiket ? anak.filter((s) => adaAPiket(s.nis)) : anak;
   const kandidat = anak.filter((s) => statusRfid(s.nis).masuk && JAM.some((j) => kodeSel(s.nis, j) === "A")).length;
 
   return (
@@ -192,7 +247,7 @@ export default function PerJam() {
         {bisaUbah && (
           <div className="heading-actions">
             {dirty && <span className="dirty-pill">Belum disimpan</span>}
-            <button className="primary-button" onClick={() => (piket ? setDialogPiket(true) : simpan())} disabled={!dirty || busy}>{busy ? <Spinner /> : <Icon name="check" size={16} />}Simpan</button>
+            <button className="primary-button" onClick={() => (piket ? mulaiSimpanPiket() : simpan())} disabled={!dirty || busy}>{busy ? <Spinner /> : <Icon name="check" size={16} />}Simpan</button>
           </div>
         )}
       </div>
@@ -206,8 +261,14 @@ export default function PerJam() {
       <div className="jam-legend">
         {(Object.keys(KODE_LABEL) as KodeJam[]).map((k) => <span key={k}><i className={`kode kode-${k}`}>{k}</i>{KODE_LABEL[k]}</span>)}
         <span><i className="kode kode-H">·</i>Hadir (kosong)</span>
-        {wakaUbah && <small>Klik sel untuk memutar: kosong → A → I → S → D</small>}
-        {piket && <small>Klik sel: kosong → I → S → D. Sel A (gembok) hanya dapat diubah Waka.</small>}
+        {wakaUbah && <small>Klik sel untuk memutar: kosong → A → I → S → D. Titik oranye = A diisi guru piket (Waka dapat merevisi kapan saja).</small>}
+        {piket && (tanggal === today
+          ? <small data-testid="bantu-piket">Hari ini: klik sel kosong → A → I → S → D. A (Alfa) hanya untuk hari ini; koreksi hari sebelumnya oleh Waka. Sel bergembok tidak dapat diubah (diisi Waka atau turunan harian).</small>
+          : <small data-testid="bantu-piket">Tanggal ini: klik sel kosong → I → S → D. A hanya dapat diisi pada hari ini; sel A bergembok diubah oleh Waka.</small>)}
+        <span><i className="kode kode-A turunan">A</i>Baris berlabel “seharian (otomatis)” = turunan status harian, terkunci</span>
+        {wakaUbah && (
+          <label className="check-inline"><input type="checkbox" checked={hanyaAPiket} onChange={(e) => setHanyaAPiket(e.target.checked)} aria-label="Hanya A dari piket" />Hanya baris dengan A dari piket</label>
+        )}
       </div>
 
       {piket && kelas && anak.length > 0 && (
@@ -261,23 +322,31 @@ export default function PerJam() {
               </tr>
             </thead>
             <tbody>
-              {anak.map((s) => {
+              {tampil.map((s) => {
                 const st = statusRfid(s.nis);
+                const t = turunan[s.nis];
                 const bolos = st.masuk && JAM.some((j) => kodeSel(s.nis, j) === "A");
                 return (
                   <tr key={s.nis} className={bolos ? "bolos" : ""}>
-                    <td className="sticky-col"><b>{s.nama}</b><small>{s.nis}</small></td>
+                    <td className="sticky-col"><b>{s.nama}</b><small>{s.nis}</small>{t && <small className="turunan-label" data-testid="label-turunan">{t.label}</small>}</td>
                     <td><span className={`rfid-tag rfid-${st.tone}`}>{st.teks}</span></td>
                     {JAM.map((j) => {
-                      const k = kodeSel(s.nis, j);
+                      const tersimpan = kodeSel(s.nis, j);
+                      const k = kodeTampil(t, tersimpan);
                       const ubah = `${s.nis}:${j}` in draft;
+                      const pengisi = pengisiLihat(s.nis, j);
+                      const dariPiket = !t && k === "A" && pengisi === "piket";
                       return (
                         <td key={j} className={`sel ${ubah ? "ubah" : ""}`}>
-                          {piket && k === "A" ? (
-                            <button type="button" disabled className="kode kode-A terkunci" title="Diisi Waka" aria-label={`${s.nama} jam ${j}: Alfa (terkunci, diisi Waka)`}><Icon name="lock" size={13} /></button>
+                          {t ? (
+                            <button type="button" disabled className={`kode kode-${t.kode} terkunci turunan`} title={t.label} aria-label={`${s.nama} jam ${j}: ${KODE_LABEL[t.kode]} seharian (otomatis, terkunci)`}>{t.kode}</button>
+                          ) : piket && selATerkunciPiket(k, pengisi, tanggal, today) ? (
+                            <button type="button" disabled className="kode kode-A terkunci" title={pengisi === "waka" ? "Diisi Waka" : "Alfa piket pada tanggal lampau: hanya Waka yang dapat mengubah"} aria-label={`${s.nama} jam ${j}: Alfa (terkunci, ${pengisi === "waka" ? "diisi Waka" : "tanggal lampau"})`}><Icon name="lock" size={13} /></button>
                           ) : (
-                            <button type="button" disabled={!bisaUbah} className={`kode kode-${k || "H"}`} aria-label={`${s.nama} jam ${j}: ${k ? KODE_LABEL[k] : "hadir"}`}
-                              onClick={() => setSel(s.nis, j, berikutnya(k, siklus))}>{k || "·"}</button>
+                            <button type="button" disabled={!bisaUbah} className={`kode kode-${k || "H"} ${dariPiket ? "dari-piket" : ""}`}
+                              title={dariPiket ? `Diisi piket: ${jamPiket(s.nis, j)}` : undefined}
+                              aria-label={`${s.nama} jam ${j}: ${k ? KODE_LABEL[k] : "hadir"}${dariPiket ? " (diisi piket)" : ""}`}
+                              onClick={() => klikSel(s.nis, j, k)}>{k || "·"}{dariPiket && <i className="dot-piket" data-testid="penanda-piket" />}</button>
                           )}
                         </td>
                       );
@@ -297,6 +366,18 @@ export default function PerJam() {
             </tbody>
           </table>
         </div>
+      )}
+      {konfirmAlfa && (
+        <Modal title="Isi Alfa per jam?" subtitle="Alfa = tidak hadir tanpa keterangan" onClose={() => setKonfirmAlfa(false)}>
+          <div className="modal-form" data-testid="konfirmasi-alfa">
+            <p>Alfa = tidak hadir tanpa keterangan. Lanjutkan?</p>
+            <p className="modal-note">Alfa per jam hanya untuk hari ini. Kekeliruan dikoreksi oleh Waka.</p>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setKonfirmAlfa(false)}>Batal</button>
+              <button className="primary-button" onClick={() => { try { sessionStorage.setItem("alfa-jam-konfirmasi", "1"); } catch { /* abaikan */ } setKonfirmAlfa(false); void lanjutSimpanPiket(); }}>Lanjutkan</button>
+            </div>
+          </div>
+        </Modal>
       )}
       {dialogPiket && (
         <KeteranganDialog judul="Simpan izin per jam" subjudul={`${Object.keys(draft).length} perubahan · ${kelas} · ${formatTanggal(tanggal, false)}`} tombol="Simpan" onClose={() => setDialogPiket(false)} onSubmit={simpanPiket} />

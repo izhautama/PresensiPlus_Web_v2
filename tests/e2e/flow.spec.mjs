@@ -128,6 +128,12 @@ function kecualikan(l, n = 1) {
   }) };
 }
 
+/** Grid per jam dibuka pada KEMARIN: ANDI & BUDI hadir kemarin, sedangkan HARI INI keduanya tidak tap (baris diturunkan dari status harian, terkunci). */
+async function bukaKemarin(page, kelas = "XI IPS") {
+  await page.locator("select[aria-label=Kelas]").selectOption(kelas);
+  await page.locator("input[type=date]").first().fill(T.kemarin);
+}
+
 /** Login piket lalu pilih petugas (layar wajib). */
 async function masukPiket(page, petugas = "Bu Rina") {
   await loginStaf(page, "piket");
@@ -161,7 +167,15 @@ test("laporan kesiswaan 'Kehadiran per jam' mengabaikan hari Minggu", async ({ p
   const sel = citra.locator("span.num");
   await expect(sel.nth(0), "Alfa CITRA: sel hari Minggu tidak boleh dihitung").toHaveText("0");
   await expect(sel.nth(3), "Dispensasi CITRA (hari kerja)").toHaveText("1");
-  await expect(page.locator(".table-row.lap-jam", { hasText: "EKO TEST" }), "EKO hanya punya sel hari Minggu").toHaveCount(0);
+  // EKO: sel per jam HANYA hari Minggu (diabaikan) sehingga "A per jam (bolos)" = 0; Alfa seharian kemarin dihitung TERPISAH sebagai hari
+  const eko = page.locator(".table-row.lap-jam", { hasText: "EKO TEST" });
+  if (T.kemarin.slice(0, 7) === T.mingguBulanIni.slice(0, 7)) {
+    await expect(eko, "EKO tampil karena Alfa seharian kemarin").toHaveCount(1);
+    await expect(eko.locator("span.num").nth(0), "A per jam (bolos) EKO: sel Minggu tidak dihitung").toHaveText("0");
+    await expect(eko.getByTestId("alfa-seharian-hari")).toHaveText(/^[1-9]/);
+  } else {
+    await expect(eko, "Alfa seharian kemarin berada di bulan lain").toHaveCount(0);
+  }
   await expect(page.getByText("Fikih"), "mapel dari hari Minggu tidak boleh muncul").toHaveCount(0);
   bersih(lap, "waka (laporan per jam, Minggu diabaikan)");
 });
@@ -253,7 +267,7 @@ test("waka: presensi per jam tersimpan, validasi harian (Izin/Sakit & Alfa)", as
 
   await menu(page, "Presensi per jam");
   await expect(judul(page)).toHaveText("Presensi per jam");
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   await page.getByLabel("Mapel jam 3").fill("TI");
   await page.getByLabel("ANDI TEST jam 3: hadir").click(); // kosong -> A
   await expect(page.getByLabel("ANDI TEST jam 3: Alfa")).toBeVisible();
@@ -266,7 +280,7 @@ test("waka: presensi per jam tersimpan, validasi harian (Izin/Sakit & Alfa)", as
   await expect(page.getByText("Belum disimpan")).toHaveCount(0);
   // tetap tersimpan setelah muat ulang
   await page.reload();
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   await expect(page.getByLabel("ANDI TEST jam 3: Alfa")).toBeVisible();
   await expect(page.getByLabel("Mapel jam 3")).toHaveValue("TI");
 
@@ -592,7 +606,7 @@ test("piket: izin per jam (S/I/D), sel A terkunci, aksi cepat, keterangan wajib"
   await masukPiket(page);
   await menu(page, "Izin per jam");
   await expect(judul(page)).toHaveText("Izin per jam");
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
 
   const tgl = page.locator("input[type=date]").first();
   await expect(tgl).toHaveAttribute("min", T.min);
@@ -603,7 +617,8 @@ test("piket: izin per jam (S/I/D), sel A terkunci, aksi cepat, keterangan wajib"
   await expect(page.getByLabel("Mapel jam 3")).toBeDisabled();
   await expect(page.getByLabel("Isi semua jam 3")).toHaveCount(0);
 
-  // siklus klik piket: kosong -> I -> S -> D -> kosong (tanpa A)
+  // siklus klik piket pada tanggal LAMPAU: kosong -> I -> S -> D -> kosong (A terkunci; A hanya untuk hari ini)
+  await expect(page.getByTestId("bantu-piket")).toContainText("A hanya dapat diisi pada hari ini");
   const sel = (n, j, k) => page.getByLabel(`${n} jam ${j}: ${k}`);
   await sel("ANDI TEST", 6, "hadir").click();
   await expect(sel("ANDI TEST", 6, "Izin")).toBeVisible();
@@ -640,7 +655,7 @@ test("piket: izin per jam (S/I/D), sel A terkunci, aksi cepat, keterangan wajib"
 
   // bertahan setelah muat ulang; sel A tetap terkunci
   await page.reload();
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   await expect(sel("BUDI TEST", 8, "Sakit")).toBeVisible();
   await expect(sel("ANDI TEST", 1, "Dispensasi")).toBeVisible();
   await expect(page.getByLabel("ANDI TEST jam 3: Alfa (terkunci, diisi Waka)")).toBeDisabled();
@@ -735,7 +750,7 @@ test("waka melihat hasil input piket: laporan izin & surat, nama petugas, menimp
 
   // waka menimpa sel S piket (BUDI jam 7) menjadi A: kosong->A butuh melewati siklus S -> D -> kosong -> A
   await menu(page, "Presensi per jam");
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   for (const k of ["Sakit", "Dispensasi", "hadir"]) await page.getByLabel(`BUDI TEST jam 7: ${k}`).click();
   await expect(page.getByLabel("BUDI TEST jam 7: Alfa")).toBeVisible();
   await page.getByRole("button", { name: "Simpan" }).click();
@@ -764,7 +779,7 @@ test("waka melihat hasil input piket: laporan izin & surat, nama petugas, menimp
   const lapP = await siapkan(p2);
   await masukPiket(p2);
   await menu(p2, "Izin per jam");
-  await p2.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(p2);
   await expect(p2.getByLabel("BUDI TEST jam 7: Alfa (terkunci, diisi Waka)")).toBeDisabled();
   bersih(lapP, "piket (sel ditimpa waka)");
   await konteks.close();
@@ -972,7 +987,7 @@ test("kepala: panel pantau + kesiswaan, tidak ada error permission", async ({ pa
   }
   // per jam: hanya lihat
   await menu(page, "Presensi per jam");
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   await expect(page.getByLabel("ANDI TEST jam 3: Alfa")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Simpan" })).toHaveCount(0);
   // kepala boleh mencatat pelanggaran dan memutuskan saran
@@ -1013,7 +1028,7 @@ test("admin: kesiswaan hanya lihat, tidak ada error permission", async ({ page }
   await menu(page, "Tata tertib");
   await expect(page.getByRole("button", { name: "Tambah" })).toHaveCount(0);
   await menu(page, "Presensi per jam");
-  await page.locator("select[aria-label=Kelas]").selectOption("XI IPS");
+  await bukaKemarin(page);
   await expect(page.getByLabel("ANDI TEST jam 3: Alfa")).toBeDisabled();
   await menu(page, "Validasi harian");
   await expect(page.getByRole("button", { name: "Konfirmasi Alfa" })).toHaveCount(0);
@@ -1252,29 +1267,23 @@ test("pemetaan saran (autoMap) di Tata tertib, cadangan nama sekali-jalan, perin
   // cadangan sekali-jalan: hapus pemetaan lupaKtm -> halaman Saran menulis ulang id aturannya (bukan bergantung nama selamanya)
   await dbPut("discipline/autoMap/lupaKtm", null);
   await menu(page, "Perlu ditinjau");
-  await expect(page.getByTestId("saran-belum-dipetakan")).toContainText("Alfa terverifikasi"); // 'alfa' memang belum dipetakan
-  await expect(page.getByTestId("saran-belum-dipetakan")).not.toContainText("Lupa membawa KTM");
+  await expect(page.getByTestId("saran-belum-dipetakan")).toHaveCount(0); // lupaKtm dipulihkan otomatis; tidak ada saran "alfa" yang menunggu pemetaan
   await menu(page, "Tata tertib");
   await page.getByRole("tab", { name: "Pemetaan saran" }).click();
   const peta = page.getByTestId("pemetaan-saran");
   await expect(peta.getByLabel("Aturan untuk saran Lupa membawa KTM")).toHaveValue("rg14");
   await expect(peta.getByLabel("Aturan untuk saran Menghilangkan KTM")).toHaveValue("rg15");
 
-  // dropdown: petakan 'Alfa terverifikasi' ke aturan, lalu peringatan di halaman Saran berubah
-  await peta.getByLabel("Aturan untuk saran Alfa terverifikasi").selectOption("sd03");
-  await expect(toast(page)).toContainText("Pemetaan saran disimpan");
-  await expect(peta.getByLabel("Aturan untuk saran Alfa terverifikasi")).not.toHaveValue("");
+  // Alfa seharian BUKAN pelanggaran otomatis: tidak ada saran/pemetaan "Alfa terverifikasi"; data lama autoMap.alfa dibiarkan dan tidak berpengaruh
+  await expect(peta.getByLabel("Aturan untuk saran Alfa terverifikasi")).toHaveCount(0);
+  await expect(peta.getByLabel("Aturan untuk saran Terlambat")).toBeVisible();
+  await dbPut("discipline/autoMap/alfa", "sd03"); // data lama: diabaikan
   await menu(page, "Perlu ditinjau");
+  await expect(page.locator(".saran-row", { hasText: "Alfa dikonfirmasi" })).toHaveCount(0);
   await expect(page.getByTestId("saran-belum-dipetakan")).toHaveCount(0);
-  // pemetaan tercatat di jejak audit
   await menu(page, "Jejak audit");
-  await expect(page.locator(".table-row", { hasText: "autoMap/alfa" }).first()).toBeVisible();
   await expect(page.locator(".table-row", { hasText: "autoMap/lupaKtm" }).first()).toBeVisible();
-  // kembalikan agar tidak mengubah uji lain
-  await menu(page, "Tata tertib");
-  await page.getByRole("tab", { name: "Pemetaan saran" }).click();
-  await page.getByTestId("pemetaan-saran").getByLabel("Aturan untuk saran Alfa terverifikasi").selectOption({ label: "(belum dipetakan)" });
-  await expect(toast(page)).toContainText("Pemetaan saran disimpan");
+  await dbPut("discipline/autoMap/alfa", null);
   bersih(lap, "waka (pemetaan saran)");
 
   // admin: Log harian memuat entri manual (badge, alasan, petugas) + rekap bulanan memakai data gabungan (manual terhitung Hadir)
@@ -2006,4 +2015,198 @@ test("jam perangkat salah: tanggal mengikuti SERVER — Log aktivitas menampilka
   const tglPerangkat = new Date(perangkat.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
   expect(await dbRest("GET", `activity/${tglPerangkat}`), "tidak ada entri pada tanggal perangkat yang salah").toBeNull();
   bersih(lap, "admin (jam perangkat salah)");
+});
+
+// ===================================================================== v2.3.1 — PRESENSI PER JAM: Alfa oleh piket (hari ini), Alfa seharian turunan
+const hariKeDariTgl = (tgl) => Math.round(Date.parse(`${tgl}T00:00:00Z`) / 86_400_000);
+const sIPA = encodeURIComponent("X IPA");
+
+test("per jam: piket mengisi A HARI INI (konfirmasi sekali, tanpa keterangan); A kemarin & A waka terkunci; waka melihat penanda, kartu Dashboard, saran bolosJam, lalu merevisi", async ({ page, browser }) => {
+  // data awal: A piket yang diisi KEMARIN (CITRA jam 5) dan A milik waka HARI INI (FANI jam 6, penanda 'waka')
+  const infoKemarin = { petugas: "Bu Rina", ts: Date.now() - 86_400_000, hariKe: hariKeDariTgl(T.kemarin) };
+  await dbPut(`lessons/${T.kemarin}/${sIPA}/absen/333/5`, "A");
+  await dbPut(`lessons/${T.kemarin}/${sIPA}/absenOleh/333/5`, "piket");
+  await dbPut(`lessons/${T.kemarin}/${sIPA}/absenInfo/333/5`, infoKemarin);
+  await dbPut(`lessonsByStudent/333/${T.kemarin}/5`, { k: "A" });
+  await dbPut(`lessons/${T.hariIni}/${sIPA}/absen/666/6`, "A");
+  await dbPut(`lessons/${T.hariIni}/${sIPA}/absenOleh/666/6`, "waka");
+  await dbPut(`lessonsByStudent/666/${T.hariIni}/6`, { k: "A" });
+
+  const lap = await siapkan(page);
+  await masukPiket(page);
+  await menu(page, "Izin per jam");
+  await page.locator("select[aria-label=Kelas]").selectOption("X IPA");
+  await expect(page.locator("input[type=date]").first()).toHaveValue(T.hariIni);
+  await expect(page.getByTestId("bantu-piket")).toContainText("Hari ini: klik sel kosong → A");
+
+  // A milik waka (hari ini) terkunci; baris yang hadir tidak diturunkan
+  await expect(page.getByLabel("FANI TEST jam 6: Alfa (terkunci, diisi Waka)")).toBeDisabled();
+  await expect(page.getByTestId("label-turunan")).toHaveCount(0);
+
+  // siklus hari ini: kosong -> A -> I -> S -> D -> kosong
+  const sel = (n, j, k) => page.getByLabel(`${n} jam ${j}: ${k}`);
+  await sel("CITRA TEST", 7, "hadir").click();
+  await expect(sel("CITRA TEST", 7, "Alfa")).toBeVisible();
+  await sel("CITRA TEST", 7, "Alfa").click();
+  await expect(sel("CITRA TEST", 7, "Izin")).toBeVisible();
+  await sel("CITRA TEST", 7, "Izin").click();
+  await expect(sel("CITRA TEST", 7, "Sakit")).toBeVisible();
+  await sel("CITRA TEST", 7, "Sakit").click();
+  await expect(sel("CITRA TEST", 7, "Dispensasi")).toBeVisible();
+  await sel("CITRA TEST", 7, "Dispensasi").click();
+  await expect(sel("CITRA TEST", 7, "hadir")).toBeVisible(); // kembali kosong (tidak ada yang berubah)
+
+  // isi A (CITRA jam 4): Simpan -> konfirmasi ringan sekali per sesi -> tersimpan TANPA dialog keterangan
+  await sel("CITRA TEST", 4, "hadir").click();
+  await page.getByRole("button", { name: "Simpan" }).click();
+  const konf = page.getByTestId("konfirmasi-alfa");
+  await expect(konf).toContainText("Alfa = tidak hadir tanpa keterangan. Lanjutkan?");
+  await konf.getByRole("button", { name: "Lanjutkan" }).click();
+  await expect(toast(page)).toContainText("Presensi per jam tersimpan");
+  await expect(page.getByRole("dialog", { name: "Simpan izin per jam" })).toHaveCount(0);
+
+  // A kedua pada sesi yang sama: tidak ada konfirmasi lagi
+  await sel("DINA TEST", 4, "hadir").click();
+  await page.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Presensi per jam tersimpan");
+  await expect(page.getByTestId("konfirmasi-alfa")).toHaveCount(0);
+
+  // bertahan setelah muat ulang: sel A piket dapat diubah, bertooltip nama petugas + jam, bertanda titik
+  await page.reload();
+  await page.locator("select[aria-label=Kelas]").selectOption("X IPA");
+  const citra4 = page.getByLabel("CITRA TEST jam 4: Alfa (diisi piket)");
+  await expect(citra4).toBeEnabled();
+  await expect(citra4).toHaveAttribute("title", /^Diisi piket: Bu Rina, \d\d:\d\d WIB$/);
+  await expect(citra4.getByTestId("penanda-piket")).toBeVisible();
+
+  // tanggal KEMARIN: A piket yang diisi kemarin terkunci (hanya Waka); siklus tanpa A
+  await page.locator("input[type=date]").first().fill(T.kemarin);
+  await expect(page.getByLabel("CITRA TEST jam 5: Alfa (terkunci, tanggal lampau)")).toBeDisabled();
+  await expect(page.getByTestId("bantu-piket")).toContainText("A hanya dapat diisi pada hari ini");
+  bersih(lap, "piket (A per jam hari ini)");
+
+  // ---- waka: penanda, kartu Dashboard "A dari piket hari ini", filter grid, saran bolosJam, revisi
+  const kW = await browser.newContext(opsiKonteks());
+  const pw = await kW.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await expect(pw.getByTestId("jumlah-a-piket")).toHaveText("2"); // CITRA & DINA (FANI = A milik waka, tidak dihitung)
+  await pw.getByTestId("kartu-a-piket").getByRole("link", { name: /Tinjau di grid/ }).click();
+  await expect(pw).toHaveURL(/\/waka\/per-jam\?.*a=piket/);
+  await expect(pw.getByLabel("Hanya A dari piket")).toBeChecked();
+  await expect(pw.locator("tbody tr")).toHaveCount(2);
+  await expect(pw.getByTestId("penanda-piket")).toHaveCount(2);
+  await expect(pw.getByLabel("CITRA TEST jam 4: Alfa (diisi piket)")).toHaveAttribute("title", /^Diisi piket: Bu Rina, \d\d:\d\d WIB$/);
+
+  // saran bolosJam tetap berlaku untuk A dari piket (perlu persetujuan waka seperti biasa; poin tidak tercatat otomatis)
+  await menu(pw, "Perlu ditinjau");
+  const barisSaran = pw.locator(".saran-row", { hasText: "CITRA TEST" });
+  await expect(barisSaran).toContainText("jam ke-4");
+  await expect(pw.locator(".saran-row", { hasText: "DINA TEST" })).toContainText("jam ke-4");
+
+  // revisi waka: A piket CITRA jam 4 -> Izin: penanda menjadi 'waka' (titik hilang), kartu Dashboard turun
+  await menu(pw, "Presensi per jam");
+  await pw.locator("select[aria-label=Kelas]").selectOption("X IPA");
+  await pw.getByLabel("CITRA TEST jam 4: Alfa (diisi piket)").click(); // A -> I (siklus waka)
+  await expect(pw.getByLabel("CITRA TEST jam 4: Izin")).toBeVisible();
+  await pw.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(pw)).toContainText("Presensi per jam tersimpan");
+  await expect(pw.getByTestId("penanda-piket")).toHaveCount(1); // tinggal DINA
+  await menu(pw, "Dashboard");
+  await expect(pw.getByTestId("jumlah-a-piket")).toHaveText("1");
+  bersih(lapW, "waka (A dari piket)");
+  await kW.close();
+
+  // data akhir yang konsisten (penanda 'waka' pada sel hasil revisi; info Alfa piket hilang)
+  const kelasHariIni = await dbGet(`lessons/${T.hariIni}/${sIPA}`);
+  expect(kelasHariIni.absen["333"]["4"]).toBe("I");
+  expect(kelasHariIni.absenOleh["333"]["4"]).toBe("waka");
+  expect(kelasHariIni.absenInfo?.["333"]?.["4"] ?? null).toBeNull();
+  expect(kelasHariIni.absenOleh["444"]["4"]).toBe("piket");
+  expect(kelasHariIni.absenInfo["444"]["4"].hariKe).toBe(hariKeDariTgl(T.hariIni));
+
+  // piket melihat sel hasil revisi (Izin, bukan A): tidak terkunci lagi oleh aturan A
+  const kP = await browser.newContext(opsiKonteks());
+  const pp = await kP.newPage();
+  const lapP = await siapkan(pp);
+  await masukPiket(pp);
+  await menu(pp, "Izin per jam");
+  await pp.locator("select[aria-label=Kelas]").selectOption("X IPA");
+  await expect(pp.getByLabel("CITRA TEST jam 4: Izin")).toBeEnabled();
+  bersih(lapP, "piket (setelah revisi waka)");
+  await kP.close();
+});
+
+test("per jam: Alfa seharian & keterangan harian DITURUNKAN (terkunci, tidak ditulis); hilang saat ada tap/izin; tidak memicu saran; portal ortu satu baris", async ({ page, browser }) => {
+  // siswa uji tanpa tap hari ini (Alfa seharian) di kelas XII IPS
+  await dbPut("config/students/LNA00899", { nis: "899", nama: "LINA UJI", kelas: "XII IPS" });
+  await dbPut("profiles/899", { nama: "LINA UJI", kelas: "XII IPS", aktifSejak: "2020-01-01" });
+  await dbPut("siswaKelas/899", "XII IPS");
+
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Presensi per jam");
+  await page.locator("select[aria-label=Kelas]").selectOption("XII IPS");
+  const baris = page.locator("tbody tr", { hasText: "LINA UJI" });
+  await expect(baris.getByTestId("label-turunan")).toHaveText("Alfa seharian (otomatis)");
+  for (let j = 1; j <= 9; j++) await expect(page.getByLabel(`LINA UJI jam ${j}: Alfa seharian (otomatis, terkunci)`)).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Simpan" })).toBeDisabled(); // tidak ada draf: sel turunan tidak dapat diubah
+
+  // data TIDAK ditulis: tidak ada lessons/lessonsByStudent untuk LINA
+  expect(await dbGet("lessonsByStudent/899")).toBeNull();
+
+  // Alfa seharian tidak memicu saran apa pun
+  await menu(page, "Perlu ditinjau");
+  await expect(page.locator(".saran-row", { hasText: "LINA UJI" })).toHaveCount(0);
+
+  // kemarin: EKO (Alfa terverifikasi, tanpa tap) diturunkan A jam 1-9, terkunci untuk waka juga
+  await menu(page, "Presensi per jam");
+  await bukaKemarin(page, "X IPA");
+  await expect(page.locator("tbody tr", { hasText: "EKO TEST" }).getByTestId("label-turunan")).toHaveText("Alfa seharian (otomatis)");
+  await expect(page.getByLabel("EKO TEST jam 1: Alfa seharian (otomatis, terkunci)")).toBeDisabled();
+  // tap masuk datang kemudian -> turunan hilang otomatis (live) dan sel bisa diisi biasa
+  await dbPut(`log/${T.kemarin}/EEEE5555_M`, { jam: "07:10:00", nis: "555", status: "Hadir" });
+  await expect(page.locator("tbody tr", { hasText: "EKO TEST" }).getByTestId("label-turunan")).toHaveCount(0);
+  await expect(page.getByLabel("EKO TEST jam 1: hadir")).toBeEnabled();
+  await dbPut(`log/${T.kemarin}/EEEE5555_M`, null); // kembalikan
+  await expect(page.locator("tbody tr", { hasText: "EKO TEST" }).getByTestId("label-turunan")).toHaveText("Alfa seharian (otomatis)");
+
+  // piket mengisi izin harian LINA (Beranda) -> baris waka berubah menjadi Izin seharian (I jam 1-9, terkunci)
+  const kP = await browser.newContext(opsiKonteks());
+  const pp = await kP.newPage();
+  const lapP = await siapkan(pp);
+  await masukPiket(pp);
+  const rowLina = pp.locator(".piket-grid[data-nis='899']");
+  await expect(rowLina).toBeVisible();
+  await rowLina.getByRole("button", { name: "Izin", exact: true }).click();
+  const dlg = pp.getByRole("dialog", { name: "Izin" });
+  await dlg.getByLabel("Keterangan (wajib)").fill("Acara keluarga, orang tua menelepon");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(pp)).toContainText("LINA UJI");
+  await menu(pp, "Izin per jam");
+  await pp.locator("select[aria-label=Kelas]").selectOption("XII IPS");
+  await expect(pp.locator("tbody tr", { hasText: "LINA UJI" }).getByTestId("label-turunan")).toHaveText("Izin seharian (otomatis)");
+  await expect(pp.getByLabel("LINA UJI jam 3: Izin seharian (otomatis, terkunci)")).toBeDisabled();
+  bersih(lapP, "piket (izin harian -> baris turunan)");
+  await kP.close();
+
+  await menu(page, "Presensi per jam");
+  await page.locator("select[aria-label=Kelas]").selectOption("XII IPS");
+  await expect(page.locator("tbody tr", { hasText: "LINA UJI" }).getByTestId("label-turunan")).toHaveText("Izin seharian (otomatis)");
+  await expect(page.getByLabel("LINA UJI jam 1: Izin seharian (otomatis, terkunci)")).toBeDisabled();
+  bersih(lap, "waka (turunan Alfa/Izin seharian)");
+
+  // portal orang tua BUDI (Alfa seharian hari ini + terverifikasi): SATU baris, bukan baris per jam
+  const kO = await browser.newContext(opsiKonteks());
+  const po = await kO.newPage();
+  const lapO = await siapkan(po);
+  await loginOrtu(po, "222", "739104");
+  const seharian = po.getByTestId("baris-seharian");
+  await expect(seharian.first()).toContainText("Alfa (terverifikasi)");
+  await expect(seharian.first()).not.toContainText("Jam ke-");
+  bersih(lapO, "ortu 222 (Alfa seharian)");
+  await kO.close();
+
+  // bersihkan siswa uji
+  for (const path of ["config/students/LNA00899", "profiles/899", "siswaKelas/899", `izin/${T.hariIni}/899`, `attendance/899/${T.hariIni}`]) await dbPut(path, null);
 });

@@ -69,12 +69,17 @@ for (const ket of ["Izin", "Sakit"]) {
   assert.deepEqual(ringkas(tanpaTap), [], "A tanpa tap masuk bukan bolos jam");
 }
 
-// ---- alfa: tanpa autoMap.alfa tidak ada saran; dengan autoMap ada
+// ---- alfa seharian BUKAN pelanggaran otomatis (v2.3.1): tidak ada saran "alfa", dengan atau tanpa konfirmasi waka, dengan atau tanpa autoMap.alfa lama
 {
   const data = { "2026-10-13": { validasi: { 5: { status: "Alfa" } } } };
-  assert.deepEqual(ringkas(hitung({ data })), [], "autoMap.alfa kosong -> tidak ada saran");
-  const s = hitung({ data, autoMap: { ...AUTO, alfa: "rBolos" } });
-  assert.deepEqual(ringkas(s), ["2026-10-13:alfa:5"]);
+  assert.deepEqual(ringkas(hitung({ data })), [], "tanpa autoMap.alfa: tidak ada saran");
+  assert.deepEqual(ringkas(hitung({ data, autoMap: { ...AUTO, alfa: "rBolos" } })), [], "data lama autoMap.alfa DIABAIKAN (tidak memunculkan saran)");
+  const hold = hitung({ data: { "2026-10-13": { ...data["2026-10-13"], hari: { efektif: true, tap: 50, manual: 0, sumber: "otomatis" } } }, autoMap: { ...AUTO, alfa: "rBolos" } });
+  assert.deepEqual(ringkas(hold), [], "hari efektif normal + Alfa terverifikasi + autoMap.alfa lama: tetap tidak ada saran");
+  // siswa tanpa tap sama sekali (Alfa seharian) tidak memicu saran jenis apa pun, walau sel A tertulis di grid
+  const alfaSeharian = hitung({ data: { "2026-10-13": { lessons: lessons({ 5: { 1: "A", 2: "A", 3: "A", 4: "A", 5: "A", 6: "A", 7: "A", 8: "A", 9: "A" } }), validasi: { 5: { status: "Alfa" } }, hari: { efektif: true, tap: 50, manual: 0, sumber: "otomatis" } } } });
+  assert.deepEqual(ringkas(alfaSeharian), [], "Alfa seharian (tanpa tap): tidak ada terlambat / tanpaTapPulang / bolosJam");
+  assert.ok(!alfaSeharian.some((x) => x.tipe === "alfa"));
 }
 
 // ---- hari ini: saran pulang menunggu jendela pulang berakhir
@@ -87,7 +92,7 @@ for (const ket of ["Izin", "Sakit"]) {
 // ---- Minggu (libur): tidak ada saran apa pun, walau ada data
 {
   const data = { "2026-10-18": { log: M("A1", "1", "07:30:00", "Terlambat"), validasi: { 5: { status: "Alfa" } }, lessons: lessons({ 1: { 2: "A" } }) } };
-  const s = hitung({ tanggal: ["2026-10-17", "2026-10-18"], today: "2026-10-18", data, autoMap: { ...AUTO, alfa: "rBolos" } });
+  const s = hitung({ tanggal: ["2026-10-17", "2026-10-18"], today: "2026-10-18", data, autoMap: AUTO });
   assert.deepEqual(s, [], "hari Minggu: tidak ada saran");
 }
 // ---- tanggal mendatang diabaikan
@@ -147,19 +152,11 @@ assert.deepEqual(hitung({ tanggal: ["2026-10-15"], data: { "2026-10-15": { log: 
   assert.deepEqual(ringkas(hitung({ rules: R2, data: { [T]: { manual: { 1: man({ alasan: "Lainnya" }) }, lessons: lessons({ 1: { 3: "A" } }) } } })), [`${T}:bolosJam:1`]);
 }
 
-// ---- HOLD saran Alfa: hari tap rendah (belum dikonfirmasi normal) dan hari yang bukan hari efektif
+// ---- saran lain pada hari tap rendah / bukan hari efektif: perilaku TIDAK berubah oleh penghapusan saran alfa
 {
-  const R3 = { ...RULES, rAlfa: { kategori: "Sedang", nama: "Tidak masuk tanpa keterangan", poin: 30, aktif: true } };
   const T = "2026-10-13";
-  const alfa = (hari) => ringkas(hitung({ rules: R3, autoMap: { ...AUTO, alfa: "rAlfa" }, data: { [T]: { validasi: { 1: { status: "Alfa" } }, hari } } }));
-  assert.deepEqual(alfa(undefined), [`${T}:alfa:1`], "tanpa informasi hari: saran Alfa tetap muncul");
-  assert.deepEqual(alfa({ efektif: true, tap: 50, manual: 0, sumber: "otomatis" }), [`${T}:alfa:1`], "hari efektif normal");
-  assert.deepEqual(alfa({ efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true }), [], "tap rendah belum dikonfirmasi: saran Alfa DITAHAN");
-  assert.deepEqual(alfa({ efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true, normal: true }), [`${T}:alfa:1`], "dikonfirmasi normal: saran Alfa dibuka");
-  assert.deepEqual(alfa({ efektif: false, tap: 0, manual: 0, sumber: "otomatis" }), [], "bukan hari efektif: tidak ada saran Alfa");
-  // saran lain (terlambat) tidak ikut ditahan pada hari rendah
-  const lain = hitung({ rules: R3, autoMap: AUTO, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, hari: { efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true } } } });
-  assert.deepEqual(ringkas(lain), [`${T}:terlambat:1`]);
+  const lain = hitung({ autoMap: AUTO, data: { [T]: { log: { ...M("A1", "1", "07:30:00", "Terlambat"), ...P("A1", "1", "15:00:00") }, hari: { efektif: true, tap: 3, manual: 0, sumber: "otomatis", rendah: true } } } });
+  assert.deepEqual(ringkas(lain), [`${T}:terlambat:1`], "terlambat tidak ikut ditahan pada hari rendah");
 }
 
 console.log("saran.test: OK");

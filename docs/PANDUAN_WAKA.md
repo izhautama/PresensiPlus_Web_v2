@@ -24,29 +24,31 @@ Untuk: Waka Kesiswaan
 
 ## Presensi per jam dan saran
 
-1. Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Hanya Waka yang dapat mengisi A (Alfa jam).
-2. Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Alfa, Lupa membawa KTM, Menghilangkan KTM).
-3. Centang saran lalu Setujui terpilih (poin tercatat) atau Abaikan. Tidak ada poin tercatat tanpa persetujuan Anda.
-4. Jenis saran yang belum dipetakan ke aturan diberi peringatan. Atur di Tata tertib, tab Pemetaan saran.
+1. Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Waka dapat menimpa atau menghapus sel apa pun, termasuk A dari piket (titik oranye), kapan saja dalam tahun ajaran.
+2. Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan dari status harian, tidak disimpan, dan hilang bila ada tap atau presensi manual.
+3. Kartu A dari piket hari ini di Dashboard: tekan Tinjau di grid.
+4. Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM). Alfa seharian bukan pelanggaran otomatis; catat manual bila perlu.
+5. Centang saran lalu Setujui terpilih (poin tercatat) atau Abaikan. Tidak ada poin tercatat tanpa persetujuan Anda.
+6. Jenis saran yang belum dipetakan ke aturan diberi peringatan. Atur di Tata tertib, tab Pemetaan saran.
 
 ## Kalender dan tap rendah
 
-1. Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; Efektif tanpa bukti memberi peringatan karena semua siswa tanpa data menjadi Alpha.
-2. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa dan saran Alfa hari itu ditahan.
+1. Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; Efektif tanpa bukti memberi peringatan.
+2. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.
 3. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.
 4. Ambang hari efektif dan Hitung ulang rentang tanggal ada di halaman Kalender.
 
 ## Wali kelas
 
-1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu pilih kelas utama (tepat satu kelas).
-2. Ubah kelas, Cabut, dan Pasang kembali tersedia pada tiap baris. Kelas tambahan dan pergantian massal per tahun ajaran hanya dapat diatur admin.
+1. Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).
+2. Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.
 3. Kelas yang sudah punya wali tidak dapat diberi wali kedua oleh Waka; hubungi admin.
 
 > Catatan: Wali hanya melihat siswa kelasnya, mencatat Izin/Sakit seharian dan pelanggaran Ringan atau bertakziran; tidak dapat memberi Dispensasi, mengubah presensi per jam, atau memvalidasi Alfa. Semua tindakannya tercatat di log aktivitas.
 
 ## Pembinaan dan usulan remisi
 
-1. Menu Pembinaan: rekap pembinaan oleh wali kelas dan pejabat. Saring menurut tahun ajaran, status, atau kelas; tekan Unduh CSV untuk arsip. Anda dapat mencatat atau mengoreksi pembinaan, termasuk yang sudah Selesai.
+1. Menu Pembinaan: rekap pembinaan wali kelas dan pejabat. Saring menurut tahun ajaran, status, atau kelas; Unduh CSV untuk arsip. Anda dapat mencatat atau mengoreksi pembinaan, termasuk yang Selesai.
 2. Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.
 3. Tata tertib, tab Ambang pembinaan: atur Penanggung jawab tiap ambang (wali kelas, BK, Kepala, atau Waka). Pada data lama tekan Isi penanggung jawab bawaan.
 
@@ -54,8 +56,8 @@ Untuk: Waka Kesiswaan
 
 ## Pelanggaran, piket, dan pengawasan
 
-1. Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (dengan alasan), atau pulihkan.
-2. Petugas piket: tambah atau nonaktifkan nama petugas, atur jendela input mundur (0 sampai 14 hari, bawaan 2). Di sini juga tombol Kunci akun piket untuk keadaan darurat.
+1. Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (beralasan), atau pulihkan.
+2. Petugas piket: tambah atau nonaktifkan nama, atur jendela input mundur (0 sampai 14 hari, bawaan 2), dan Kunci akun piket untuk keadaan darurat.
 3. Log aktivitas: pilih tanggal, saring menurut petugas, perangkat, atau siswa; unduh CSV.
 4. Laporan kesiswaan dan Jejak audit untuk rekap dan pemeriksaan.
 

@@ -49,7 +49,7 @@ const hariIni = "((now + 25200000) / 86400000)";
 const mundurN = "(root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2)";
 /** hariKe sah: bilangan bulat dalam [hariIni - N, hariIni + batasDepan]. hariIni dihitung desimal (>= lantai), sehingga batas bawah efektif tepat N hari. */
 const hariKeSah = (ex, depan) => `${ex}.isNumber() && ${ex}.val() % 1 === 0 && ${ex}.val() >= ${hariIni} - ${mundurN} - 1 && ${ex}.val() <= ${hariIni} + ${depan}`;
-const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
+const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|alfa-jam|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
 const KET_IZIN = "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')";
 const nisRe = "/^[0-9]{1,20}$/";
 const KODE_JAM = "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'";
@@ -258,6 +258,55 @@ const usulRemisiBlok = () => ({
     $other: { ".validate": false },
   },
 });
+
+// ---- PRESENSI PER JAM v2.3.1: guru piket boleh memberi A (Alfa) HANYA untuk HARI INI ---------------------------------------------------
+// Penanda pengisi per sel: lessons/{tgl}/{kelas}/absenOleh/{nis}/{jam} = "piket" | "waka" (ditulis dalam update yang sama dengan sel; sel lama tanpa
+// penanda diperlakukan "waka"). absenInfo = {petugas, ts (=== now), hariKe}: hariKe adalah klaim klien atas hari milik sel (epoch-day WIB), yang rules
+// wajibkan === hari server saat ini pada saat A diisi; ubah/hapus A oleh piket hanya bila hariKe TERSIMPAN itu masih hari ini (jadi A kemarin terkunci).
+// Keterbatasan (sama dengan jendela piket lain): rules tidak dapat memverifikasi bahwa kunci tanggal sel cocok dengan hariKe yang diklaim.
+const SEL_SID = "(newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D')";
+const SEL_SID_K = "(newData.child('k').val() === 'S' || newData.child('k').val() === 'I' || newData.child('k').val() === 'D')";
+/** x (node hariKe) adalah bilangan bulat tepat hari server saat ini: (hariIni-1, hariIni]. */
+const HARI_INI = (x) => `${x}.isNumber() && ${x}.val() % 1 === 0 && ${x}.val() > ${hariIni} - 1 && ${x}.val() <= ${hariIni}`;
+const KELAS_BARU = `${nav(6)}.child('lessons').child($tgl).child($kelas)`; // dari sel/penanda (6 tingkat ke root)
+const KELAS_LAMA = "root.child('lessons').child($tgl).child($kelas)";
+const MARK_BARU = `${KELAS_BARU}.child('absenOleh').child($nis).child($jam)`;
+const MARK_LAMA = `${KELAS_LAMA}.child('absenOleh').child($nis).child($jam)`;
+const CELL_BARU = `${KELAS_BARU}.child('absen').child($nis).child($jam)`;
+const CELL_LAMA = `${KELAS_LAMA}.child('absen').child($nis).child($jam)`;
+const INFO_BARU = `${KELAS_BARU}.child('absenInfo').child($nis).child($jam)`;
+const INFO_LAMA = `${KELAS_LAMA}.child('absenInfo').child($nis).child($jam)`;
+/** Keterangan harian Izin/Sakit/Dispensasi pada siswa/tanggal itu (dilihat dari sel 6 tingkat ke root): sel per jam tidak boleh ditulis. */
+const KET_HARIAN_6 = `${nav(6)}.child('attendance').child($nis).child($tgl).child('ket')`;
+const KET_HARIAN_4 = `${nav(4)}.child('attendance').child($nis).child($tgl).child('ket')`;
+const piketSelJam = `${isPiket} && (
+  ((!data.exists() || data.val() !== 'A') && (
+    (!newData.exists() && ${actOk(6, ["izin-jam"])})
+    || (${SEL_SID} && ${actOk(6, ["izin-jam"])} && ${metaBaruPiket(6, '$tgl', '$nis', "newData.val()")})
+    || (newData.val() === 'A' && ${actOk(6, ["alfa-jam"])} && ${MARK_BARU}.val() === 'piket' && ${INFO_BARU}.exists() && ${HARI_INI(`${INFO_BARU}.child('hariKe')`)})
+  ))
+  || (data.val() === 'A' && ${MARK_LAMA}.val() === 'piket' && ${HARI_INI(`${INFO_LAMA}.child('hariKe')`)} && (
+    (!newData.exists() && ${actOk(6, ["alfa-jam"])} && !${MARK_BARU}.exists())
+    || (${SEL_SID} && ${actOk(6, ["izin-jam"])} && ${metaBaruPiket(6, '$tgl', '$nis', "newData.val()")})
+  ))
+)`.replace(/\n\s*/g, " ");
+// salinan lessonsByStudent: kunci kelas diambil dari indeks siswaKelas (penanda ada di lessons/{tgl}/{kelas})
+const KUNCI_KELAS_SISWA = "root.child('siswaKelas').child($nis).val()";
+const MARK_S_BARU = `${nav(4)}.child('lessons').child($tgl).child(${KUNCI_KELAS_SISWA}).child('absenOleh').child($nis).child($jam)`;
+const MARK_S_LAMA = `root.child('lessons').child($tgl).child(${KUNCI_KELAS_SISWA}).child('absenOleh').child($nis).child($jam)`;
+const INFO_S_BARU = `${nav(4)}.child('lessons').child($tgl).child(${KUNCI_KELAS_SISWA}).child('absenInfo').child($nis).child($jam)`;
+const INFO_S_LAMA = `root.child('lessons').child($tgl).child(${KUNCI_KELAS_SISWA}).child('absenInfo').child($nis).child($jam)`;
+const piketSalinanJam = `${isPiket} && (
+  ((!data.exists() || data.child('k').val() !== 'A') && (
+    (!newData.exists() && ${actOk(4, ["izin-jam"])})
+    || (${SEL_SID_K} && ${actOk(4, ["izin-jam"])} && ${metaBaruPiket(4, '$tgl', '$nis', "newData.child('k').val()")})
+    || (newData.child('k').val() === 'A' && ${actOk(4, ["alfa-jam"])} && ${MARK_S_BARU}.val() === 'piket' && ${INFO_S_BARU}.exists() && ${HARI_INI(`${INFO_S_BARU}.child('hariKe')`)})
+  ))
+  || (data.child('k').val() === 'A' && ${MARK_S_LAMA}.val() === 'piket' && ${HARI_INI(`${INFO_S_LAMA}.child('hariKe')`)} && (
+    (!newData.exists() && ${actOk(4, ["alfa-jam"])})
+    || (${SEL_SID_K} && ${actOk(4, ["izin-jam"])} && ${metaBaruPiket(4, '$tgl', '$nis', "newData.child('k').val()")})
+  ))
+)`.replace(/\n\s*/g, " ");
 
 // ---- aturan ----------------------------------------------------------------
 export function buildRules() {
@@ -734,9 +783,35 @@ export function buildRules() {
             $nis: {
               ".validate": `$nis.matches(${nisRe})`,
               $jam: {
-                // Piket: hanya S/I/D, tidak boleh membuat/mengubah/menghapus sel yang sudah A, dan wajib ada izinMeta untuk (tanggal, siswa).
-                ".write": `auth != null && ${isPiket} && (!data.exists() || data.val() !== 'A') && ${actOk(6, ["izin-jam"])} && (!newData.exists() || ((newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D') && ${metaBaruPiket(6, '$tgl', '$nis', "newData.val()")}))`,
-                ".validate": `$jam.matches(${jamRe}) && (${KODE_JAM})`,
+                // Piket: S/I/D (wajib izinMeta) kapan pun dalam jendela; A (Alfa) HANYA hari ini, bertanda "piket", log "alfa-jam", tanpa izinMeta;
+                // ubah/hapus A hanya bila milik piket (penanda) DAN hari ini; A milik waka / tanpa penanda tidak dapat disentuh.
+                ".write": `auth != null && ${piketSelJam}`,
+                // Siswa berketerangan harian (Izin/Sakit/Dispensasi) tidak boleh punya sel per jam baru; penanda "piket" hanya untuk penulis piket.
+                ".validate": `$jam.matches(${jamRe}) && (${KODE_JAM}) && !${KET_HARIAN_6}.exists() && (${isPiket} || ${MARK_BARU}.val() !== 'piket')`,
+              },
+            },
+          },
+          // Penanda pengisi sel: waka (cascade $kelas) menulis "waka"; piket hanya "piket" dan hanya bersama perubahan sel yang sama.
+          absenOleh: {
+            $nis: {
+              ".validate": `$nis.matches(${nisRe})`,
+              $jam: {
+                ".write": `auth != null && ${isPiket} && (newData.exists() ? (newData.val() === 'piket' && ${CELL_BARU}.exists() && ${CELL_BARU}.val() !== ${CELL_LAMA}.val()) : !${CELL_BARU}.exists())`,
+                ".validate": `$jam.matches(${jamRe}) && (newData.val() === 'piket' || newData.val() === 'waka') && ${CELL_BARU}.exists()`,
+              },
+            },
+          },
+          // Nama petugas + waktu pengisian A oleh piket (hanya tampilan; tooltip "Diisi piket: <nama>, <jam>").
+          absenInfo: {
+            $nis: {
+              ".validate": `$nis.matches(${nisRe})`,
+              $jam: {
+                ".write": `auth != null && ${isPiket} && (newData.exists() ? (${CELL_BARU}.val() === 'A' && ${MARK_BARU}.val() === 'piket' && ${CELL_LAMA}.val() !== 'A') : ${CELL_BARU}.val() !== 'A')`,
+                ".validate": `$jam.matches(${jamRe}) && newData.hasChildren(['petugas', 'ts', 'hariKe']) && ${CELL_BARU}.val() === 'A'`,
+                petugas: { ".validate": str(60) },
+                ts: { ".validate": "newData.val() === now" },
+                hariKe: { ".validate": HARI_INI("newData") },
+                $other: { ".validate": false },
               },
             },
           },
@@ -754,8 +829,8 @@ export function buildRules() {
         $tgl: {
           ".validate": `$tgl.matches(${tglRe})`,
           $jam: {
-            ".write": `auth != null && (${PENULIS_JAM.join(" || ")} || (${isPiket} && (!data.exists() || data.child('k').val() !== 'A') && ${actOk(4, ["izin-jam"])} && (!newData.exists() || ((newData.child('k').val() === 'S' || newData.child('k').val() === 'I' || newData.child('k').val() === 'D') && ${metaBaruPiket(4, '$tgl', '$nis', "newData.child('k').val()")}))))`,
-            ".validate": `$jam.matches(${jamRe}) && newData.hasChildren(['k'])`,
+            ".write": `auth != null && (${PENULIS_JAM.join(" || ")} || (${piketSalinanJam}))`,
+            ".validate": `$jam.matches(${jamRe}) && newData.hasChildren(['k']) && !${KET_HARIAN_4}.exists()`,
             k: { ".validate": KODE_JAM },
             mapel: { ".validate": str(60) },
             $other: { ".validate": false },

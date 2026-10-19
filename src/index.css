@@ -710,7 +710,7 @@ button.kode:disabled { cursor: default; }
 .lap-siswa { grid-template-columns: minmax(200px, 1.6fr) .8fr .7fr .6fr .6fr 1.6fr; }
 .lap-kelas { grid-template-columns: 1fr repeat(6, .8fr); }
 .lap-top { grid-template-columns: minmax(240px, 2.4fr) 1fr .6fr .7fr .8fr; }
-.lap-jam { grid-template-columns: minmax(200px, 1.6fr) .8fr repeat(4, .5fr) 2fr; }
+.lap-jam { grid-template-columns: minmax(200px, 1.6fr) .8fr .7fr repeat(3, .5fr) .7fr 2fr; }
 @media (max-width: 760px) { .lap-siswa, .lap-kelas, .lap-top, .lap-jam { min-width: 760px; } }
 
 /* Dispensasi */
@@ -764,3 +764,7 @@ button.kode:disabled { cursor: default; }
 .kal-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
 .riwayat-libur { opacity: .7; }
 @media (max-width: 880px) { .kal-wrap { grid-template-columns: 1fr; } .kal-hari { min-height: 46px; } }
+.kode.turunan { opacity: .9; position: relative; background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.06) 0 4px, transparent 4px 8px); }
+.turunan-label { display: block; color: #a64a3a; font-weight: 700; font-size: 11px; }
+button.kode { position: relative; }
+.dot-piket { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: #d9722b; }

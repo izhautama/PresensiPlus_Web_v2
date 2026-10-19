@@ -22,7 +22,7 @@ export default function BannerTapRendah() {
       {aktif.map(([tgl, x]) => (
         <div key={tgl} className="notice warn" role="alert" data-tgl={tgl}>
           <Icon name="warning" size={17} />
-          <span><b>Tap rendah — {formatTanggal(tgl)}:</b> hanya {x.tap} tap (jauh di bawah biasanya). Alat mungkin bermasalah sebagian hari. Validasi Alfa dan saran Alfa tanggal ini ditahan.</span>
+          <span><b>Tap rendah — {formatTanggal(tgl)}:</b> hanya {x.tap} tap (jauh di bawah biasanya). Alat mungkin bermasalah sebagian hari. Validasi Alfa tanggal ini ditahan.</span>
           <span className="aksi-cell">
             <Link className="secondary-button sm" to={`${base}/presensi-manual?tanggal=${tgl}`}>Isi presensi manual</Link>
             {bisaKonfirmasi && <button className="primary-button sm" onClick={async () => { try { await konfirmasiNormal(tgl); notify("Hari dikonfirmasi normal"); } catch (e) { notify((e as Error).message, "err"); } }}>Konfirmasi hari ini normal</button>}

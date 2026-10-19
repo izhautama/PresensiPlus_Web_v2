@@ -6,7 +6,11 @@ import { useAdminData } from "../admin/AdminData";
 import { downloadCSV } from "../lib/attendance";
 import { awalTa, levelDari, labelTa, perluTindakLanjut, ringkas, taKey, type DiscRecord } from "../lib/discipline";
 import { rekapPerJam, type LessonsTgl } from "../lib/rekapJam";
-import { BULAN, formatTanggal } from "../lib/time";
+import { rekapSiswa } from "../lib/hariEfektif";
+import type { ManualTap } from "../lib/manual";
+import type { DayRecord } from "../lib/types";
+import { useKalenderRentang } from "./useKalender";
+import { BULAN, formatTanggal, lastDayOfMonth } from "../lib/time";
 import { r } from "../services/db";
 import { useDiscipline } from "./useDiscipline";
 
@@ -107,15 +111,41 @@ export default function LaporanKesiswaan() {
       .then((s) => setLessons((s.val() ?? {}) as Record<string, LessonsTgl>)).catch((e) => setErrJam(e.message));
   }, [tab, bulanJam]);
 
+  // Status HARIAN bulan itu (rumus rekapSiswa yang sama dengan semua rekap): Alfa seharian dihitung sebagai HARI terpisah dari "A per jam (bolos)".
+  const { schedule, now, aktifSejak } = useAdminData();
+  const [attBulan, setAttBulan] = useState<Record<string, Record<string, DayRecord>> | null>(null);
+  const [manualBln, setManualBln] = useState<Record<string, Record<string, ManualTap>> | null>(null);
+  useEffect(() => {
+    if (tab !== "jam") return;
+    setAttBulan(null); setManualBln(null);
+    get(r("attendance")).then((x) => setAttBulan((x.val() ?? {}) as Record<string, Record<string, DayRecord>>)).catch((e) => setErrJam(e.message));
+    get(query(r("manualTap"), orderByKey(), startAt(`${bulanJam}-01`), endAt(`${bulanJam}-31`)))
+      .then((x) => setManualBln((x.val() ?? {}) as Record<string, Record<string, ManualTap>>)).catch((e) => setErrJam(e.message));
+  }, [tab, bulanJam]);
+  const kalJam = useKalenderRentang(`${bulanJam}-01`, lastDayOfMonth(bulanJam));
+  const harianJam = useMemo(() => {
+    const out = new Map<string, { alfa: number; turunan: Set<string> }>();
+    if (!attBulan || !manualBln || kalJam.loading) return null;
+    for (const s of anak) {
+      const manualSiswa: Record<string, ManualTap> = {};
+      for (const [tgl, per] of Object.entries(manualBln)) if (per[s.nis]) manualSiswa[tgl] = per[s.nis];
+      const rk = rekapSiswa({ hariEfektif: kalJam.peta, attendance: attBulan[s.nis], manualTap: manualSiswa, schedule, kelas: s.kelas, aktifSejak: aktifSejak[s.nis], awal: `${bulanJam}-01`, akhir: lastDayOfMonth(bulanJam), now });
+      const turunan = new Set(rk.hari.filter((h) => h.kategori === "Alpha" || h.kategori === "Izin" || h.kategori === "Sakit" || h.kategori === "Dispensasi").map((h) => h.tanggal));
+      if (rk.Alpha || turunan.size) out.set(s.nis, { alfa: rk.Alpha, turunan });
+    }
+    return out;
+  }, [attBulan, manualBln, kalJam.loading, kalJam.peta, anak, schedule, aktifSejak, bulanJam, now]);
+
   const perJam = useMemo(() => {
-    if (!lessons) return [];
-    const m = rekapPerJam(lessons);
-    return anak.filter((s) => m.has(s.nis)).map((s) => {
-      const e = m.get(s.nis)!;
+    if (!lessons || !harianJam) return [];
+    const m = rekapPerJam(lessons, (nis, tgl) => harianJam.get(nis)?.turunan.has(tgl) ?? false);
+    const nisAda = new Set([...m.keys(), ...[...harianJam.entries()].filter(([, v]) => v.alfa > 0).map(([n]) => n)]);
+    return anak.filter((s) => nisAda.has(s.nis)).map((s) => {
+      const e = m.get(s.nis) ?? { A: 0, I: 0, S: 0, D: 0, mapelA: new Map<string, number>() };
       const mapel = [...e.mapelA.entries()].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ×${c}`);
-      return { s, ...e, mapel };
-    }).sort((a, b) => b.A - a.A || (b.I + b.S + b.D) - (a.I + a.S + a.D));
-  }, [lessons, anak]);
+      return { s, ...e, alfaHari: harianJam.get(s.nis)?.alfa ?? 0, mapel };
+    }).sort((a, b) => b.alfaHari - a.alfaHari || b.A - a.A || (b.I + b.S + b.D) - (a.I + a.S + a.D));
+  }, [lessons, harianJam, anak]);
 
   const csv = () => {
     const nama = `laporan_kesiswaan_${tab}_${bulan || ta}`;
@@ -124,7 +154,7 @@ export default function LaporanKesiswaan() {
     else if (tab === "top") downloadCSV(`${nama}.csv`, ["Pelanggaran", "Kategori", "Kasus", "Total poin", "Siswa berbeda"], top.map((t) => [t.nama, t.kategori, t.kasus, t.poin, t.siswa.size]));
     else if (tab === "izin") downloadCSV(`laporan_izin_${bulanJam}.csv`, ["Tanggal", "NIS", "Nama", "Kelas", "Jenis", "Lingkup", "Jam", "Keterangan", "Surat fisik diterima", "Petugas"],
       izinBaris.map((x) => [x.tanggal, x.nis, x.nama, x.kelas, x.m.ket, x.m.lingkup, Object.values(x.m.jam ?? {}).join(" "), x.m.keterangan, x.m.suratDiterima ? "Ya" : "Belum", x.m.petugas]));
-    else downloadCSV(`laporan_kesiswaan_per_jam_${bulanJam}.csv`, ["NIS", "Nama", "Kelas", "Alfa", "Izin", "Sakit", "Dispensasi", "Mapel paling sering Alfa"], perJam.map((x) => [x.s.nis, x.s.nama, x.s.kelas, x.A, x.I, x.S, x.D, x.mapel.join("; ")]));
+    else downloadCSV(`laporan_kesiswaan_per_jam_${bulanJam}.csv`, ["NIS", "Nama", "Kelas", "A per jam (bolos)", "Izin (jam)", "Sakit (jam)", "Dispensasi (jam)", "Alfa seharian (hari)", "Mapel paling sering A per jam"], perJam.map((x) => [x.s.nis, x.s.nama, x.s.kelas, x.A, x.I, x.S, x.D, x.alfaHari, x.mapel.join("; ")]));
   };
 
   const judul = { siswa: "Poin per siswa", kelas: "Poin per kelas", top: "Pelanggaran terbanyak", jam: "Kehadiran per jam", izin: "Izin & bukti surat" }[tab];
@@ -202,13 +232,14 @@ export default function LaporanKesiswaan() {
           </>
         ) : (
           <>
-            <div className="table-head lap-jam"><span>Siswa</span><span>Kelas</span><span>Alfa</span><span>Izin</span><span>Sakit</span><span>Disp.</span><span>Mapel paling sering Alfa</span></div>
-            {errJam ? <Empty icon="alert" title="Gagal memuat" text={errJam} /> : !lessons ? <div className="page-loader"><Spinner dark /></div> : perJam.length === 0 ? (
+            <div className="table-head lap-jam"><span>Siswa</span><span>Kelas</span><span title="Alfa pada jam tertentu saat siswa hadir (bolos)">A per jam (bolos)</span><span>Izin</span><span>Sakit</span><span>Disp.</span><span title="Hari tanpa tap, manual, maupun keterangan (otomatis)">Alfa seharian (hari)</span><span>Mapel paling sering A per jam</span></div>
+            {errJam ? <Empty icon="alert" title="Gagal memuat" text={errJam} /> : !lessons || !harianJam ? <div className="page-loader"><Spinner dark /></div> : perJam.length === 0 ? (
               <Empty icon="clock" title="Tidak ada ketidakhadiran per jam" text={`Pada ${formatTanggal(`${bulanJam}-01`, false).replace(/^\d+ /, "")}.`} />
             ) : perJam.map((x) => (
               <div className="table-row lap-jam" key={x.s.nis}>
                 <span className="student-cell"><span><b>{x.s.nama}</b><small>NIS {x.s.nis}</small></span></span><span>{x.s.kelas}</span>
                 <span className={`num ${x.A ? "bad" : ""}`}>{x.A}</span><span className="num">{x.I}</span><span className="num">{x.S}</span><span className="num">{x.D}</span>
+                <span className={`num ${x.alfaHari ? "bad" : ""}`} data-testid="alfa-seharian-hari">{x.alfaHari}</span>
                 <span><small>{x.mapel.join(", ") || "—"}</small></span>
               </div>
             ))}

@@ -36,6 +36,28 @@ const MASTER_REMISI_T = "root.child('discipline').child('remisi').child(newData.
 const USUL_BARU_FN = (id) => `${nav(3)}.parent().child('usulRemisi').child(${id})`;
 const USUL_BARU_T = USUL_BARU_FN('$recId');
 const USUL_SAH_T = `root.child('usulRemisi').child($recId).child('status').val() === 'menunggu' && ${USUL_BARU_T}.child('status').val() === 'disetujui' && ${USUL_BARU_T}.child('recId').val() === $recId && ${USUL_BARU_T}.child('diputuskanOleh').val() === auth.uid && ${USUL_BARU_T}.child('nis').val() === $nis && newData.child('jenis').val() === 'remisi' && newData.child('refId').val() === ${USUL_BARU_T}.child('remId').val() && newData.child('poin').val() === ${USUL_BARU_T}.child('poin').val() && newData.child('nama').val() === ${USUL_BARU_T}.child('nama').val()`;
+// ---- pembantu mutasi PER JAM v2.3.1 (salinan helper rules; harus identik dengan scripts/build-rules.mjs)
+const HARI_INI_X = "((now + 25200000) / 86400000)";
+const HARI_INI_T = (x) => `${x}.isNumber() && ${x}.val() % 1 === 0 && ${x}.val() > ${HARI_INI_X} - 1 && ${x}.val() <= ${HARI_INI_X}`;
+const SEL_SID_T = "(newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D')";
+const SEL_SID_K_T = "(newData.child('k').val() === 'S' || newData.child('k').val() === 'I' || newData.child('k').val() === 'D')";
+const KELAS_BARU_T = `${nav(6)}.child('lessons').child($tgl).child($kelas)`;
+const KELAS_LAMA_T = "root.child('lessons').child($tgl).child($kelas)";
+const MARK_BARU_T = `${KELAS_BARU_T}.child('absenOleh').child($nis).child($jam)`;
+const MARK_LAMA_T = `${KELAS_LAMA_T}.child('absenOleh').child($nis).child($jam)`;
+const CELL_BARU_T = `${KELAS_BARU_T}.child('absen').child($nis).child($jam)`;
+const CELL_LAMA_T = `${KELAS_LAMA_T}.child('absen').child($nis).child($jam)`;
+const INFO_BARU_T = `${KELAS_BARU_T}.child('absenInfo').child($nis).child($jam)`;
+const INFO_LAMA_T = `${KELAS_LAMA_T}.child('absenInfo').child($nis).child($jam)`;
+const KET6_T = `${nav(6)}.child('attendance').child($nis).child($tgl).child('ket')`;
+const KET4_T = `${nav(4)}.child('attendance').child($nis).child($tgl).child('ket')`;
+const KUNCI_S_T = "root.child('siswaKelas').child($nis).val()";
+const MARK_S_BARU_T = `${nav(4)}.child('lessons').child($tgl).child(${KUNCI_S_T}).child('absenOleh').child($nis).child($jam)`;
+const MARK_S_LAMA_T = `root.child('lessons').child($tgl).child(${KUNCI_S_T}).child('absenOleh').child($nis).child($jam)`;
+const INFO_S_BARU_T = `${nav(4)}.child('lessons').child($tgl).child(${KUNCI_S_T}).child('absenInfo').child($nis).child($jam)`;
+const INFO_S_LAMA_T = `root.child('lessons').child($tgl).child(${KUNCI_S_T}).child('absenInfo').child($nis).child($jam)`;
+/** hapus SEMUA kemunculan teks dari satu aturan */
+const buangSemua = (teks, dari) => { if (!teks.includes(dari)) throw new Error(`mutasi tidak menemukan teks target: ${dari.slice(0, 60)}`); return teks.split(dari).join(""); };
 const RULE = "root.child('discipline').child('rules').child(newData.child('refId').val())";
 /** ganti SEMUA kemunculan teks pada seluruh rules (JSON) */
 function ubahJson(r, dari, ke) {
@@ -106,17 +128,13 @@ const mutasi = [
   { nama: "admin boleh menulis keputusan saran", ubah: (r) => { const n = r.discipline.suggest.$tgl.$key; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN} && !data.exists())`; } },
   { nama: "ortu boleh membaca suggest", ubah: (r) => { r.discipline.suggest[".read"] = "auth != null"; } },
   // ---- Piket + Dispensasi + jalur alat (firmware v12)
-  { nama: "piket boleh mengisi sel per jam 'A'", ubah: (r) => {
+  { nama: "piket boleh mengubah/menimpa sel yang sudah 'A' (jalur S/I/D menyentuh A milik waka)", ubah: (r) => {
     const n = r.lessons.$tgl.$kelas.absen.$nis.$jam;
-    n[".write"] = ganti(n[".write"], "newData.val() === 'D')", "newData.val() === 'D' || newData.val() === 'A')");
+    n[".write"] = ganti(n[".write"], "((!data.exists() || data.val() !== 'A') && (", "(true && (");
   } },
-  { nama: "piket boleh mengubah/menimpa sel yang sudah 'A'", ubah: (r) => {
-    const n = r.lessons.$tgl.$kelas.absen.$nis.$jam;
-    n[".write"] = ganti(n[".write"], "(!data.exists() || data.val() !== 'A') && ", "");
-  } },
-  { nama: "piket boleh mengubah salinan lessonsByStudent yang sudah 'A'", ubah: (r) => {
+  { nama: "piket boleh mengubah salinan lessonsByStudent yang sudah 'A' (jalur S/I/D menyentuh A milik waka)", ubah: (r) => {
     const n = r.lessonsByStudent.$nis.$tgl.$jam;
-    n[".write"] = ganti(n[".write"], " && (!data.exists() || data.child('k').val() !== 'A')", "");
+    n[".write"] = ganti(n[".write"], "((!data.exists() || data.child('k').val() !== 'A') && (", "(true && (");
   } },
   { nama: "piket boleh membaca discipline/records", ubah: (r) => { const n = r.discipline.records; n[".read"] = `(${n[".read"]}) || (auth != null && ${PIKET})`; } },
   { nama: "piket boleh membaca discipline/levels", ubah: (r) => { const n = r.discipline.levels; n[".read"] = ganti(n[".read"], " && !(root.child('roles').child(auth.uid).val() === 'piket')", ""); } },
@@ -228,19 +246,19 @@ const mutasi = [
   } },
   { nama: "log: sel per jam piket tidak lagi mewajibkan log (sel, salinan, izinMeta)", ubah: (r) => {
     const c = r.lessons.$tgl.$kelas.absen.$nis.$jam;
-    c[".write"] = ganti(c[".write"], ` && ${actOk(6, ["izin-jam"])}`, "");
+    c[".write"] = buangSemua(c[".write"], ` && ${actOk(6, ["izin-jam"])}`);
     const k = r.lessonsByStudent.$nis.$tgl.$jam;
-    k[".write"] = ganti(k[".write"], ` && ${actOk(4, ["izin-jam"])}`, "");
+    k[".write"] = buangSemua(k[".write"], ` && ${actOk(4, ["izin-jam"])}`);
     const m = r.izinMeta.$tgl.$nis.$metaId;
     m[".write"] = ganti(m[".write"], ` && ${actOk(4, ["izin-harian", "izin-jam"])}`, "");
   } },
   { nama: "log: sel piket tanpa izinMeta BARU pada sel (lessons)", ubah: (r) => {
     const c = r.lessons.$tgl.$kelas.absen.$nis.$jam;
-    c[".write"] = ganti(c[".write"], ` && ${metaBaruPiket(6, "$tgl", "$nis", "newData.val()")}`, "");
+    c[".write"] = buangSemua(c[".write"], ` && ${metaBaruPiket(6, "$tgl", "$nis", "newData.val()")}`);
   } },
   { nama: "log: sel piket tanpa izinMeta BARU pada salinan (lessonsByStudent)", ubah: (r) => {
     const k = r.lessonsByStudent.$nis.$tgl.$jam;
-    k[".write"] = ganti(k[".write"], ` && ${metaBaruPiket(4, "$tgl", "$nis", "newData.child('k').val()")}`, "");
+    k[".write"] = buangSemua(k[".write"], ` && ${metaBaruPiket(4, "$tgl", "$nis", "newData.child('k').val()")}`);
   } },
   { nama: "log: pelanggaran piket tidak lagi mewajibkan log (records, recordMeta, piketHarian)", ubah: (r) => {
     const rc = r.discipline.records.$nis.$recId;
@@ -652,6 +670,53 @@ const mutasi = [
   { nama: "usul: record usul-wali: jenis harus remisi (hanya lapisan record; usulan memeriksa jenis record yang sama)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], " && newData.child('jenis').val() === 'remisi' && newData.child('refId')", " && newData.child('refId')"); } },
   { nama: "usul: record usul-wali: siswa harus sama dengan usulan (hanya lapisan record; usulan mencari record di siswa yang sama)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], ` && ${USUL_BARU_T}.child('nis').val() === $nis`, ""); } },
   { nama: "ambang: penanggung jawab bebas", ubah: (r) => { r.discipline.levels.$lvlId.penanggungJawab[".validate"] = "newData.isString()"; } },
+  // ---------------------------------------------------------------- v2.3.1: piket boleh memberi A per jam HANYA hari ini
+  // Catatan lapisan: set A hari ini ditegakkan di sel (write) DAN absenInfo (validate hariKe); mutan yang membuka celah merusak keduanya.
+  { nama: "alfa-jam: piket mengisi A bukan hari ini (hariKe tidak diperiksa di SEMUA lapisan: sel + absenInfo + salinan)", ubah: (r) => {
+    const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${HARI_INI_T(`${INFO_BARU_T}.child('hariKe')`)})`, ")");
+    r.lessons.$tgl.$kelas.absenInfo.$nis.$jam.hariKe[".validate"] = "newData.isNumber()";
+    const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_BARU_T}.child('hariKe')`)})`, ")");
+  } },
+  { nama: "alfa-jam: piket mengisi A tanpa info (hariKe tak terbukti)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${INFO_BARU_T}.exists()`, ""); } },
+  { nama: "alfa-jam: piket mengisi A tanpa penanda 'piket' (sel + absenInfo.write)", ubah: (r) => {
+    const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `${actOk(6, ["alfa-jam"])} && ${MARK_BARU_T}.val() === 'piket' && `, `${actOk(6, ["alfa-jam"])} && `);
+    const m = r.lessons.$tgl.$kelas.absenInfo.$nis.$jam; m[".write"] = ganti(m[".write"], `${MARK_BARU_T}.val() === 'piket' && ${CELL_LAMA_T}`, `${CELL_LAMA_T}`);
+  } },
+  { nama: "alfa-jam: piket mengisi A tanpa log aktivitas", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(newData.val() === 'A' && ${actOk(6, ["alfa-jam"])} && `, "(newData.val() === 'A' && "); } },
+  { nama: "alfa-jam: piket mengisi A dengan log aksi apa pun", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(newData.val() === 'A' && ${actOk(6, ["alfa-jam"])}`, `(newData.val() === 'A' && ${ACT(6)}.child('ts').val() === now && ${ENT(6)}.child('ts').val() === now && ${ENT(6)}.child('uid').val() === auth.uid`); } },
+  { nama: "alfa-jam: piket mengubah/menghapus A milik waka (penanda lama tidak diperiksa)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(data.val() === 'A' && ${MARK_LAMA_T}.val() === 'piket' && `, "(data.val() === 'A' && "); } },
+  { nama: "alfa-jam: piket mengubah/menghapus A piket yang diisi hari sebelumnya (hariKe tersimpan tidak diperiksa)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${HARI_INI_T(`${INFO_LAMA_T}.child('hariKe')`)} && (`, " && ("); } },
+  { nama: "alfa-jam: piket menghapus A tanpa log aksi 'alfa-jam'", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(!newData.exists() && ${actOk(6, ["alfa-jam"])} && !${MARK_BARU_T}.exists())`, `(!newData.exists() && !${MARK_BARU_T}.exists())`); } },
+  { nama: "alfa-jam: piket menghapus A tanpa menghapus penanda", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && !${MARK_BARU_T}.exists())`, ")"); } },
+  { nama: "alfa-jam: piket mengganti A miliknya menjadi S/I/D tanpa izinMeta", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `${MARK_LAMA_T}.val() === 'piket' && ${HARI_INI_T(`${INFO_LAMA_T}.child('hariKe')`)} && (`, `${MARK_LAMA_T}.val() === 'piket' && ${HARI_INI_T(`${INFO_LAMA_T}.child('hariKe')`)} && (true || `); } },
+  { nama: "alfa-jam: piket mengisi A tanpa log lewat jalur ganti S->A (log 'izin-jam' diterima untuk A)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], `(newData.val() === 'A' && ${actOk(6, ["alfa-jam"])}`, `(newData.val() === 'A' && ${actOk(6, ["alfa-jam", "izin-jam"])}`); } },
+  { nama: "alfa-jam: peran lain (wali) dapat mengisi A (sel + penanda + info + salinan)", ubah: (r) => {
+    const sw = (n) => { n[".write"] = ganti(n[".write"], `auth != null && ${PIKET} && (`, `auth != null && (${PIKET} || ${WALI}) && (`); };
+    sw(r.lessons.$tgl.$kelas.absen.$nis.$jam); sw(r.lessons.$tgl.$kelas.absenOleh.$nis.$jam); sw(r.lessons.$tgl.$kelas.absenInfo.$nis.$jam);
+    const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(${PIKET} && (`, `((${PIKET} || ${WALI}) && (`);
+  } },
+  { nama: "alfa-jam: sel per jam diterima untuk siswa berketerangan harian (sel)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".validate"] = ganti(c[".validate"], ` && !${KET6_T}.exists()`, ""); } },
+  { nama: "alfa-jam: salinan per jam diterima untuk siswa berketerangan harian (lessonsByStudent)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".validate"] = ganti(k[".validate"], ` && !${KET4_T}.exists()`, ""); } },
+  { nama: "alfa-jam: penanda 'piket' basi dapat tertinggal pada sel waka", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".validate"] = ganti(c[".validate"], ` && (${PIKET} || ${MARK_BARU_T}.val() !== 'piket')`, ""); } },
+  { nama: "alfa-jam: piket menulis penanda 'waka'", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenOleh.$nis.$jam; m[".write"] = ganti(m[".write"], "(newData.val() === 'piket' && ", "(true && "); } },
+  { nama: "alfa-jam: piket menulis penanda tanpa mengubah sel (mencuri A milik waka)", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenOleh.$nis.$jam; m[".write"] = ganti(m[".write"], ` && ${CELL_BARU_T}.val() !== ${CELL_LAMA_T}.val()`, ""); } },
+  { nama: "alfa-jam: piket menghapus penanda tanpa mengosongkan sel", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenOleh.$nis.$jam; m[".write"] = ganti(m[".write"], `: !${CELL_BARU_T}.exists())`, ": true)"); } },
+  { nama: "alfa-jam: penanda bernilai liar diterima", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenOleh.$nis.$jam; m[".validate"] = ganti(m[".validate"], "(newData.val() === 'piket' || newData.val() === 'waka')", "newData.isString()"); } },
+  { nama: "alfa-jam: penanda tanpa sel diterima", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenOleh.$nis.$jam; m[".validate"] = ganti(m[".validate"], ` && ${CELL_BARU_T}.exists()`, ""); } },
+  { nama: "alfa-jam: piket menulis info pada sel yang bukan A miliknya", ubah: (r) => { const m = r.lessons.$tgl.$kelas.absenInfo.$nis.$jam; m[".write"] = ganti(m[".write"], `(${CELL_BARU_T}.val() === 'A' && ${MARK_BARU_T}.val() === 'piket' && ${CELL_LAMA_T}.val() !== 'A')`, "true"); } },
+  { nama: "alfa-jam: info ts bukan waktu server diterima", ubah: (r) => { r.lessons.$tgl.$kelas.absenInfo.$nis.$jam.ts[".validate"] = "newData.isNumber()"; } },
+  { nama: "alfa-jam: info petugas tanpa batas panjang", ubah: (r) => { r.lessons.$tgl.$kelas.absenInfo.$nis.$jam.petugas[".validate"] = "newData.isString()"; } },
+  { nama: "alfa-jam: info tanpa hariKe diterima (hasChildren + pemeriksaan hariKe di sel)", ubah: (r) => {
+    const m = r.lessons.$tgl.$kelas.absenInfo.$nis.$jam; m[".validate"] = ganti(m[".validate"], "['petugas', 'ts', 'hariKe']", "['petugas', 'ts']");
+    const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = ganti(c[".write"], ` && ${HARI_INI_T(`${INFO_BARU_T}.child('hariKe')`)})`, ")");
+  } },
+  { nama: "alfa-jam: info field asing diterima", ubah: (r) => { r.lessons.$tgl.$kelas.absenInfo.$nis.$jam.$other[".validate"] = true; } },
+  // salinan lessonsByStudent (kunci kelas dari siswaKelas)
+  { nama: "alfa-jam: salinan A tanpa penanda 'piket' (lessonsByStudent)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `${actOk(4, ["alfa-jam"])} && ${MARK_S_BARU_T}.val() === 'piket' && `, `${actOk(4, ["alfa-jam"])} && `); } },
+  { nama: "alfa-jam: salinan A bukan hari ini (hariKe info tidak diperiksa, lessonsByStudent)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_BARU_T}.child('hariKe')`)})`, ")"); } },
+  { nama: "alfa-jam: salinan A tanpa log aktivitas (lessonsByStudent)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(newData.child('k').val() === 'A' && ${actOk(4, ["alfa-jam"])} && `, "(newData.child('k').val() === 'A' && "); } },
+  { nama: "alfa-jam: piket mengubah/menghapus salinan A milik waka (penanda lama tidak diperiksa)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], `(data.child('k').val() === 'A' && ${MARK_S_LAMA_T}.val() === 'piket' && `, "(data.child('k').val() === 'A' && "); } },
+  { nama: "alfa-jam: piket mengubah/menghapus salinan A piket kemarin (hariKe tersimpan tidak diperiksa)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_LAMA_T}.child('hariKe')`)} && (`, " && ("); } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
 
@@ -666,9 +731,9 @@ const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
 // Kelompok: manual | piket | saran | kalender | wali | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+const GRUP = (nama) => /^alfa-jam/.test(nama) ? "perjam" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 // ---- Pengelola emulator: mutasi memakai emulator SENDIRI (bukan firebase emulators:exec) supaya dapat direstart ----
 // Penyebab macet sebelumnya: satu emulator Java melayani ratusan run suite; memorinya menumpuk (+-3 GB) hingga tiap suite timeout.

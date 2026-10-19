@@ -29,9 +29,12 @@ Untuk: Guru piket (akun bersama meja piket)
 
 ## Izin per jam dan pelanggaran ringan
 
-1. Izin per jam: pilih kelas, isi sel S, I, atau D pada jam pelajaran (siswa pulang awal dll), beri keterangan. Sel A (Alfa) hanya Waka.
-2. Pelanggaran: pilih siswa dan jenis dari daftar (hanya pelanggaran Ringan atau yang punya takziran). Poin tidak dapat diubah.
-3. Catatan pelanggaran Anda sendiri dapat dihapus dengan alasan.
+1. Izin per jam: pilih kelas, isi sel S, I, atau D pada jam pelajaran (siswa pulang awal dll), beri keterangan.
+2. Alfa per jam: khusus HARI INI klik sel kosong sampai A (urutan kosong, A, I, S, D). Alfa = tidak hadir tanpa keterangan; tidak perlu keterangan, dan konfirmasi singkat muncul sekali per sesi. Untuk tanggal lampau sel A terkunci: koreksi oleh Waka.
+3. Sel A milik Waka (gembok, Diisi Waka) tidak dapat diubah. A yang Anda isi sendiri hari ini boleh diganti atau dihapus pada hari yang sama.
+4. Siswa yang hari itu Alfa seharian atau berketerangan harian tampil satu baris berlabel (otomatis) dan terkunci: input izin harian dari Beranda mengubah barisnya otomatis.
+5. Pelanggaran: pilih siswa dan jenis dari daftar (hanya pelanggaran Ringan atau yang punya takziran). Poin tidak dapat diubah.
+6. Catatan pelanggaran Anda sendiri dapat dihapus dengan alasan.
 
 ## Batasan yang normal
 

@@ -1,23 +1,26 @@
 // Logika saran pelanggaran otomatis. Fungsi MURNI (tanpa Firebase) agar dapat diuji unit; impor memakai ekstensi .ts
 // supaya Node dapat mengeksekusinya langsung (tsconfig: allowImportingTsExtensions).
 import type { AutoMap, Rule } from "./discipline.ts";
-import { tertahan, type RingkasanHari } from "./hariEfektif.ts";
+import type { RingkasanHari } from "./hariEfektif.ts";
 import { gabungTap, type ManualTap } from "./manual.ts";
 import { namaHari, weekday } from "./time.ts";
 
-export type TipeSaran = "terlambat" | "tanpaTapPulang" | "bolosJam" | "alfa" | "lupaKtm" | "ktmHilang";
+/**
+ * Alfa seharian BUKAN pelanggaran otomatis (v2.3.1): tidak ada saran "alfa". Data lama `autoMap.alfa` dan keputusan lama `{tgl}_alfa` diabaikan
+ * (tidak dihapus). Kesiswaan tetap dapat mencatat pelanggaran manual bila memutuskan perlu.
+ */
+export type TipeSaran = "terlambat" | "tanpaTapPulang" | "bolosJam" | "lupaKtm" | "ktmHilang";
 export const TIPE_LABEL: Record<TipeSaran, string> = {
   terlambat: "Terlambat",
   tanpaTapPulang: "Tidak tap pulang",
   bolosJam: "Tidak masuk kelas (jam pelajaran)",
-  alfa: "Alfa terverifikasi",
   lupaKtm: "Lupa membawa KTM",
   ktmHilang: "Menghilangkan KTM",
 };
 
 /** Bila autoMap belum memetakan tipe ini (data lama), cari aturan aktif berdasarkan namanya di master. */
 const NAMA_BAWAAN: Partial<Record<TipeSaran, string>> = { lupaKtm: "lupa membawa ktm", ktmHilang: "menghilangkan ktm" };
-export const SEMUA_TIPE_SARAN: TipeSaran[] = ["terlambat", "tanpaTapPulang", "bolosJam", "alfa", "lupaKtm", "ktmHilang"];
+export const SEMUA_TIPE_SARAN: TipeSaran[] = ["terlambat", "tanpaTapPulang", "bolosJam", "lupaKtm", "ktmHilang"];
 /** Cadangan SEKALI-JALAN: id aturan aktif yang namanya cocok dengan bawaan; hasilnya ditulis ke autoMap agar tidak bergantung nama lagi. */
 export function cariAturanBawaan(tipe: TipeSaran, rules: Record<string, Rule>): string | undefined {
   const nama = NAMA_BAWAAN[tipe];
@@ -129,8 +132,8 @@ export function hitungSaran(a: {
       if (manualEfektif?.masuk && manualEfektif.alasan === "Lupa KTM") tambah("lupaKtm", `Presensi manual (${manualEfektif.masuk.slice(0, 5)}): lupa membawa KTM`);
       if (manualEfektif?.masuk && manualEfektif.alasan === "KTM hilang") tambah("ktmHilang", `Presensi manual (${manualEfektif.masuk.slice(0, 5)}): KTM hilang`);
 
-      // saran Alfa DITAHAN pada hari ber-tap rendah (belum dikonfirmasi normal) dan pada hari yang bukan hari efektif
-      if (d.validasi?.[s.nis] && !tertahan(d.hari) && d.hari?.efektif !== false) tambah("alfa", "Alfa dikonfirmasi waka/kepala (tidak masuk tanpa keterangan)");
+      // Alfa seharian (dengan atau tanpa konfirmasi waka) TIDAK menghasilkan saran apa pun: siswa tanpa tap masuk tidak memicu terlambat,
+      // tanpaTapPulang, maupun bolosJam (ketiganya mensyaratkan tap masuk).
     }
   }
   return out.sort((x, y) => y.tanggal.localeCompare(x.tanggal) || x.nama.localeCompare(y.nama) || x.tipe.localeCompare(y.tipe));

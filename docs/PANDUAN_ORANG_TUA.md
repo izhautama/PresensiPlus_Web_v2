@@ -25,7 +25,7 @@ Untuk: Orang tua atau wali siswa
 1. Presensi hari ini (jam masuk dan pulang), grafik minggu dan bulan ini, serta persen kehadiran.
 2. Kartu rekap menulis Hari efektif ke-N: hanya hari yang benar-benar ada kegiatan presensi. Bulan tanpa kegiatan tertulis Belum ada kegiatan presensi, bukan 0 persen.
 3. Riwayat 10 hari terakhir dan rekap per bulan dalam satu tahun ajaran.
-4. Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level).
+4. Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level). Hari Alfa atau berketerangan penuh tampil satu baris (Alfa seharian), bukan sembilan baris jam.
 5. Data diperbarui otomatis tiap 1 menit; tekan tulisan "Diperbarui" untuk memuat ulang sekarang.
 
 ## Lupa PIN atau tidak bisa masuk

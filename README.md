@@ -87,7 +87,7 @@ Butuh Java (emulator Database) dan, untuk E2E, `npx playwright install chromium`
 | `npm run test:unit` | Logika murni: per jam, saran otomatis, kehadiran (Dispensasi), aturan piket, label perangkat, rekap per jam (Minggu diabaikan), jangkar tanggal E2E |
 | `npm run test:rules` | Security Rules di Emulator (semua peran + jalur firmware alat) |
 | `npm run test:mutation` | Merusak rules satu per satu; suite WAJIB gagal (mutasi ekuivalen terdokumentasi) |
-| `npm run test:mutation:manual` / `:piket` / `:saran` / `:kalender` / `:wali` / `:pembinaan` / `:dasar` | Mutasi per kelompok (juga `npm run test:mutation --grup=manual`). Gunakan ini saat iterasi. |
+| `npm run test:mutation:manual` / `:piket` / `:saran` / `:kalender` / `:wali` / `:pembinaan` / `:perjam` / `:dasar` | Mutasi per kelompok (juga `npm run test:mutation --grup=manual`). Gunakan ini saat iterasi. |
 
 **Catatan mutasi:** runner mutasi (`tests/mutation.mjs`) mengelola emulatornya sendiri (bukan `emulators:exec`) agar tidak macet: emulator **direstart tiap 15 mutan** (`MUTASI_RESTART_N`) dan tiap pindah kelompok, namespace uji dihapus setelah tiap mutan, tiap mutan dibatasi **90 detik** (`MUTASI_TIMEOUT_MS`); mutan yang habis waktu ditandai TIDAK TERVERIFIKASI, emulator direstart, lalu mutan itu **diulang otomatis di akhir** pada emulator baru. Hasil run tetap TIDAK VALID bila canary (rules bocor sengaja) tidak tertangkap atau hash rules di emulator tidak cocok.
 
@@ -117,6 +117,16 @@ Sebuah tanggal adalah **hari efektif** hanya bila ada bukti sekolah berlangsung 
 **Tap rendah:** bila tap < 50% median 10 hari efektif sebelumnya (butuh >= 3 pembanding), tanggal ditandai `rendah`: banner di Dashboard, validasi Alfa dan saran Alfa ditahan sampai waka menekan **Konfirmasi hari ini normal**.
 
 **Satu rumus:** `rekapSiswa()` di `src/lib/hariEfektif.ts` dipakai di semua tempat (portal orang tua, laporan bulanan/CSV, rekap tahunan). Identitas yang diuji: Tepat + Terlambat + Izin/Sakit + Dispensasi + Alpha = hari efektif siswa; persen = (Tepat + Terlambat + Dispensasi) / hari efektif siswa, "–" bila 0 hari. `rekap()`/`rekapBulan()` lama dihapus.
+
+## Presensi per jam: Alfa oleh piket dan kode turunan (v2.3.1)
+- **Penanda pengisi** per sel: `lessons/{tgl}/{kelas}/absenOleh/{nis}/{jam}` = `"piket"` | `"waka"`, ditulis pada update yang sama dengan sel dan ikut terhapus saat sel dikosongkan; sel lama tanpa penanda dianggap `"waka"`. `absenInfo/{nis}/{jam}` = `{petugas, ts, hariKe}` (hanya tampilan tooltip "Diisi piket: nama, jam"; `ts === now`). Salinan `lessonsByStudent` tidak memuat penanda (rules mengambil kunci kelas dari `siswaKelas/{nis}`).
+- **Piket**: S/I/D seperti biasa (jendela mundur, keterangan + `izinMeta`). **A (Alfa) hanya untuk hari ini**: penanda `"piket"`, `absenInfo.hariKe` = hari server saat ini, log aktivitas aksi `alfa-jam`, tanpa `izinMeta`. Ubah/hapus A hanya bila penandanya `"piket"` dan `absenInfo.hariKe` tersimpan masih hari ini (jadi A kemarin terkunci). A milik waka atau tanpa penanda tidak dapat disentuh. Mengganti S/I/D menjadi A hari ini boleh. **Waka** menimpa apa pun dan selalu menulis penanda `"waka"` (penanda `"piket"` yang basi ditolak). Kepala/admin/wali hanya membaca.
+- **Keterbatasan:** rules tidak dapat memverifikasi bahwa kunci tanggal sel cocok dengan `hariKe` yang diklaim klien (sama dengan jendela waktu piket lain); yang terjamin server adalah bahwa A hanya dapat diubah pada hari yang sama dengan saat ia diisi.
+- **Keterangan harian**: rules menolak penulisan sel per jam (sel dan salinan, oleh siapa pun) untuk siswa/tanggal yang ber-`ket` harian Izin/Sakit/Dispensasi.
+- **Kode turunan** (`src/lib/turunan.ts`, tidak ditulis ke database): baris siswa yang status hariannya Alfa seharian (rumus `rekapSiswa`: hari efektif, tanpa tap/manual/keterangan, batas jam terlambat lewat) menampilkan A jam 1-9, dan keterangan harian menampilkan I/S/D, terkunci untuk semua peran. Sebelum batas jam terlambat tampil "Belum tap" dan sel diisi seperti biasa. Hilang otomatis bila ada tap, presensi manual, atau izin.
+- **Alfa seharian bukan pelanggaran otomatis**: saran "alfa" dan pemetaan `autoMap.alfa` dihapus dari UI (data lama diabaikan). Saran lain (terlambat, tanpaTapPulang, bolosJam, lupaKtm, ktmHilang) tetap hanya saran dan tidak pernah dipicu siswa tanpa tap masuk.
+- **Laporan per jam** memisahkan "A per jam (bolos)" dan "Alfa seharian (hari)"; portal orang tua menampilkan Alfa seharian satu baris.
+- Uji: `npm run test:mutation:perjam`, `tests/turunan.test.mjs`, `tests/perjam.test.mjs`.
 
 ## Panduan pengguna
 Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_WALI.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.

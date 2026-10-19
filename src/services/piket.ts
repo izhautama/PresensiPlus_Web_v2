@@ -1,7 +1,7 @@
 import { serverTimestamp, update } from "firebase/database";
 import { taKey } from "../lib/discipline";
 import { KET_DARI_KODE, hariKeDariTanggal, type KetPiket, type KodeIzin } from "../lib/piket";
-import { encodeKelas } from "../lib/perjam";
+import { encodeKelas, type KodeJam } from "../lib/perjam";
 import type { Rule } from "../lib/discipline";
 import { kirimUpdate, sisipkanAktivitas, type AksiLog } from "./aktivitas";
 import { r } from "./db";
@@ -16,7 +16,7 @@ export type PiketCtx = { uid: string; petugas: string };
 export function pesanPiket(e: unknown): string {
   const t = `${(e as { code?: string })?.code ?? ""} ${(e as Error)?.message ?? ""}`;
   if (/permission|PERMISSION_DENIED/i.test(t)) {
-    return "Ditolak oleh aturan keamanan. Kemungkinan: tanggal di luar jendela waktu, siswa sudah dikonfirmasi Alfa oleh Waka, sel jam sudah diisi Alfa (hanya Waka yang dapat mengubahnya), atau jam perangkat sangat tidak akurat.";
+    return "Ditolak oleh aturan keamanan. Kemungkinan: tanggal di luar jendela waktu, siswa sudah dikonfirmasi Alfa oleh Waka, sel jam berisi Alfa milik Waka atau Alfa piket pada tanggal lampau (hanya Waka yang dapat mengubahnya), Alfa untuk tanggal selain hari ini, siswa sudah berketerangan harian, atau jam perangkat sangat tidak akurat.";
   }
   return (e as Error)?.message ?? "Terjadi kesalahan";
 }
@@ -58,26 +58,70 @@ export async function hapusIzinHarianPiket(tanggal: string, nis: string) {
   await kirimUpdate(u);
 }
 
-export type SelPiket = { nis: string; jam: number; kode: KodeIzin | null };
+/** `lama` = kode tersimpan sebelum perubahan (menentukan jalur: A diatur aturan terpisah, aksi log "alfa-jam"). */
+export type SelPiket = { nis: string; jam: number; kode: KodeIzin | "A" | null; lama?: KodeJam | "" };
+
+/** Sel yang termasuk jalur ALFA: mengisi A atau mengosongkan A milik piket sendiri. Log aksi "alfa-jam", tanpa izinMeta. */
+export const selJalurAlfa = (s: SelPiket) => s.kode === "A" || (s.lama === "A" && s.kode === null);
 
 /**
- * Simpan izin per jam (hanya S/I/D). Setiap siswa+kode yang BERUBAH mendapat satu izinMeta (kunci "<idLog>_<kode>");
- * sel yang dikosongkan tidak. lessons/... + lessonsByStudent/... + izinMeta + log dalam SATU update.
+ * Simpan perubahan per jam oleh piket. Dua jalur terpisah (aturan log berbeda, jadi dua update):
+ *  - ALFA (A hari ini / kosongkan A sendiri): lessons + penanda `absenOleh`="piket" + `absenInfo` (nama petugas, waktu) + salinan siswa + log "alfa-jam".
+ *  - S/I/D (termasuk mengganti A sendiri menjadi S/I/D): seperti sebelumnya, wajib keterangan + izinMeta + log "izin-jam".
+ * Jalur Alfa dijalankan lebih dulu; bila jalur kedua gagal, jalur pertama sudah tersimpan (pesan galat menyebutnya).
  */
 export async function izinPerJamPiket(a: {
   tanggal: string; kelas: string; sel: SelPiket[]; mapelByJam: Record<number, string | undefined>; keterangan: string; suratDiterima: boolean;
 }, ctx: PiketCtx) {
-  const base = `lessons/${a.tanggal}/${encodeKelas(a.kelas)}/absen`;
+  const alfa = a.sel.filter(selJalurAlfa);
+  const sid = a.sel.filter((s) => !selJalurAlfa(s));
+  let alfaTersimpan = 0;
+  if (alfa.length) {
+    await simpanAlfaPiket({ ...a, sel: alfa }, ctx);
+    alfaTersimpan = alfa.length;
+  }
+  if (sid.length) {
+    try { await simpanSidPiket({ ...a, sel: sid }, ctx); }
+    catch (e) { if (alfaTersimpan) throw new Error(`${alfaTersimpan} sel Alfa sudah tersimpan, tetapi perubahan Izin/Sakit/Dispensasi gagal: ${pesanPiket(e)}`); throw e; }
+  }
+}
+
+/** Alfa per jam oleh piket (hanya hari ini; rules menegakkan). Tanpa keterangan dan tanpa izinMeta: Alfa = tidak hadir tanpa keterangan. */
+async function simpanAlfaPiket(a: { tanggal: string; kelas: string; sel: SelPiket[]; mapelByJam: Record<number, string | undefined> }, ctx: PiketCtx) {
+  const base = `lessons/${a.tanggal}/${encodeKelas(a.kelas)}`;
+  const u: Updates = {};
+  for (const s of a.sel) {
+    const isi = s.kode === "A";
+    u[`${base}/absen/${s.nis}/${s.jam}`] = isi ? "A" : null;
+    u[`${base}/absenOleh/${s.nis}/${s.jam}`] = isi ? "piket" : null;
+    u[`${base}/absenInfo/${s.nis}/${s.jam}`] = isi ? { petugas: ctx.petugas.slice(0, 60), ts: serverTimestamp(), hariKe: hariKeDariTanggal(a.tanggal) } : null; // hariKe: klaim hari sel, rules wajibkan = hari server
+    const mapel = a.mapelByJam[s.jam];
+    u[`lessonsByStudent/${s.nis}/${a.tanggal}/${s.jam}`] = isi ? { k: "A", ...(mapel ? { mapel } : {}) } : null;
+  }
+  const nisUnik = [...new Set(a.sel.map((s) => s.nis))];
+  const ringkas = a.sel.map((s) => `${s.nis} jam ${s.jam} ${s.kode === "A" ? "Alfa" : "kosongkan A"}`).join("; ");
+  logWajib(u, "alfa-jam", nisUnik.length === 1 ? nisUnik[0] : undefined, `${a.kelas} ${a.tanggal}: ${ringkas}`);
+  await kirimUpdate(u);
+}
+
+/** S/I/D per jam + izinMeta (kunci "<idLog>_<kode>") + log "izin-jam" dalam satu update. Penanda `absenOleh`="piket" untuk sel yang terisi. */
+async function simpanSidPiket(a: {
+  tanggal: string; kelas: string; sel: SelPiket[]; mapelByJam: Record<number, string | undefined>; keterangan: string; suratDiterima: boolean;
+}, ctx: PiketCtx) {
+  const base = `lessons/${a.tanggal}/${encodeKelas(a.kelas)}`;
   const u: Updates = {};
   const grup = new Map<string, { nis: string; kode: KodeIzin; jam: number[] }>();
   for (const s of a.sel) {
-    u[`${base}/${s.nis}/${s.jam}`] = s.kode;
+    const kode = s.kode === "A" ? null : s.kode; // jalur ini tidak pernah menulis A
+    u[`${base}/absen/${s.nis}/${s.jam}`] = kode;
+    u[`${base}/absenOleh/${s.nis}/${s.jam}`] = kode ? "piket" : null;
+    if (s.lama === "A") u[`${base}/absenInfo/${s.nis}/${s.jam}`] = null; // A milik piket diganti: info Alfa ikut dihapus
     const mapel = a.mapelByJam[s.jam];
-    u[`lessonsByStudent/${s.nis}/${a.tanggal}/${s.jam}`] = s.kode ? { k: s.kode, ...(mapel ? { mapel } : {}) } : null;
-    if (s.kode) {
-      const g = grup.get(`${s.nis}|${s.kode}`) ?? { nis: s.nis, kode: s.kode, jam: [] };
+    u[`lessonsByStudent/${s.nis}/${a.tanggal}/${s.jam}`] = kode ? { k: kode, ...(mapel ? { mapel } : {}) } : null;
+    if (kode) {
+      const g = grup.get(`${s.nis}|${kode}`) ?? { nis: s.nis, kode, jam: [] };
       g.jam.push(s.jam);
-      grup.set(`${s.nis}|${s.kode}`, g);
+      grup.set(`${s.nis}|${kode}`, g);
     }
   }
   const nisUnik = [...new Set(a.sel.map((s) => s.nis))];

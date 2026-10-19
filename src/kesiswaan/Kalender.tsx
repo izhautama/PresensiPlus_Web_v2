@@ -98,7 +98,7 @@ export default function Kalender() {
           {tertahan(info) && (
             <div className="notice warn" role="status" data-testid="kal-rendah">
               <Icon name="warning" size={17} />
-              <span>Tap pada tanggal ini jauh lebih rendah dari biasanya (alat mungkin bermasalah sebagian hari). Validasi Alfa dan saran Alfa tanggal ini <b>ditahan</b>.</span>
+              <span>Tap pada tanggal ini jauh lebih rendah dari biasanya (alat mungkin bermasalah sebagian hari). Validasi Alfa tanggal ini <b>ditahan</b>.</span>
               <span className="aksi-cell">
                 <Link className="secondary-button sm" to={`${base}/presensi-manual?tanggal=${dipilih}`}>Isi presensi manual</Link>
                 {bisaAtur && <button className="primary-button sm" onClick={async () => { try { await konfirmasiNormal(dipilih); notify("Hari dikonfirmasi normal"); } catch (e) { notify((e as Error).message, "err"); } }}>Konfirmasi hari ini normal</button>}

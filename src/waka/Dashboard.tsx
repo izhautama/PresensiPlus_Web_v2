@@ -9,6 +9,7 @@ import { initials, toneOf } from "../lib/attendance";
 import { labelTa, levelDari, perluTindakLanjut, poinBertanda, ringkas, taKey } from "../lib/discipline";
 import { formatTanggal, hariKerjaSebelum, salam, weekday } from "../lib/time";
 import { useDiscipline } from "../kesiswaan/useDiscipline";
+import { decodeKelas, type LessonsKelas } from "../lib/perjam";
 import { useLive } from "../services/db";
 import { rentang, useSaran } from "../kesiswaan/useSaran";
 
@@ -19,6 +20,18 @@ export default function Dashboard() {
   const d = useDiscipline();
   const ta = taKey(today);
   const valLive = useLive<Record<string, unknown>>(`validasi/${today}`);
+  // A per jam yang diisi guru piket HARI INI (penanda lessons/{tgl}/{kelas}/absenOleh): untuk ditinjau waka
+  const lessonsHariIni = useLive<Record<string, LessonsKelas>>(`lessons/${today}`);
+  const aPiket = useMemo(() => {
+    const perKelas: Record<string, Set<string>> = {};
+    for (const [kelasKey, k] of Object.entries(lessonsHariIni.data ?? {})) {
+      for (const [nis, jams] of Object.entries(k.absen ?? {})) {
+        for (const [jam, kode] of Object.entries(jams)) if (kode === "A" && k.absenOleh?.[nis]?.[jam] === "piket") (perKelas[kelasKey] ??= new Set()).add(nis);
+      }
+    }
+    const kelas = Object.keys(perKelas).sort();
+    return { jumlah: kelas.reduce((n, k) => n + perKelas[k].size, 0), kelasPertama: kelas[0] ? decodeKelas(kelas[0]) : "" };
+  }, [lessonsHariIni.data]);
 
   const libur = weekday(today) === 0;
   const saranHari = useSaran(useMemo(() => rentang(hariKerjaSebelum(today), today), [today])); // Senin: hari kerja terakhir = Sabtu
@@ -56,6 +69,7 @@ export default function Dashboard() {
         <article className="stat-card"><div className="stat-icon coral"><Icon name="clock" /></div><div><p>Belum tap hari ini</p><strong>{belumTap}</strong><span className="trend neutral">{libur ? "Hari Minggu — libur" : `dari ${students.length} siswa`}</span></div></article>
         <article className="stat-card"><div className="stat-icon amber"><Icon name="warning" /></div><div><p>Perlu tindak lanjut</p><strong>{perlu.length}</strong><span className="trend warn">mencapai ambang / sangat berat</span></div></article>
         <article className="stat-card"><div className="stat-icon green"><Icon name="check" /></div><div><p>Belum divalidasi</p><strong>{belumValidasi}</strong><span className="trend neutral"><Link to="/waka/validasi">Buka validasi harian</Link></span></div></article>
+        <article className="stat-card" data-testid="kartu-a-piket"><div className="stat-icon coral"><Icon name="alert" /></div><div><p>A dari piket hari ini</p><strong data-testid="jumlah-a-piket">{lessonsHariIni.loading ? "…" : aPiket.jumlah}</strong><span className="trend neutral">{aPiket.jumlah > 0 ? <Link to={`/waka/per-jam?tanggal=${today}&kelas=${encodeURIComponent(aPiket.kelasPertama)}&a=piket`}>({aPiket.jumlah} siswa) Tinjau di grid</Link> : "tidak ada"}</span></div></article>
         <article className="stat-card"><div className="stat-icon teal"><Icon name="bell" /></div><div><p>Saran perlu ditinjau</p><strong data-testid="jumlah-saran">{saranHari.loading ? "…" : saranHari.saran.length}</strong><span className="trend neutral"><Link to="/waka/saran">Buka daftar saran</Link></span></div></article>
       </section>
 

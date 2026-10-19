@@ -29,6 +29,9 @@ export async function simpanPerJam(args: {
 
   for (const { nis, jam, kode } of args.sel) {
     u[`${base}/absen/${nis}/${jam}`] = kode;
+    // penanda pengisi: setiap tulisan waka mengeset "waka" (hilang bersama sel yang dikosongkan); info Alfa piket ikut dihapus
+    u[`${base}/absenOleh/${nis}/${jam}`] = kode ? "waka" : null;
+    u[`${base}/absenInfo/${nis}/${jam}`] = null;
     u[`lessonsByStudent/${nis}/${tanggal}/${jam}`] = kode ? { k: kode, ...(args.mapelAkhir[jam] ? { mapel: args.mapelAkhir[jam] } : {}) } : null;
     ditulis.add(`${nis}:${jam}`);
   }

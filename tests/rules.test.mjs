@@ -463,33 +463,34 @@ await tolak("orang tanpa peran TIDAK bisa baca recordMeta", orang, "GET", "disci
 // ================================================================ TAHAP 2: PRESENSI PER JAM & VALIDASI
 const KLS = "XI IPS";
 const cell = (n, j) => `lessons/${TGL}/${KLS}/absen/${n}/${j}`;
+// siswa 911/922 TIDAK punya keterangan harian (attendance/<nis>/<tgl>/ket); sel per jam ditolak untuk siswa/tanggal yang ber-ket (v2.3.1)
 seksi("PER JAM — waka");
-for (const k of ["A", "I", "S", "D"]) await izin(`waka set sel ${k}`, waka, "PUT", cell("111", k === "A" ? 1 : k === "I" ? 2 : k === "S" ? 3 : 4), k);
+for (const k of ["A", "I", "S", "D"]) await izin(`waka set sel ${k}`, waka, "PUT", cell("911", k === "A" ? 1 : k === "I" ? 2 : k === "S" ? 3 : 4), k);
 await izin("waka set meta mapel+guru", waka, "PUT", `lessons/${TGL}/${KLS}/meta/1`, { mapel: "Matematika", guru: "Pak Budi" });
 await izin("waka set meta hanya mapel", waka, "PUT", `lessons/${TGL}/${KLS}/meta/2`, { mapel: "TI" });
 await izin("waka simpan multi-path (sel + salinan + oleh + ts)", waka, "PATCH", "", {
-  [cell("222", 5)]: "A", [`lessonsByStudent/222/${TGL}/5`]: { k: "A", mapel: "TI" },
+  [cell("922", 5)]: "A", [`lessonsByStudent/922/${TGL}/5`]: { k: "A", mapel: "TI" },
   [`lessons/${TGL}/${KLS}/oleh`]: waka.uid, [`lessons/${TGL}/${KLS}/ts`]: SV,
 });
-await izin("waka hapus sel (kembali hadir)", waka, "DELETE", cell("111", 4));
-await izin("waka hapus salinan sel", waka, "DELETE", `lessonsByStudent/222/${TGL}/5`);
-await izin("waka kelas dengan karakter ter-encode", waka, "PUT", `lessons/${TGL}/XI%252EIPS/absen/111/1`, "A");
-await tolak("sel kode B (bolos sudah dihapus) ditolak", waka, "PUT", cell("111", 6), "B");
-await tolak("sel kode kecil 'a' ditolak", waka, "PUT", cell("111", 6), "a");
-await tolak("sel kode asing 'H' ditolak", waka, "PUT", cell("111", 6), "H");
-await tolak("sel jam 0 ditolak", waka, "PUT", cell("111", 0), "A");
-await tolak("sel jam 10 ditolak", waka, "PUT", cell("111", 10), "A");
+await izin("waka hapus sel (kembali hadir)", waka, "DELETE", cell("911", 4));
+await izin("waka hapus salinan sel", waka, "DELETE", `lessonsByStudent/922/${TGL}/5`);
+await izin("waka kelas dengan karakter ter-encode", waka, "PUT", `lessons/${TGL}/XI%252EIPS/absen/911/1`, "A");
+await tolak("sel kode B (bolos sudah dihapus) ditolak", waka, "PUT", cell("911", 6), "B");
+await tolak("sel kode kecil 'a' ditolak", waka, "PUT", cell("911", 6), "a");
+await tolak("sel kode asing 'H' ditolak", waka, "PUT", cell("911", 6), "H");
+await tolak("sel jam 0 ditolak", waka, "PUT", cell("911", 0), "A");
+await tolak("sel jam 10 ditolak", waka, "PUT", cell("911", 10), "A");
 await tolak("sel nis bukan angka ditolak", waka, "PUT", cell("abc", 1), "A");
-await tolak("tanggal format salah ditolak", waka, "PUT", `lessons/14-10-2026/${KLS}/absen/111/1`, "A");
+await tolak("tanggal format salah ditolak", waka, "PUT", `lessons/14-10-2026/${KLS}/absen/911/1`, "A");
 await tolak("meta jam 0 ditolak", waka, "PUT", `lessons/${TGL}/${KLS}/meta/0`, { mapel: "X" });
 await tolak("meta mapel > 60 karakter ditolak", waka, "PUT", `lessons/${TGL}/${KLS}/meta/3`, { mapel: "x".repeat(61) });
 await tolak("meta field asing ditolak", waka, "PUT", `lessons/${TGL}/${KLS}/meta/3`, { mapel: "X", rahasia: 1 });
 await tolak("kelas: field asing ditolak", waka, "PUT", `lessons/${TGL}/${KLS}/asing`, 1);
 await tolak("oleh bukan pengguna ditolak", waka, "PUT", `lessons/${TGL}/${KLS}/oleh`, kepala.uid);
-await tolak("salinan: k = B ditolak", waka, "PUT", `lessonsByStudent/111/${TGL}/6`, { k: "B" });
-await tolak("salinan: tanpa k ditolak", waka, "PUT", `lessonsByStudent/111/${TGL}/6`, { mapel: "X" });
-await tolak("salinan: field asing ditolak", waka, "PUT", `lessonsByStudent/111/${TGL}/6`, { k: "A", asing: 1 });
-await izin("salinan: valid (k + mapel)", waka, "PUT", `lessonsByStudent/111/${TGL}/6`, { k: "S", mapel: "IPA" });
+await tolak("salinan: k = B ditolak", waka, "PUT", `lessonsByStudent/911/${TGL}/6`, { k: "B" });
+await tolak("salinan: tanpa k ditolak", waka, "PUT", `lessonsByStudent/911/${TGL}/6`, { mapel: "X" });
+await tolak("salinan: field asing ditolak", waka, "PUT", `lessonsByStudent/911/${TGL}/6`, { k: "A", asing: 1 });
+await izin("salinan: valid (k + mapel)", waka, "PUT", `lessonsByStudent/911/${TGL}/6`, { k: "S", mapel: "IPA" });
 
 seksi("PER JAM — peran lain");
 await izin("kepala baca lessons", kepala, "GET", "lessons");
@@ -846,7 +847,165 @@ await izin("waka menimpa sel S/I/D piket menjadi A", waka, "PATCH", "", sel("666
 await tolak("piket TIDAK bisa menulis meta mapel/guru", piket, "PUT", `lessons/${HT}/XI IPS/meta/3`, { mapel: "TI" });
 await tolak("piket TIDAK bisa menulis oleh/ts kelas", piket, "PUT", `lessons/${HT}/XI IPS/oleh`, piket.uid);
 await tolak("piket TIDAK bisa menulis node kelas utuh", piket, "PUT", `lessons/${HT}/XI IPS`, { absen: { 111: { 1: "S" } } });
+// ================================================================ v2.3.1 — PRESENSI PER JAM: piket boleh memberi A (Alfa) HANYA hari ini
+seksi("PER JAM v2.3.1 — piket A hari ini; penanda pengisi absenOleh; A milik waka terkunci");
+const AJ = "XI IPS";
+const NIS_AJ = ["5101", "5102", "5103", "5104", "5105", "5106", "5107", "5108", "5109", "5110", "5111", "5112", "5113", "5114", "5115", "5116", "5117", "5118", "5119", "5120", "5121", "5122"];
+await http("PATCH", "", { owner: true, body: {
+  ...Object.fromEntries(NIS_AJ.map((n) => [`siswaKelas/${n}`, AJ])),
+  [`attendance/5110/${HT}/ket`]: "Sakit", [`izin/${HT}/5110`]: "Sakit", // siswa berketerangan harian
+  // A milik waka (tanpa penanda = data lama) dan A milik piket yang diisi KEMARIN (info.hariKe = kemarin)
+  [`lessons/${HT}/${AJ}/absen/5111/1`]: "A", [`lessonsByStudent/5111/${HT}/1`]: { k: "A" },
+  [`lessons/${HT}/${AJ}/absen/5112/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5112/1`]: "waka", [`lessonsByStudent/5112/${HT}/1`]: { k: "A" },
+  [`lessons/${HT}/${AJ}/absen/5113/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5113/1`]: "piket", [`lessons/${HT}/${AJ}/absenInfo/5113/1`]: { petugas: "Bu Rina", ts: 1000, hariKe: HK - 1 }, [`lessonsByStudent/5113/${HT}/1`]: { k: "A" },
+  [`lessons/${HT}/${AJ}/absen/5114/1`]: "S", [`lessonsByStudent/5114/${HT}/1`]: { k: "S" }, // S milik siapa pun: dapat diganti A hari ini
+  // INFO BASI: waka menimpa A piket dengan A miliknya (penanda 'waka') tetapi info hari ini TERTINGGAL; rules tidak memaksa waka menghapus info
+  [`lessons/${HT}/${AJ}/absen/5119/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5119/1`]: "waka", [`lessons/${HT}/${AJ}/absenInfo/5119/1`]: { petugas: "Bu Rina", ts: 1000, hariKe: HK }, [`lessonsByStudent/5119/${HT}/1`]: { k: "A" },
+  [`lessons/${HT}/${AJ}/absen/5120/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5120/1`]: "waka", [`lessons/${HT}/${AJ}/absenInfo/5120/1`]: { petugas: "Bu Rina", ts: 1000, hariKe: HK }, // tanpa salinan
+  [`lessons/${HT}/${AJ}/absen/5121/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5121/1`]: "piket", [`lessons/${HT}/${AJ}/absenInfo/5121/1`]: { petugas: "Bu Rina", ts: 1000, hariKe: HK - 1 }, // piket KEMARIN, tanpa salinan
+  [`lessons/${HT}/${AJ}/absen/5122/1`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5122/1`]: "piket", [`lessons/${HT}/${AJ}/absenInfo/5122/1`]: { petugas: "Bu Rina", ts: 1000, hariKe: HK }, // piket hari ini, tanpa salinan
+}});
+const aSet = (u, nis, jam, o = {}) => {
+  const A = act(u, o.aksi ?? "alfa-jam", o.act ?? {});
+  const t = o.tgl ?? HT;
+  const body = { ...A.body };
+  if (!o.tanpaSel) body[`lessons/${t}/${AJ}/absen/${nis}/${jam}`] = o.kode ?? "A";
+  if (!o.tanpaMarker) body[`lessons/${t}/${AJ}/absenOleh/${nis}/${jam}`] = o.marker ?? "piket";
+  if (!o.tanpaInfo) body[`lessons/${t}/${AJ}/absenInfo/${nis}/${jam}`] = { petugas: "Bu Rina", ts: SV, hariKe: HK, ...(o.info ?? {}) };
+  if (!o.tanpaSalinan) body[`lessonsByStudent/${nis}/${t}/${jam}`] = { k: o.kodeSalinan ?? "A" };
+  return { ...body, ...(o.tambah ?? {}) };
+};
+const aUji = (nama, who, nis, jam, harap, o) => uji(nama, who, "PATCH", "", aSet(who, nis, jam, o), harap);
+
+// ---- piket SET A
+await aUji("alfa-jam: piket set A hari ini (sel + penanda piket + info + salinan + log) DITERIMA", piket, "5101", 1, "izin");
+await cek("alfa-jam: penanda 'piket' dan info tersimpan, hariKe = hari ini", waka, `lessons/${HT}/${AJ}`, (j) => j?.absenOleh?.["5101"]?.["1"] === "piket" && j.absenInfo?.["5101"]?.["1"]?.hariKe === HK && j.absen?.["5101"]?.["1"] === "A");
+await aUji("alfa-jam: set A KEMARIN (hariKe info = kemarin) DITOLAK", piket, "5102", 1, "tolak", { info: { hariKe: HK - 1 } });
+await aUji("alfa-jam: set A BESOK (hariKe info = besok) DITOLAK", piket, "5102", 1, "tolak", { info: { hariKe: HK + 1 } });
+await aUji("alfa-jam: set A hariKe info bukan angka DITOLAK", piket, "5102", 1, "tolak", { info: { hariKe: "hari ini" } });
+await aUji("alfa-jam: set A hariKe info pecahan DITOLAK", piket, "5102", 1, "tolak", { info: { hariKe: HK + 0.5 } });
+await aUji("alfa-jam: set A TANPA info (hariKe tak terbukti) DITOLAK", piket, "5102", 1, "tolak", { tanpaInfo: true });
+await aUji("alfa-jam: set A TANPA penanda DITOLAK", piket, "5102", 1, "tolak", { tanpaMarker: true });
+await aUji("alfa-jam: set A dengan penanda 'waka' DITOLAK (penanda palsu)", piket, "5102", 1, "tolak", { marker: "waka" });
+await aUji("alfa-jam: set A dengan penanda liar ('admin') DITOLAK", piket, "5102", 1, "tolak", { marker: "admin" });
+await aUji("alfa-jam: set A TANPA log aktivitas DITOLAK", piket, "5102", 1, "tolak", { act: { tanpa: true } });
+await aUji("alfa-jam: set A dengan log aksi 'izin-jam' DITOLAK", piket, "5102", 1, "tolak", { aksi: "izin-jam" });
+await aUji("alfa-jam: set A dengan penanda log TANPA entri DITOLAK", piket, "5102", 1, "tolak", { act: { tanpaEntri: true } });
+await aUji("alfa-jam: info ts bukan waktu server DITOLAK", piket, "5102", 1, "tolak", { info: { ts: 12345 } });
+await aUji("alfa-jam: info petugas > 60 karakter DITOLAK", piket, "5102", 1, "tolak", { info: { petugas: "p".repeat(61) } });
+await aUji("alfa-jam: info petugas kosong DITOLAK", piket, "5102", 1, "tolak", { info: { petugas: "" } });
+await aUji("alfa-jam: info dengan field asing DITOLAK", piket, "5102", 1, "tolak", { info: { rahasia: 1 } });
+await aUji("alfa-jam: info TANPA hariKe DITOLAK", piket, "5102", 1, "tolak", { info: { hariKe: undefined } });
+await aUji("alfa-jam: HANYA salinan A (tanpa sel/penanda/info) DITOLAK", piket, "5102", 1, "tolak", { tanpaSel: true, tanpaMarker: true, tanpaInfo: true });
+await aUji("alfa-jam: set A pada siswa BERKETERANGAN harian (Sakit) DITOLAK", piket, "5110", 1, "tolak");
+await aUji("alfa-jam: kode 'B' DITOLAK", piket, "5102", 1, "tolak", { kode: "B", kodeSalinan: "B" });
+await aUji("alfa-jam: A pada jam 0 DITOLAK", piket, "5102", 0, "tolak");
+await aUji("alfa-jam: A pada siswa tanpa indeks siswaKelas (salinan tak dapat diverifikasi) DITOLAK", piket, "5999", 1, "tolak");
+await uji("alfa-jam: sel A hari ini TANPA salinan (PATCH sel+penanda+info+log) DITERIMA seperti S/I/D", piket, "PATCH", "", aSet(piket, "5103", 2, { tanpaSalinan: true }), "izin");
+await uji("alfa-jam: PUT tunggal sel A (tanpa log/penanda) DITOLAK", piket, "PUT", `lessons/${HT}/${AJ}/absen/5102/3`, "A", "tolak");
+
+// ---- penanda/info ditulis sendirian atau palsu
+await uji("alfa-jam: piket menulis penanda 'piket' saja pada sel A milik WAKA (mencuri) DITOLAK", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absenOleh/5112/1`]: "piket" }, "tolak");
+await uji("alfa-jam: piket menghapus penanda sel A milik WAKA (sel tetap) DITOLAK", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absenOleh/5112/1`]: null }, "tolak");
+await uji("alfa-jam: piket menulis info saja pada sel A milik waka DITOLAK", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absenInfo/5112/1`]: { petugas: "Bu Rina", ts: SV, hariKe: HK } }, "tolak");
+await tolak("alfa-jam: piket menulis penanda dengan PUT tunggal DITOLAK", piket, "PUT", `lessons/${HT}/${AJ}/absenOleh/5112/2`, "piket");
+await tolak("alfa-jam: ortu TIDAK menulis penanda", ortu1, "PUT", `lessons/${HT}/${AJ}/absenOleh/5112/2`, "waka");
+await tolak("alfa-jam: penanda bernilai liar ditolak (waka; sel jam 1 ADA, jadi hanya .validate penanda yang menolak)", waka, "PUT", `lessons/${HT}/${AJ}/absenOleh/5112/1`, "admin");
+await tolak("alfa-jam: penanda TANPA sel (waka) ditolak", waka, "PUT", `lessons/${HT}/${AJ}/absenOleh/5112/9`, "waka");
+await tolak("alfa-jam: field asing di bawah penanda ditolak", waka, "PUT", `lessons/${HT}/${AJ}/absenOleh/5112/1/x`, "waka");
+
+// ---- piket ubah/hapus A MILIKNYA (hari ini)
+await uji("alfa-jam: piket mengganti A miliknya (hari ini) menjadi I dengan izinMeta DITERIMA", piket, "PATCH", "", (() => {
+  const A = act(piket, "izin-jam");
+  return { ...A.body, [`lessons/${HT}/${AJ}/absen/5101/1`]: "I", [`lessons/${HT}/${AJ}/absenOleh/5101/1`]: "piket", [`lessons/${HT}/${AJ}/absenInfo/5101/1`]: null, [`lessonsByStudent/5101/${HT}/1`]: { k: "I" }, [MZ(HT, "5101", `${A.id}_I`)]: metaIz(piket, { lingkup: "jam", ket: "Izin", jam: { 0: 1 } }) };
+})(), "izin");
+await aUji("alfa-jam: piket mengisi A lagi pada sel yang tadi diganti I (hari ini) DITERIMA", piket, "5101", 1, "izin");
+await uji("alfa-jam: piket mengganti A miliknya menjadi I TANPA izinMeta DITOLAK", piket, "PATCH", "", { ...act(piket, "izin-jam").body, [`lessons/${HT}/${AJ}/absen/5101/1`]: "I", [`lessonsByStudent/5101/${HT}/1`]: { k: "I" } }, "tolak");
+await uji("alfa-jam: piket menghapus A miliknya TANPA log DITOLAK", piket, "PATCH", "", { [`lessons/${HT}/${AJ}/absen/5101/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/5101/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/5101/1`]: null, [`lessonsByStudent/5101/${HT}/1`]: null }, "tolak");
+await uji("alfa-jam: piket menghapus A miliknya dengan log aksi 'izin-jam' DITOLAK", piket, "PATCH", "", { ...act(piket, "izin-jam").body, [`lessons/${HT}/${AJ}/absen/5101/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/5101/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/5101/1`]: null, [`lessonsByStudent/5101/${HT}/1`]: null }, "tolak");
+await uji("alfa-jam: piket menghapus A miliknya TANPA menghapus penanda DITOLAK", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absen/5101/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/5101/1`]: null, [`lessonsByStudent/5101/${HT}/1`]: null }, "tolak");
+await uji("alfa-jam: piket menghapus A miliknya (sel + penanda + info + salinan + log 'alfa-jam') DITERIMA", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absen/5101/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/5101/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/5101/1`]: null, [`lessonsByStudent/5101/${HT}/1`]: null }, "izin");
+await cek("alfa-jam: sel, penanda, dan info ikut hilang", waka, `lessons/${HT}/${AJ}`, (j) => !j?.absen?.["5101"]?.["1"] && !j?.absenOleh?.["5101"]?.["1"] && !j?.absenInfo?.["5101"]?.["1"]);
+await uji("alfa-jam: piket mengisi A (5104) lalu menghapus sel saja", piket, "PATCH", "", aSet(piket, "5104", 1), "izin");
+await uji("alfa-jam: piket menghapus sel A + penanda + info miliknya TANPA menyentuh salinan DITERIMA (tidak ada keharusan salinan, seperti S/I/D)", piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absen/5104/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/5104/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/5104/1`]: null }, "izin");
+
+// ---- A milik WAKA / tanpa penanda / A piket yang diisi KEMARIN: terkunci bagi piket
+const hapusA = (nis, aksi = "alfa-jam") => ({ ...act(piket, aksi).body, [`lessons/${HT}/${AJ}/absen/${nis}/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/${nis}/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/${nis}/1`]: null, [`lessonsByStudent/${nis}/${HT}/1`]: null });
+const ubahAkeI = (nis) => { const A = act(piket, "izin-jam"); return { ...A.body, [`lessons/${HT}/${AJ}/absen/${nis}/1`]: "I", [`lessons/${HT}/${AJ}/absenOleh/${nis}/1`]: "piket", [`lessonsByStudent/${nis}/${HT}/1`]: { k: "I" }, [MZ(HT, nis, `${A.id}_I`)]: metaIz(piket, { lingkup: "jam", ket: "Izin", jam: { 0: 1 } }) }; };
+for (const [nis, ket] of [["5112", "A milik WAKA (penanda 'waka')"], ["5111", "A TANPA penanda (data lama = waka)"], ["5113", "A milik piket yang diisi KEMARIN"]]) {
+  await uji(`alfa-jam: piket menghapus ${ket} DITOLAK`, piket, "PATCH", "", hapusA(nis), "tolak");
+  await uji(`alfa-jam: piket menghapus ${ket} (log 'izin-jam') DITOLAK`, piket, "PATCH", "", hapusA(nis, "izin-jam"), "tolak");
+  await uji(`alfa-jam: piket mengganti ${ket} menjadi I DITOLAK`, piket, "PATCH", "", ubahAkeI(nis), "tolak");
+  await uji(`alfa-jam: piket menimpa ${ket} dengan A baru DITOLAK`, piket, "PATCH", "", aSet(piket, nis, 1), "tolak");
+  await uji(`alfa-jam: piket HANYA salinan ${ket} dihapus DITOLAK`, piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessonsByStudent/${nis}/${HT}/1`]: null }, "tolak");
+  await uji(`alfa-jam: piket HANYA sel ${ket} dihapus DITOLAK`, piket, "PATCH", "", { ...act(piket, "alfa-jam").body, [`lessons/${HT}/${AJ}/absen/${nis}/1`]: null }, "tolak");
+}
+await cek("alfa-jam: A milik waka / piket-kemarin tetap utuh", waka, `lessons/${HT}/${AJ}/absen`, (j) => j?.["5111"]?.["1"] === "A" && j?.["5112"]?.["1"] === "A" && j?.["5113"]?.["1"] === "A");
+// S -> A pada hari yang sama (koreksi piket sendiri) boleh, walau sel S diisi waka
+await uji("alfa-jam: piket mengganti sel S (milik siapa pun) menjadi A hari ini DITERIMA", piket, "PATCH", "", aSet(piket, "5114", 1), "izin");
+await uji("alfa-jam: piket mengganti sel S menjadi A KEMARIN DITOLAK", piket, "PATCH", "", aSet(piket, "5115", 1, { info: { hariKe: HK - 1 } }), "tolak");
+
+// ---- waka: menimpa/menghapus apa pun, mengeset penanda "waka"
+const wakaTulis = (nis, jam, kode, o = {}) => ({ [`lessons/${HT}/${AJ}/absen/${nis}/${jam}`]: kode, [`lessons/${HT}/${AJ}/absenOleh/${nis}/${jam}`]: kode ? (o.marker ?? "waka") : null, [`lessons/${HT}/${AJ}/absenInfo/${nis}/${jam}`]: null, [`lessonsByStudent/${nis}/${HT}/${jam}`]: kode ? { k: kode } : null, ...(o.tambah ?? {}) });
+await uji("alfa-jam: waka menimpa A milik piket (5114) menjadi I dengan penanda 'waka' DITERIMA", waka, "PATCH", "", wakaTulis("5114", 1, "I"), "izin");
+await cek("alfa-jam: penanda jadi 'waka', info Alfa hilang", piket, `lessons/${HT}/${AJ}`, (j) => j?.absenOleh?.["5114"]?.["1"] === "waka" && !j?.absenInfo?.["5114"]?.["1"] && j.absen?.["5114"]?.["1"] === "I");
+await uji("alfa-jam: waka menimpa A piket dengan A baru (penanda 'waka') DITERIMA", waka, "PATCH", "", aSet(waka, "5103", 2, { marker: "waka", aksi: "presensi-jam", tanpaInfo: true }), "izin");
+await uji("alfa-jam: waka mengisi A TANPA penanda (bersih) DITERIMA (data lama kompatibel)", waka, "PATCH", "", { [`lessons/${HT}/${AJ}/absen/5116/3`]: "A", [`lessonsByStudent/5116/${HT}/3`]: { k: "A" } }, "izin");
+await uji("alfa-jam: piket mengisi A (5117) untuk uji penanda basi", piket, "PATCH", "", aSet(piket, "5117", 1), "izin");
+await uji("alfa-jam: waka mengubah sel A piket menjadi S TANPA mengganti penanda 'piket' DITOLAK", waka, "PATCH", "", { [`lessons/${HT}/${AJ}/absen/5117/1`]: "S", [`lessonsByStudent/5117/${HT}/1`]: { k: "S" } }, "tolak");
+await uji("alfa-jam: waka mengubah sel A piket menjadi S dengan penanda 'piket' tertulis ulang DITOLAK", waka, "PATCH", "", wakaTulis("5117", 1, "S", { marker: "piket" }), "tolak");
+await uji("alfa-jam: waka menghapus sel A piket (sel + penanda + info + salinan) DITERIMA", waka, "PATCH", "", wakaTulis("5117", 1, null), "izin");
+await uji("alfa-jam: waka menulis sel untuk siswa BERKETERANGAN harian (Sakit) DITOLAK", waka, "PATCH", "", wakaTulis("5110", 2, "A"), "tolak");
+await uji("alfa-jam: waka menulis I untuk siswa berketerangan harian DITOLAK", waka, "PATCH", "", wakaTulis("5110", 2, "I"), "tolak");
+await uji("alfa-jam: waka menulis HANYA salinan untuk siswa berketerangan harian DITOLAK", waka, "PATCH", "", { [`lessonsByStudent/5110/${HT}/3`]: { k: "A" } }, "tolak");
+await uji("alfa-jam: piket menulis S untuk siswa berketerangan harian DITOLAK", piket, "PATCH", "", (() => { const A = act(piket, "izin-jam"); return { ...A.body, [`lessons/${HT}/${AJ}/absen/5110/4`]: "S", [`lessonsByStudent/5110/${HT}/4`]: { k: "S" }, [MZ(HT, "5110", `${A.id}_S`)]: metaIz(piket, { lingkup: "jam", ket: "Sakit", jam: { 0: 4 } }) }; })(), "tolak");
+await uji("alfa-jam: waka MENGHAPUS sel lama siswa berketerangan harian tetap boleh (pembersihan)", waka, "PATCH", "", { [`lessons/${HT}/${AJ}/absen/5110/9`]: null }, "izin");
+
+// ---- peran lain tidak punya hak A
+for (const [n, who] of [["kepala", kepala], ["admin", admin], ["ortu", ortu1], ["alat", dev]]) {
+  await uji(`alfa-jam: ${n} TIDAK dapat mengisi A`, who, "PATCH", "", aSet(who, "5102", 5), "tolak");
+  await tolak(`alfa-jam: ${n} TIDAK dapat menulis penanda`, who, "PUT", `lessons/${HT}/${AJ}/absenOleh/5102/5`, "waka");
+}
+await tolak("alfa-jam: piket TIDAK menulis absenInfo dengan PUT tunggal", piket, "PUT", `lessons/${HT}/${AJ}/absenInfo/5102/5`, { petugas: "x", ts: SV, hariKe: HK });
+// ---- keterbacaan: piket/waka/kepala/admin membaca penanda & info (lessons dapat dibaca piket); ortu tidak
+await izin("alfa-jam: piket membaca penanda & info (lessons kelas)", piket, "GET", `lessons/${HT}/${AJ}`);
+await izin("alfa-jam: waka membaca penanda", waka, "GET", `lessons/${HT}/${AJ}/absenOleh`);
+await tolak("alfa-jam: ortu TIDAK membaca lessons (penanda/info)", ortu1, "GET", `lessons/${HT}/${AJ}`);
 await tolak("piket TIDAK bisa menulis lessonsByStudent utuh per tanggal", piket, "PUT", `lessonsByStudent/666/${HT}`, { 1: { k: "S" } });
+
+// ---- ISOLASI LAPISAN: tiap syarat sel/penanda/info/salinan diuji TERSENDIRI (tanpa salinan, atau salinan sendirian) agar lapisan lain tidak menutupinya
+const tanpaS = { tanpaSalinan: true };
+await aUji("lapis: set A TANPA info dan TANPA salinan DITOLAK (hanya syarat sel yang menolak)", piket, "5102", 1, "tolak", { ...tanpaS, tanpaInfo: true });
+await aUji("lapis: set A TANPA log dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, act: { tanpa: true } });
+await aUji("lapis: set A dengan log 'izin-jam' dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, aksi: "izin-jam" });
+await aUji("lapis: set A KEMARIN dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, info: { hariKe: HK - 1 } });
+await aUji("lapis: set A info TANPA hariKe dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, info: { hariKe: undefined } });
+await aUji("lapis: set A TANPA penanda dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, tanpaMarker: true });
+await aUji("lapis: set A penanda 'waka' dan TANPA salinan DITOLAK", piket, "5102", 1, "tolak", { ...tanpaS, marker: "waka" });
+await aUji("lapis: set A pada siswa berketerangan harian TANPA salinan DITOLAK", piket, "5110", 1, "tolak", tanpaS);
+await uji("lapis: waka menulis sel A siswa berketerangan harian TANPA salinan DITOLAK", waka, "PATCH", "", { [`lessons/${HT}/${AJ}/absen/5110/5`]: "A", [`lessons/${HT}/${AJ}/absenOleh/5110/5`]: "waka" }, "tolak");
+// piket menulis penanda 'waka' bersama perubahan sel S/I/D (hanya aturan tulis penanda yang menahan)
+await uji("lapis: piket menulis penanda 'waka' bersama sel S DITOLAK", piket, "PATCH", "", (() => {
+  const A = act(piket, "izin-jam");
+  return { ...A.body, [`lessons/${HT}/${AJ}/absen/5116/5`]: "S", [`lessons/${HT}/${AJ}/absenOleh/5116/5`]: "waka", [`lessonsByStudent/5116/${HT}/5`]: { k: "S" }, [MZ(HT, "5116", `${A.id}_S`)]: metaIz(piket, { lingkup: "jam", ket: "Sakit", jam: { 0: 5 } }) };
+})(), "tolak");
+// hapus A milik sendiri: lapisan sel saja (sel + penanda + info, TANPA salinan)
+const hapusSel = (nis, o = {}) => ({ ...(o.tanpaLog ? {} : act(piket, o.aksi ?? "alfa-jam").body), [`lessons/${HT}/${AJ}/absen/${nis}/1`]: null, [`lessons/${HT}/${AJ}/absenOleh/${nis}/1`]: null, [`lessons/${HT}/${AJ}/absenInfo/${nis}/1`]: null });
+await uji("lapis: piket mengisi A (5105) untuk uji hapus tersendiri", piket, "PATCH", "", aSet(piket, "5105", 1, tanpaS), "izin");
+await uji("lapis: piket menghapus A miliknya TANPA log dan TANPA salinan DITOLAK", piket, "PATCH", "", hapusSel("5105", { tanpaLog: true }), "tolak");
+await uji("lapis: piket menghapus A miliknya dengan log 'izin-jam' dan TANPA salinan DITOLAK", piket, "PATCH", "", hapusSel("5105", { aksi: "izin-jam" }), "tolak");
+await uji("lapis: piket menghapus A miliknya (sel + penanda + info, log 'alfa-jam') DITERIMA", piket, "PATCH", "", hapusSel("5105"), "izin");
+await uji("lapis: piket menghapus A piket KEMARIN (5121) TANPA salinan DITOLAK (hariKe tersimpan = kemarin)", piket, "PATCH", "", hapusSel("5121"), "tolak");
+await uji("lapis: piket menghapus A milik waka dengan INFO BASI hari ini (5119) TANPA salinan DITOLAK (penanda lama 'waka')", piket, "PATCH", "", hapusSel("5119"), "tolak");
+await uji("lapis: piket menghapus A milik waka dengan INFO BASI hari ini (5120) DITOLAK", piket, "PATCH", "", hapusSel("5120"), "tolak");
+// salinan A SENDIRIAN (sel/penanda/info sudah ada di database): hanya aturan tulis salinan yang menentukan
+const salinanSaja = (nis, k = "A", o = {}) => ({ ...(o.tanpaLog ? {} : act(piket, o.aksi ?? "alfa-jam").body), [`lessonsByStudent/${nis}/${HT}/1`]: k === null ? null : { k } });
+await uji("lapis: salinan A SENDIRIAN pada sel dengan penanda 'waka' dan info basi (5120) DITOLAK", piket, "PATCH", "", salinanSaja("5120"), "tolak");
+await uji("lapis: salinan A SENDIRIAN pada sel piket KEMARIN (5121) DITOLAK", piket, "PATCH", "", salinanSaja("5121"), "tolak");
+await uji("lapis: salinan A SENDIRIAN TANPA log (5122, sel piket hari ini) DITOLAK", piket, "PATCH", "", salinanSaja("5122", "A", { tanpaLog: true }), "tolak");
+await uji("lapis: salinan A SENDIRIAN dengan log 'izin-jam' (5122) DITOLAK", piket, "PATCH", "", salinanSaja("5122", "A", { aksi: "izin-jam" }), "tolak");
+await uji("lapis: salinan A SENDIRIAN pada sel piket hari ini dengan log 'alfa-jam' (5122) DITERIMA (kontrol: hanya log yang berbeda dari kasus di atas)", piket, "PATCH", "", salinanSaja("5122"), "izin");
+await uji("lapis: piket menghapus salinan A milik waka dengan INFO BASI (5119) DITOLAK (penanda lama 'waka')", piket, "PATCH", "", salinanSaja("5119", null), "tolak");
 
 seksi("PIKET — pelanggaran ringan / bertakziran (dari master) + LOG WAJIB");
 const hapusPkTanpaEntri = () => ({
@@ -1216,6 +1375,10 @@ await http("PATCH", "", { owner: true, body: {
   // catatan bersumber 'manual' yang pencatatnya (dibuatOleh) adalah wali A: wali tetap TIDAK boleh menghapusnya (hanya sumber 'wali')
   "discipline/records/701/recMan": sd("701"), "discipline/recordMeta/701/recMan": { dibuatOleh: waliA.uid, dibuatNama: "Bu Wali", dibuatTs: 1000 },
 }});
+
+// v2.3.1: wali TIDAK dapat mengisi A per jam (diuji di sini karena akun wali baru dibuat pada bagian ini)
+await uji("lapis: wali TIDAK mengisi A", waliA, "PATCH", "", aSet(waliA, "5102", 5), "tolak");
+await uji("lapis: wali TIDAK mengisi A (tanpa salinan)", waliA, "PATCH", "", aSet(waliA, "5102", 5, tanpaS), "tolak");
 
 // ---- BACA: hanya siswa binaan (kelas utama dan tambahan)
 const BACA = (n) => [`profiles/${n}`, `attendance/${n}`, `attendance/${n}/${TGL}`, `discipline/records/${n}`, `discipline/recordMeta/${n}`, `discipline/notes/${n}`, `lessonsByStudent/${n}`, `manualTapByStudent/${n}`, `validasiByStudent/${n}`];
