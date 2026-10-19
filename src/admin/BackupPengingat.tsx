@@ -3,6 +3,7 @@ import { serverTimestamp, update } from "firebase/database";
 import Icon from "../components/Icon";
 import { Spinner } from "../components/ui";
 import { relatif } from "../lib/time";
+import { waktuServer } from "../services/aktivitas";
 import { r, useLive } from "../services/db";
 import { useToast } from "./AdminLayout";
 
@@ -21,7 +22,7 @@ export default function BackupPengingat() {
   const live = useLive<number>("sistem/backupTerakhir");
   const [busy, setBusy] = useState(false);
   const ts = typeof live.data === "number" ? live.data : null;
-  const lewat = ts !== null && Date.now() - ts > BATAS_HARI * 86_400_000;
+  const lewat = ts !== null && waktuServer() - ts > BATAS_HARI * 86_400_000; // jam server, bukan jam perangkat
   const url = urlKonsolDatabase(import.meta.env.VITE_FIREBASE_PROJECT_ID, import.meta.env.VITE_FIREBASE_DATABASE_URL);
 
   const tandai = async () => {

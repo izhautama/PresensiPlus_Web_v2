@@ -2,6 +2,7 @@
 // (desktop & mobile punya namespace + server Vite sendiri agar data tidak saling bercampur). Hanya ke emulator lokal.
 import { readFileSync } from "node:fs";
 import { hitungTanggal } from "./tanggal.mjs";
+import { muatRulesTerverifikasi } from "../emu.mjs";
 
 export const T = hitungTanggal();
 
@@ -30,14 +31,14 @@ const Pl = (uid, nis, jam) => ({ [`${uid}_P`]: { jam, nis, status: "Pulang" } })
 
 async function siapkan(nama, { ns, ver }) {
   const rules = readFileSync(process.env.RULES_FILE ?? new URL("../../database.rules.json", import.meta.url), "utf8"); // RULES_FILE: hanya untuk uji detektor
-  const r = await fetch(`${DB}/.settings/rules.json?ns=${ns}`, { method: "PUT", headers: OWNER, body: rules });
-  if (!r.ok) throw new Error(`gagal memuat rules (${nama}): ${r.status}`);
+  await muatRulesTerverifikasi({ db: DB, ns, teks: rules, label: `e2e ${nama}` }); // rules di emulator = rules file yang diuji (hash dicocokkan)
 
   const id = {
     admin: await buatUser(`admin.${nama}@e2e.test`),
     waka: await buatUser(`waka.${nama}@e2e.test`),
     kepala: await buatUser(`kepala.${nama}@e2e.test`),
     piket: await buatUser(`piket.${nama}@e2e.test`),
+    wali: await buatUser(`wali.${nama}@e2e.test`),
     ortu1: await buatUser(`111.${ver}@ortu.presensi-ma.local`, "482915"),
     ortu2: await buatUser(`222.${ver}@ortu.presensi-ma.local`, "739104"),
   };
@@ -73,12 +74,15 @@ async function siapkan(nama, { ns, ver }) {
   const log18 = { ...M("AAAA1111", "111", "07:30:00", "Terlambat"), ...M("BBBB2222", "222", "07:00:00") };
 
   const seed = {
-    roles: { [id.admin]: "admin", [id.waka]: "waka", [id.kepala]: "kepala", [id.piket]: "piket" },
+    roles: { [id.admin]: "admin", [id.waka]: "waka", [id.kepala]: "kepala", [id.piket]: "piket", [id.wali]: "wali" },
     staff: {
       [id.waka]: { email: `waka.${nama}@e2e.test`, nama: "Waka Uji", role: "waka", dibuat: now },
       [id.kepala]: { email: `kepala.${nama}@e2e.test`, nama: "Kepala Uji", role: "kepala", dibuat: now },
       [id.piket]: { email: `piket.${nama}@e2e.test`, nama: "Meja Piket", role: "piket", dibuat: now },
+      [id.wali]: { email: `wali.${nama}@e2e.test`, nama: "Bu Wali X IPA", role: "wali", dibuat: now, kelasUtama: "X IPA" },
     },
+    waliAkun: { [id.wali]: { email: `wali.${nama}@e2e.test`, nama: "Bu Wali X IPA", kelasUtama: "X IPA", aktif: true } },
+    siswaKelas: Object.fromEntries(Object.values(siswa).map((s) => [s.nis, s.kelas])), // indeks untuk rules wali (kunci kelas = encodeKelas; tanpa karakter khusus di data uji)
     parents: { 111: { ver, uid: id.ortu1 }, 222: { ver, uid: id.ortu2 } },
     config: { version: 1, students: siswa },
     profiles: Object.fromEntries(Object.values(siswa).map((s) => [s.nis, { nama: s.nama, kelas: s.kelas }])),

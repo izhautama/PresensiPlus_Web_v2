@@ -9,9 +9,11 @@ import {
 import { formatTanggal } from "../lib/time";
 import type { StudentRow } from "../lib/types";
 import { hapusRecord, pulihkanRecord, simpanCatatanInternal, ubahRecord, type Actor } from "../services/discipline";
+import { waktuServer } from "../services/aktivitas";
 import { r as refDb, useLive } from "../services/db";
 import { get } from "firebase/database";
 import { htmlLembar, type BarisJam } from "../lib/lembar";
+import type { Pembinaan } from "../lib/pembinaan";
 
 type Props = {
   siswa: StudentRow;
@@ -47,6 +49,8 @@ export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelLis
     w.document.write("<p style='font-family:sans-serif'>Menyiapkan lembar pembinaan…</p>");
     try {
       const snap = await get(refDb(`lessonsByStudent/${siswa.nis}`));
+      const pbSnap = await get(refDb(`pembinaan/${siswa.nis}`)).catch(() => null); // riwayat pembinaan (wali kelas & pejabat) ikut dicetak
+      const pembinaan = Object.values((pbSnap?.val() ?? {}) as Record<string, Pembinaan>).filter((p) => p.ta === ta);
       const perJam: BarisJam[] = [];
       for (const [tgl, jams] of Object.entries((snap.val() ?? {}) as Record<string, Record<string, { k: string; mapel?: string }>>)) {
         if (tgl < awalTa(ta) || tgl > akhirTa(ta)) continue;
@@ -55,8 +59,8 @@ export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelLis
       perJam.sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.jam - b.jam);
       const html = htmlLembar({
         nama: siswa.nama, nis: siswa.nis, kelas: siswa.kelas, ta, ringkas: r, sekarang, berikut,
-        riwayat: daftarRecord(recs, metas, ta, false), perJam,
-        dicetak: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }), dicetakOleh: actor.nama,
+        riwayat: daftarRecord(recs, metas, ta, false), perJam, pembinaan,
+        dicetak: new Date(waktuServer()).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }), dicetakOleh: actor.nama,
       });
       w.document.open(); w.document.write(html); w.document.close();
       w.focus();

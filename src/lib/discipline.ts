@@ -1,4 +1,4 @@
-import { tahunAjaran } from "./time";
+import { tahunAjaran } from "./time.ts";
 
 export type KategoriPelanggaran = "Sangat Berat" | "Berat" | "Sedang" | "Ringan";
 export const KATEGORI_LIST: KategoriPelanggaran[] = ["Sangat Berat", "Berat", "Sedang", "Ringan"];
@@ -6,7 +6,9 @@ export type Kelompok = "Prestasi" | "Tanpa prestasi";
 
 export type Rule = { kategori: KategoriPelanggaran; nama: string; poin: number; takziran?: string; aktif: boolean; diubahOleh: string; diubahTs: number };
 export type Remisi = { kelompok: Kelompok; nama: string; poin: number; syarat?: string; aktif: boolean; diubahOleh: string; diubahTs: number };
-export type Level = { poin: number; tindakan: string };
+/** Penanggung jawab tindak lanjut sebuah ambang (field eksplisit di discipline/levels/{id}). */
+export type PenanggungJawab = "wali" | "bk" | "kepala" | "waka";
+export type Level = { poin: number; tindakan: string; penanggungJawab?: PenanggungJawab };
 export type AutoMap = { terlambat?: string; tanpaTapPulang?: string; bolosJam?: string; alfa?: string; lupaKtm?: string; ktmHilang?: string };
 
 /**
@@ -22,7 +24,7 @@ export type DiscRecord = {
   tanggal: string;
   ta: string;
   takziran?: string;
-  sumber: "manual" | "saran";
+  sumber: "manual" | "saran" | "piket" | "wali" | "usul-wali";
 };
 
 /** discipline/recordMeta/{nis}/{recId} — KHUSUS STAF. `snapshot` = salinan isi catatan saat dihapus. */

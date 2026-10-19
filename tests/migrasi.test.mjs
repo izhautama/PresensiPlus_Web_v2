@@ -7,6 +7,8 @@ import { isDeepStrictEqual } from "node:util";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { encodeKelas } from "../src/lib/perjam.ts";
+import { muatRulesTerverifikasi } from "./emu.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -40,8 +42,7 @@ const masuk = async (email, password) => { const j = await authPost("signInWithP
 
 const rules = readFileSync(new URL("../database.rules.json", import.meta.url), "utf8");
 for (const ns of [NS, NS2]) {
-  const r = await fetch(`${DB}/.settings/rules.json?ns=${ns}`, { method: "PUT", headers: OWNER, body: rules });
-  assert.ok(r.ok, `gagal memuat rules ${ns}`);
+  await muatRulesTerverifikasi({ db: DB, ns, teks: rules, label: `migrasi ${ns}` });
 }
 
 // ---------------------------------------------------------------- data PRA-ADA (modul baru + peran staf + data yang tidak boleh ditimpa)
@@ -70,6 +71,7 @@ const PRA = {
   attendance: { 9001: { "2026-09-02": { masuk: "07:30:00", status: "Terlambat" } }, 9002: { "2026-09-05": { ket: "Dispensasi", catatan: "lomba" } } },
   izin: { "2026-09-05": { 9002: "Dispensasi" } },
   config: { version: 1 },
+  siswaKelas: { 9002: "X IPA", 7777: "X IPA" }, // 9002 salah kelas (seharusnya XI IPS); 7777 tanpa siswa (usang)
 };
 await sebagaiPemilik(NS, "PUT", "", PRA);
 const alatLama = await buatUser(DEVICE_EMAIL, PW_LAMA); // akun alat SUDAH ada (firmware berjalan)
@@ -94,6 +96,8 @@ cek("dry-run: keluaran menyatakan dry-run", /dry-run/i.test(dry.keluaran));
 cek("dry-run: 6 baris induk tidak valid dilaporkan", dry.masalah.length === 6, JSON.stringify(dry.masalah));
 cek("dry-run: nama > 60 dan kelas > 15 DILEWATI (bukan dipotong diam-diam)", dry.masalah.some((x) => /nama > 60/.test(x)) );
 cek("dry-run: 3 akun ortu akan dibuat", dry.ortu_baru === 3);
+cek("dry-run: laporan indeks siswaKelas (2 baru, 1 berubah, 1 usang, 0 sesuai)", dry.indeks.baru === 2 && dry.indeks.berubah === 1 && dry.indeks.usang === 1 && dry.indeks.sama === 0, JSON.stringify(dry.indeks));
+cek("dry-run: indeks siswaKelas TIDAK ditulis", JSON.stringify(sesudahDry.siswaKelas) === JSON.stringify(sebelum.siswaKelas) && sesudahDry.siswaKelas[9002] === "X IPA");
 cek("dry-run: 2 data sudah ada akan dilewati (hari alat + Dispensasi)", dry.riwayat.sudah_ada === 2, JSON.stringify(dry.riwayat));
 cek("dry-run: akun admin TIDAK dibuat", (await masuk("admin.migrasi@uji.test", "password-admin-123")) === null);
 cek("dry-run: akun ortu TIDAK dibuat", (await masuk("9001.1@ortu.presensi-ma.local", "000000")) === null);
@@ -112,6 +116,8 @@ cek("tidak ada kredensial alat baru dicetak", !("password" in {}) && real.device
 cek("data alat yang sudah ada (9001 2026-09-02) TIDAK ditimpa", JSON.stringify(d1.attendance[9001]["2026-09-02"]) === JSON.stringify(PRA.attendance[9001]["2026-09-02"]));
 cek("Dispensasi yang sudah ada (9002) TIDAK ditimpa (izin + attendance)", d1.izin["2026-09-05"][9002] === "Dispensasi" && d1.attendance[9002]["2026-09-05"].ket === "Dispensasi" && d1.attendance[9002]["2026-09-05"].catatan === "lomba");
 cek("3 siswa valid masuk config/students & profiles", Object.keys(d1.config.students).length === 3 && Object.keys(d1.profiles).length === 3);
+cek("indeks siswaKelas: setiap siswa config/students punya indeks kelas yang sama dengan web", Object.values(d1.config.students).every((s) => d1.siswaKelas?.[s.nis] === encodeKelas(s.kelas)), JSON.stringify(d1.siswaKelas));
+cek("indeks siswaKelas: 9002 yang salah dikoreksi; 7777 usang TIDAK dihapus migrasi", d1.siswaKelas[9002] === "XI IPS" && d1.siswaKelas[7777] === "X IPA");
 cek("baris tidak valid tidak ikut tertulis", !d1.config.students.XYZ && !d1.profiles[9004] && !d1.profiles[9005] && !d1.profiles.ab12 && !d1.profiles[9008]);
 cek("parents/{nis} = {uid, ver:1} untuk 3 siswa", ["9001", "9002", "9003"].every((n) => d1.parents[n]?.ver === 1 && d1.parents[n]?.uid));
 cek("presensi masuk+pulang 9001 tertulis (format jam rules)", JSON.stringify(d1.attendance[9001]["2026-09-01"]) === JSON.stringify({ masuk: "07:05:00", pulang: "15:01:00", status: "Hadir" }));
@@ -141,6 +147,11 @@ cek("rotasi: peran alat tetap 'device'", (await semua()).roles[alatLama.uid] ===
 
 // ================================================================ 5. penjaga jalur & peran
 console.log("\n5. Penjaga jalur terlarang & peran");
+const kunci = jalan("kunci");
+for (const [k, v] of Object.entries(kunci).filter(([k]) => k !== "keluaran")) cek(`kunci kelas Python = encodeKelas web: ${JSON.stringify(k)}`, v === encodeKelas(k), `${v} vs ${encodeKelas(k)}`);
+const bt = jalan("batch");
+cek("batch: setiap siswa (config + profil + indeks kelas) utuh dalam satu update", bt.utuh === true && bt.total === 1000, JSON.stringify(bt));
+cek("batch: tiap update <= 400 path", bt.batch.every((n) => n <= 400), JSON.stringify(bt.batch));
 const guard = jalan("guard");
 for (const [p, h] of Object.entries(guard.jalur)) cek(`jalur '${p}' ditolak skrip`, h === "ditolak");
 cek("uid berperan waka TIDAK dijadikan admin", guard.peran_waka === "ditolak" && guard.role_waka_setelah === "waka");
@@ -158,6 +169,7 @@ await kirim("admin menulis config/schedule", adminW, "PUT", "config/schedule", h
 await kirim("admin menulis config/version", adminW, "PUT", "config/version", hasilMigrasi.config.version);
 // rules menulis per-anak ($nis / $key), jadi replay memakai PATCH multi-path (seperti Admin SDK update)
 const multi = (node, prefixFn = (k) => k) => Object.fromEntries(Object.entries(node ?? {}).map(([k, v]) => [prefixFn(k), v]));
+await kirim("admin menulis siswaKelas/{nis}", adminW, "PATCH", "", multi(hasilMigrasi.siswaKelas, (k) => `siswaKelas/${k}`));
 await kirim("admin menulis profiles/{nis}", adminW, "PATCH", "", multi(hasilMigrasi.profiles, (k) => `profiles/${k}`));
 await kirim("admin menulis parents/{nis}", adminW, "PATCH", "", multi(hasilMigrasi.parents, (k) => `parents/${k}`));
 const izinPaths = {};
@@ -182,6 +194,20 @@ cek("web: ortu TIDAK membaca anak lain", (await http(NS2, "GET", "attendance/900
 cek("web: admin membaca config/students", Object.keys((await http(NS2, "GET", "config/students", { token: adminW.token })).json ?? {}).length === 3);
 cek("web: waka membaca daftar presensi", (await http(NS2, "GET", "attendance", { token: wakaW.token })).status === 200);
 cek("web: waka membaca log hari itu", Object.keys((await http(NS2, "GET", "log/2026-09-01", { token: wakaW.token })).json ?? {}).length === 3);
+
+// wali kelas bekerja di atas data hasil migrasi: indeks siswaKelas (hasil migrasi) membatasi wewenangnya
+const waliW = await buatUser(`wali.replay.${rnd()}@uji.test`, "password-uji-123");
+await sebagaiPemilik(NS2, "PATCH", "", { [`roles/${waliW.uid}`]: "wali", [`staff/${waliW.uid}`]: { email: "w@uji.test", nama: "Wali Uji", role: "wali", dibuat: 1, kelasUtama: "XI IPS" } });
+const qIdx = async (kelas, who) => { // query REST orderBy="$value"&equalTo=<kelas> (satu-satunya cara wali membaca indeks)
+  const q = new URLSearchParams({ ns: NS2, auth: who.token, orderBy: '"$value"', equalTo: JSON.stringify(kelas) });
+  const res = await fetch(`${DB}/siswaKelas.json?${q}`);
+  let json = null; try { json = await res.json(); } catch { /* kosong */ }
+  return { status: res.status, json };
+};
+cek("web: wali XI IPS meng-query indeks hasil migrasi (9001 & 9002)", Object.keys((await qIdx("XI IPS", waliW)).json ?? {}).sort().join() === "9001,9002");
+cek("web: wali XI IPS membaca profil 9001 (siswa binaan)", (await http(NS2, "GET", "profiles/9001", { token: waliW.token })).json?.nama === "ANDI SATU");
+cek("web: wali XI IPS TIDAK membaca profil 9003 (X IPA)", [401, 403].includes((await http(NS2, "GET", "profiles/9003", { token: waliW.token })).status));
+cek("web: wali XI IPS TIDAK meng-query kelas X IPA", [401, 403].includes((await qIdx("X IPA", waliW)).status));
 
 rmSync(CSV, { force: true });
 console.log(`\n${lolos} lolos, ${gagal.length} gagal`);

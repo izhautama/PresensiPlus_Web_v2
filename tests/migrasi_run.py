@@ -50,7 +50,37 @@ IZIN = [
 ]
 
 hasil = {}
-if mode == "guard":
+if mode == "kunci":
+    contoh = ["X IPA", "XI/IPS.1", "X-A#2", "K$[1]", "100%", "a.b/c", "Kelas Ü"]
+    hasil = {k: M.kunci_kelas(k) for k in contoh}
+elif mode == "batch":
+    # penulisan satu siswa (config + profil nama/kelas + indeks kelas) TIDAK boleh terpecah antar-update (batch)
+    class _Ref:
+        def __init__(self, sink): self.sink = sink
+        def update(self, d): self.sink.append(dict(d))
+    class _Db:
+        def __init__(self): self.sink = []
+        def reference(self, p): return _Ref(self.sink)
+    fake = _Db(); asli = M.db; M.db = fake
+    try:
+        paths = {}
+        for i in range(1, 251):
+            nis = str(1000 + i)
+            paths[f"config/students/AB{i:06d}"] = {"nis": nis, "nama": "S", "kelas": "X"}
+            paths[f"profiles/{nis}/nama"] = "S"; paths[f"profiles/{nis}/kelas"] = "X"
+            paths[f"siswaKelas/{nis}"] = "X"
+        M._update_batch(paths, "uji", dry_run=False, unit=4)
+    finally:
+        M.db = asli
+    utuh = True
+    for b in fake.sink:
+        for nis in {k.split("/")[1] for k in b if k.startswith("siswaKelas/")}:
+            utuh = utuh and f"profiles/{nis}/nama" in b and f"profiles/{nis}/kelas" in b
+        for k in b:
+            if k.startswith("profiles/"):
+                utuh = utuh and f"siswaKelas/{k.split('/')[1]}" in b
+    hasil = {"batch": [len(b) for b in fake.sink], "utuh": utuh, "total": sum(len(b) for b in fake.sink)}
+elif mode == "guard":
     # 1) jalur terlarang ditolak oleh skrip (Admin SDK melewati rules, jadi penjaga ada di skrip)
     galat = {}
     for p in ["discipline/rules/x", "roles/abc", "staff/abc", "validasi/2026-09-01/9001", "izinMeta/a/b/c", "manualTap/2026-09-01/9001",
@@ -79,5 +109,5 @@ else:
     R = M.migrasi_riwayat(TAP, IZIN, S["nis_ke_uid"], dry_run=dry)
     M.naikkan_versi(dry_run=dry)
     hasil = {"masalah": S["masalah"], "ortu_baru": S["ortu_baru"], "riwayat": R, "rotasi_alat": AK.get("rotasi_alat"),
-             "device_password": AK.get("device_password"), "admin_uid": AK.get("admin_uid"), "device_uid": AK.get("device_uid")}
+             "device_password": AK.get("device_password"), "admin_uid": AK.get("admin_uid"), "device_uid": AK.get("device_uid"), "indeks": S["indeks"]}
 print("HASIL_JSON=" + json.dumps(hasil))

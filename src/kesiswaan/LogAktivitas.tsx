@@ -12,8 +12,10 @@ const jam = (ms: number) => new Date(ms).toLocaleTimeString("id-ID", { timeZone:
 
 /** Log aktivitas akun staf (admin & waka, hanya baca). Satu hari per tampilan. */
 export default function LogAktivitas() {
-  const { students } = useAdminData();
-  const [tgl, setTgl] = useState(todayWIB());
+  const { students, today } = useAdminData();
+  // default = tanggal SERVER (mengikuti perubahan hari); tanggal pilihan pengguna menimpanya
+  const [tglPilihan, setTgl] = useState<string | null>(null);
+  const tgl = tglPilihan ?? today;
   const [f, setF] = useState<Filter>(FILTER_KOSONG);
   const live = useLive<Record<string, Omit<EntriLog, "id">>>(tgl ? `activity/${tgl}` : null);
   const perangkat = useLive<Record<string, Perangkat>>("piketPerangkat");

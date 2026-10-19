@@ -55,6 +55,7 @@ export default function LoginPage() {
   if (session?.role === "kepala") return <Navigate to="/kepala" replace />;
   if (session?.role === "waka") return <Navigate to="/waka" replace />;
   if (session?.role === "piket") return <Navigate to="/piket" replace />;
+  if (session?.role === "wali") return <Navigate to="/wali" replace />;
   if (session?.role === "ortu") return <Navigate to={`/siswa/${session.nis}`} replace />;
 
   const switchMode = (next: Mode) => {

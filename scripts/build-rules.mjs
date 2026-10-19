@@ -14,6 +14,7 @@ const isDevice = peran("device");
 const isKepala = peran("kepala");
 const isWaka = peran("waka");
 const isPiket = peran("piket");
+const isWali = peran("wali");
 
 /** auth != null && (a || b || ...) — tanpa kurung bila hanya satu. */
 const anyOf = (...e) => `auth != null && ${e.length === 1 ? e[0] : `(${e.join(" || ")})`}`;
@@ -31,9 +32,11 @@ const PENULIS_JAM = [isWaka];
 const penulisJam = anyOf(...PENULIS_JAM);
 
 const orStafKes = STAF_KESISWAAN.join(" || ");
-const orAdminDanStaf = [isAdmin, ...STAF_KESISWAAN, isPiket].join(" || ");
+const orAdminDanStaf = [isAdmin, ...STAF_KESISWAAN, isPiket, isWali].join(" || ");
 /** Pembaca tambahan untuk piket pada node yang memang diperlukan (granular; piket TIDAK masuk PEMBACA umum). */
 const pembacaPiket = anyOf(isAdmin, isKepala, isWaka, isPiket);
+/** pengaturan umum yang juga dibaca wali (jendela mundur, ambang hari efektif) */
+const pembacaStafLuas = anyOf(isAdmin, isKepala, isWaka, isPiket, isWali);
 
 const tglRe = "/^20[0-9]{2}-[01][0-9]-[0-3][0-9]$/";
 const taRe = "/^20[0-9]{2}-20[0-9]{2}$/";
@@ -46,11 +49,24 @@ const hariIni = "((now + 25200000) / 86400000)";
 const mundurN = "(root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2)";
 /** hariKe sah: bilangan bulat dalam [hariIni - N, hariIni + batasDepan]. hariIni dihitung desimal (>= lantai), sehingga batas bawah efektif tepat N hari. */
 const hariKeSah = (ex, depan) => `${ex}.isNumber() && ${ex}.val() % 1 === 0 && ${ex}.val() >= ${hariIni} - ${mundurN} - 1 && ${ex}.val() <= ${hariIni} + ${depan}`;
-const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
+const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)";
 const KET_IZIN = "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')";
 const nisRe = "/^[0-9]{1,20}$/";
 const KODE_JAM = "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'";
-const milikAnak = "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid";
+// ---- WALI KELAS: guru per akun (bukan akun bersama). Wewenang HANYA untuk siswa kelas binaannya, dicocokkan lewat indeks siswaKelas/{nis}.
+//   staff/{uid}/kelasUtama (waka/admin) dan staff/{uid}/kelasTambahan/{kelasKey}: true (HANYA admin). Rules tidak bisa menghitung anak,
+//   jadi "1 kelas utama" ditegakkan oleh bentuk datanya (satu nilai), dan "kelas tambahan hanya admin" oleh `.write` pada anak kelasTambahan.
+const KELAS_KEY_RE = "/^[^.#$\\[\\]\\/]{1,45}$/";
+const STF = "root.child('staff').child(auth.uid)";
+const SK = (nis) => `root.child('siswaKelas').child(${nis})`;
+/** wali yang membina kelas tempat siswa $nis berada (kelas utama ATAU tambahan). Siswa tanpa indeks = tidak dapat dibina siapa pun. */
+const waliDari = (nis) => `(${isWali} && ${SK(nis)}.exists() && (${STF}.child('kelasUtama').val() === ${SK(nis)}.val() || ${STF}.child('kelasTambahan').child(${SK(nis)}.val()).val() === true))`;
+/** staff/$uid pada update yang sama (newData) dilihat dari waliAkun/$uid/<field> (3 tingkat ke root). */
+const STF_BARU = "newData.parent().parent().parent().child('staff').child($uid)";
+const WALI_CERMIN_BUAT = `auth != null && ${isWaka} && !data.exists() && ${STF_BARU}.child('role').val() === 'wali'`;
+/** waka membuat entri akun wali: create-only per field, hanya untuk role 'wali' */
+const WALI_DIBUAT = `auth != null && ${isWaka} && !data.exists() && newData.parent().child('role').val() === 'wali'`;
+const milikAnak = `auth != null && (root.child('parents').child($nis).child('uid').val() === auth.uid || ${waliDari("$nis")})`;
 const KATEGORI = "newData.val() === 'Sangat Berat' || newData.val() === 'Berat' || newData.val() === 'Sedang' || newData.val() === 'Ringan'";
 
 /** Akses data BARU (setelah update ini) dari dalam rules `discipline/records|recordMeta/$nis/$recId`: tiga tingkat ke `discipline`. */
@@ -67,13 +83,18 @@ const isiRecord = () => ({
   tanggal: { ".validate": `newData.isString() && newData.val().matches(${tglRe})` },
   ta: { ".validate": `newData.isString() && newData.val().matches(${taRe})` },
   takziran: { ".validate": str(300) },
-  sumber: { ".validate": "newData.val() === 'manual' || newData.val() === 'saran' || newData.val() === 'piket'" },
+  sumber: { ".validate": "newData.val() === 'manual' || newData.val() === 'saran' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'usul-wali'" },
 });
 
 const TIPE_SARAN = "(terlambat|tanpaTapPulang|bolosJam|alfa|lupaKtm|ktmHilang)";
 /** Catatan bersumber "saran" HANYA sah bila ada keputusan "diterima" pada update yang sama (id deterministik {tanggal}_{tipe}). */
 const saranSah = () =>
   `$recId.matches(/^20[0-9]{2}-[01][0-9]-[0-3][0-9]_${TIPE_SARAN}$/) && $recId.beginsWith(newData.child('tanggal').val() + '_') && ${dariDisc}.child('suggest').child(newData.child('tanggal').val()).child($recId.replace(newData.child('tanggal').val() + '_', '') + '_' + $nis).child('keputusan').val() === 'diterima'`;
+
+/** Record remisi bersumber "usul-wali" HANYA sah bila usulan (id = recId) berstatus menunggu SEBELUM update ini dan disetujui oleh pengguna pada update yang sama. */
+const USUL_BARU = (id) => `${dariDisc}.parent().child('usulRemisi').child(${id})`;
+const usulSah = () =>
+  `root.child('usulRemisi').child($recId).child('status').val() === 'menunggu' && ${USUL_BARU('$recId')}.child('status').val() === 'disetujui' && ${USUL_BARU('$recId')}.child('recId').val() === $recId && ${USUL_BARU('$recId')}.child('diputuskanOleh').val() === auth.uid && ${USUL_BARU('$recId')}.child('nis').val() === $nis && newData.child('jenis').val() === 'remisi' && newData.child('refId').val() === ${USUL_BARU('$recId')}.child('remId').val() && newData.child('poin').val() === ${USUL_BARU('$recId')}.child('poin').val() && newData.child('nama').val() === ${USUL_BARU('$recId')}.child('nama').val()`;
 
 // ---- LOG AKTIVITAS WAJIB (piket) -------------------------------------------------------------------------------
 // Setiap tulisan piket hanya sah bila UPDATE YANG SAMA menulis:
@@ -88,6 +109,8 @@ const ACT = (n) => `${nav(n)}.child('activityLast').child(auth.uid)`;
 const ENT = (n) => `${nav(n)}.child('activity').child(${ACT(n)}.child('tgl').val()).child(${ACT(n)}.child('id').val())`;
 const actOk = (n, aksi) => `${ACT(n)}.child('ts').val() === now && ${ENT(n)}.child('ts').val() === now && ${ENT(n)}.child('uid').val() === auth.uid && (${aksi.map((a) => `${ENT(n)}.child('aksi').val() === '${a}'`).join(" || ")})`;
 /** izinMeta baru (ts === now) berkunci "<activityId>_<sufiks>" untuk (tgl, nis) pada update yang sama. */
+/** Izin harian oleh wali (HANYA Izin/Sakit; Dispensasi ditolak) untuk siswa binaan; log aktivitas + izinMeta baru (kunci "<idLog>_H") wajib. */
+const waliIzin = (n, tgl, cekKet) => `(${isWali} && ${waliDari('$nis')} && !root.child('validasi').child(${tgl}).child($nis).exists() && (newData.exists() ? (${cekKet ? "newData.val() !== 'Dispensasi' && " : ""}${actOk(n, ["izin-harian"])} && ${metaBaruPiket(n, tgl, '$nis', "'H'")}) : ${actOk(n, ["hapus-izin"])}))`;
 const metaBaruPiket = (n, tgl, nis, sufiks) => `${nav(n)}.child('izinMeta').child(${tgl}).child(${nis}).child(${ACT(n)}.child('id').val() + '_' + ${sufiks}).child('ts').val() === now`;
 
 /** override kalender untuk $tgl dari node kalenderEfektif/$tgl (n tingkat ke root). */
@@ -127,6 +150,115 @@ const piketRecordOk = () => {
   return `(newData.exists() ? (${buat}) : (${hapus}))`;
 };
 
+/**
+ * Hak tulis WALI pada discipline/records/$nis/$recId: sama seperti piket (pelanggaran dari master, aktif, Ringan ATAU bertakziran,
+ * poin/nama/kategori/takziran identik master) tetapi sumber "wali", HANYA untuk siswa binaan, tanpa piketHarian: jendela waktu
+ * ditegakkan lewat recordMeta.hariKe (hariKeSah, tanpa masa depan). Soft delete hanya catatan wali itu sendiri.
+ */
+const waliRecordOk = () => {
+  const R = "root.child('discipline').child('rules').child(newData.child('refId').val())";
+  const MB = metaBaru('$nis', '$recId');
+  const buat = [
+    "!data.exists()",
+    `${waliDari('$nis')}`,
+    "newData.child('jenis').val() === 'pelanggaran'",
+    "newData.child('sumber').val() === 'wali'",
+    `${R}.child('aktif').val() === true`,
+    `(${R}.child('kategori').val() === 'Ringan' || ${R}.child('takziran').val().length > 0)`,
+    `newData.child('poin').val() === ${R}.child('poin').val()`,
+    `newData.child('nama').val() === ${R}.child('nama').val()`,
+    `newData.child('kategori').val() === ${R}.child('kategori').val()`,
+    `newData.child('takziran').val() === ${R}.child('takziran').val()`,
+    hariKeSah(`${MB}.child('hariKe')`, 0),
+    actOk(4, ["pelanggaran"]),
+  ].join(" && ");
+  const hapus = `${waliDari('$nis')} && data.child('sumber').val() === 'wali' && root.child('discipline').child('recordMeta').child($nis).child($recId).child('dibuatOleh').val() === auth.uid && ${MB}.child('dihapus').val() === true && ${actOk(4, ["hapus-pelanggaran"])}`;
+  return `(newData.exists() ? (${buat}) : (${hapus}))`;
+};
+
+// ---- PEMBINAAN (wali kelas) + USUL REMISI ----------------------------------------------------------------------
+/** Ambang yang penanggung jawabnya wali kelas (field eksplisit; tanpa nilai bawaan tersembunyi). */
+const LEVEL_WALI = (lvl) => `root.child('discipline').child('levels').child(${lvl}).child('penanggungJawab').val() === 'wali'`;
+const METODE_PB = ["Tatap muka", "Telepon/WhatsApp", "Kunjungan rumah", "Lainnya"].map((m) => `newData.val() === '${m}'`).join(" || ");
+/** pembinaan/$nis/$id (3 tingkat ke root) -> salinan status pembinaanStatus/$nis/$ta/$levelId pada update yang sama. */
+const PS_DARI_PB = `${nav(3)}.child('pembinaanStatus').child($nis).child(newData.child('ta').val()).child(newData.child('levelId').val())`;
+const PB_DARI_PS = `${nav(4)}.child('pembinaan').child($nis).child($ta + '_' + $levelId)`;
+const pembinaanBlok = () => ({
+  ".read": anyOf(isAdmin, isKepala, isWaka),
+  $nis: {
+    ".read": `auth != null && (${isAdmin} || ${isKepala} || ${isWaka} || ${waliDari("$nis")})`,
+    ".validate": `$nis.matches(${nisRe})`,
+    $id: {
+      // Tidak dapat dihapus fisik (newData.exists()). Wali: siswa binaan + ambang yang penanggung jawabnya wali + log aktivitas.
+      // Setelah 'selesai' hanya waka/kepala yang boleh mengoreksi. Satu catatan per (TA, ambang): id = {ta}_{levelId}.
+      ".write": `auth != null && newData.exists() && ((${isWaka} || ${isKepala}) || (${waliDari("$nis")} && ${LEVEL_WALI("newData.child('levelId').val()")} && ${actOk(3, ["catat-pembinaan"])})) && (!data.exists() || data.child('status').val() !== 'selesai' || ${isWaka} || ${isKepala})`,
+      ".validate": `$id.matches(/^20[0-9]{2}-20[0-9]{2}_[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['ta', 'levelId', 'levelPoin', 'tindakan', 'tanggal', 'metode', 'hasil', 'status', 'oleh', 'olehNama', 'dibuatTs']) && $id === newData.child('ta').val() + '_' + newData.child('levelId').val() && ${PS_DARI_PB}.child('id').val() === $id && ${PS_DARI_PB}.child('status').val() === newData.child('status').val() && ${PS_DARI_PB}.child('tanggal').val() === newData.child('tanggal').val() && ${PS_DARI_PB}.child('levelPoin').val() === newData.child('levelPoin').val() && (data.exists() ? (newData.child('oleh').val() === data.child('oleh').val() && newData.child('dibuatTs').val() === data.child('dibuatTs').val() && newData.child('levelPoin').val() === data.child('levelPoin').val() && newData.child('diubahOleh').val() === auth.uid && newData.child('diubahTs').val() === now) : (newData.child('oleh').val() === auth.uid && newData.child('dibuatTs').val() === now && root.child('discipline').child('levels').child(newData.child('levelId').val()).child('poin').val() === newData.child('levelPoin').val()))`,
+      ta: { ".validate": `newData.isString() && newData.val().matches(${taRe})` },
+      levelId: { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,40}$/)" },
+      levelPoin: { ".validate": bulat(1, 100000) },
+      tindakan: { ".validate": str(200) },
+      tanggal: { ".validate": `newData.isString() && newData.val().matches(${tglRe})` },
+      metode: { ".validate": METODE_PB },
+      hasil: { ".validate": str(1000, 10) },
+      tindakLanjut: { ".validate": str(500) },
+      status: { ".validate": "newData.val() === 'dijadwalkan' || newData.val() === 'selesai'" },
+      oleh: { ".validate": "newData.isString()" },
+      olehNama: { ".validate": str(60) },
+      dibuatTs: { ".validate": "newData.isNumber()" },
+      diubahOleh: { ".validate": "newData.isString()" },
+      diubahTs: { ".validate": "newData.isNumber()" },
+      $other: { ".validate": false },
+    },
+  },
+});
+/** Salinan status untuk portal orang tua: tanpa isi pembinaan dan tanpa nama. Harus konsisten dengan pembinaan pada update yang sama. */
+const pembinaanStatusBlok = () => ({
+  ".read": anyOf(isAdmin, isKepala, isWaka),
+  $nis: {
+    ".read": milikAnak,
+    ".validate": `$nis.matches(${nisRe})`,
+    $ta: {
+      ".validate": `$ta.matches(${taRe})`,
+      $levelId: {
+        ".write": `auth != null && newData.exists() && ((${isWaka} || ${isKepala}) || (${waliDari("$nis")} && ${LEVEL_WALI("$levelId")}))`,
+        ".validate": `$levelId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['id', 'status', 'tanggal', 'levelPoin']) && newData.child('id').val() === $ta + '_' + $levelId && ${PB_DARI_PS}.child('ta').val() === $ta && ${PB_DARI_PS}.child('levelId').val() === $levelId && ${PB_DARI_PS}.child('status').val() === newData.child('status').val() && ${PB_DARI_PS}.child('tanggal').val() === newData.child('tanggal').val() && ${PB_DARI_PS}.child('levelPoin').val() === newData.child('levelPoin').val()`,
+        id: { ".validate": "newData.isString()" },
+        status: { ".validate": "newData.val() === 'dijadwalkan' || newData.val() === 'selesai'" },
+        tanggal: { ".validate": `newData.isString() && newData.val().matches(${tglRe})` },
+        levelPoin: { ".validate": bulat(1, 100000) },
+        $other: { ".validate": false },
+      },
+    },
+  },
+});
+/** usulRemisi/$id (2 tingkat ke root) -> record remisi pada update yang sama bila disetujui. */
+const REC_USUL = `${nav(2)}.child('discipline').child('records').child(newData.child('nis').val()).child($id)`;
+const MASTER_REMISI = "root.child('discipline').child('remisi').child(newData.child('remId').val())";
+const usulRemisiBlok = () => ({
+  ".read": `auth != null && (${isAdmin} || ${isKepala} || ${isWaka} || (${isWali} && query.orderByChild === 'oleh' && query.equalTo === auth.uid))`,
+  ".indexOn": ["oleh", "status"],
+  $id: {
+    ".read": `auth != null && ${isWali} && data.child('oleh').val() === auth.uid`,
+    // wali: buat (menunggu, siswa binaan, snapshot master) atau batalkan usulan SENDIRI yang masih menunggu (hapus), keduanya dengan log aktivitas.
+    // waka/kepala: memutuskan SEKALI (data.status === 'menunggu' -> disetujui|ditolak); keputusan kedua (mis. serentak) ditolak.
+    ".write": `auth != null && ((${isWali} && !data.exists() && newData.exists() && ${waliDari("newData.child('nis').val()")} && ${actOk(2, ["usul-remisi"])}) || (${isWali} && data.exists() && !newData.exists() && data.child('oleh').val() === auth.uid && data.child('status').val() === 'menunggu' && ${waliDari("data.child('nis').val()")} && ${actOk(2, ["batal-usul"])}) || ((${isWaka} || ${isKepala}) && data.exists() && newData.exists() && data.child('status').val() === 'menunggu' && newData.child('status').val() !== 'menunggu'))`,
+    ".validate": `$id.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['nis', 'remId', 'nama', 'poin', 'alasan', 'oleh', 'ts', 'status']) && (data.exists() || (${MASTER_REMISI}.child('aktif').val() === true && ${MASTER_REMISI}.child('nama').val() === newData.child('nama').val() && ${MASTER_REMISI}.child('poin').val() === newData.child('poin').val())) && (newData.child('status').val() === 'menunggu' ? (!newData.child('diputuskanOleh').exists() && !newData.child('diputuskanTs').exists() && !newData.child('alasanKeputusan').exists() && !newData.child('recId').exists()) : (newData.child('diputuskanOleh').val() === auth.uid && newData.child('diputuskanTs').val() === now && (newData.child('status').val() === 'disetujui' ? (newData.child('recId').val() === $id && ${REC_USUL}.child('sumber').val() === 'usul-wali' && ${REC_USUL}.child('jenis').val() === 'remisi') : (newData.child('alasanKeputusan').exists() && !newData.child('recId').exists()))))`,
+    nis: { ".validate": `newData.isString() && newData.val().matches(${nisRe}) && (!data.exists() || newData.val() === data.val())` },
+    remId: { ".validate": `newData.isString() && newData.val().length <= 40 && (!data.exists() || newData.val() === data.val())` },
+    nama: { ".validate": `newData.isString() && newData.val().length >= 1 && newData.val().length <= 200 && (!data.exists() || newData.val() === data.val())` },
+    poin: { ".validate": `${bulat(1, 1000)} && (!data.exists() || newData.val() === data.val())` },
+    alasan: { ".validate": `newData.isString() && newData.val().length >= 10 && newData.val().length <= 300 && (!data.exists() || newData.val() === data.val())` },
+    oleh: { ".validate": "data.exists() ? newData.val() === data.val() : newData.val() === auth.uid" },
+    ts: { ".validate": "data.exists() ? newData.val() === data.val() : newData.val() === now" },
+    status: { ".validate": "(newData.val() === 'menunggu' && !data.exists()) || newData.val() === 'disetujui' || newData.val() === 'ditolak'" },
+    diputuskanOleh: { ".validate": "newData.val() === auth.uid" },
+    diputuskanTs: { ".validate": "newData.val() === now" },
+    alasanKeputusan: { ".validate": str(300, 5) },
+    recId: { ".validate": str(60) },
+    $other: { ".validate": false },
+  },
+});
+
 // ---- aturan ----------------------------------------------------------------
 export function buildRules() {
   const rules = {
@@ -137,25 +269,61 @@ export function buildRules() {
     roles: {
       $uid: {
         ".read": `auth != null && (auth.uid === $uid || ${isAdmin})`,
-        // admin: kelola kepala/waka/piket. waka: HANYA mengunci (hapus role) dan membuka kunci (set 'piket' bila staff/{uid}.role = piket) akun piket.
-        ".write": `auth != null && $uid !== auth.uid && ((${isAdmin} && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket')) || (${isWaka} && ((data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket'))))`,
-        ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'",
+        // admin: kelola kepala/waka/piket/wali. waka: kunci/buka-kunci akun piket (hapus role / pasang 'piket' bila staff.role = piket) dan
+        // buat/cabut akun WALI (set 'wali' hanya bila staff/{uid}.role = 'wali' pada update yang sama atau sudah ada; hapus role 'wali').
+        // Tidak ada yang dapat memberi 'admin'/'device' atau mengubah role dirinya sendiri.
+        ".write": `auth != null && $uid !== auth.uid && ((${isAdmin} && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket' || data.val() === 'wali') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali')) || (${isWaka} && ((data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket') || (data.val() === 'wali' && !newData.exists()) || (!data.exists() && newData.val() === 'wali' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'))))`,
+        ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali'",
       },
     },
-
+    // Admin menulis semua. Waka HANYA: membuat entri akun wali (create-only per field) dan mengatur kelasUtama akun wali.
+    // kelasTambahan: HANYA admin (struktur anak-per-kelas agar dapat ditegakkan tanpa menghitung).
     staff: {
       ".read": adminSaja,
       $uid: {
         ".read": `auth != null && (auth.uid === $uid || ${isAdmin})`,
         ".write": adminSaja,
         ".validate": "newData.hasChildren(['email', 'nama', 'role', 'dibuat'])",
-        email: { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
-        nama: { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
-        role: { ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'" },
-        dibuat: { ".validate": "newData.isNumber()" },
+        email: { ".write": WALI_DIBUAT, ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        nama: { ".write": WALI_DIBUAT, ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+        role: { ".write": `${WALI_DIBUAT} && newData.val() === 'wali'`, ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali'" },
+        dibuat: { ".write": WALI_DIBUAT, ".validate": "newData.isNumber()" },
+        kelasUtama: { ".write": `auth != null && (${isAdmin} || (${isWaka} && newData.parent().child('role').val() === 'wali' && newData.exists()))`, ".validate": `newData.isString() && newData.val().matches(${KELAS_KEY_RE})` },
+        kelasTambahan: {
+          $kelas: { ".write": adminSaja, ".validate": `newData.val() === true && $kelas.matches(${KELAS_KEY_RE})` },
+        },
         $other: { ".validate": false },
       },
     },
+    // Cermin akun wali untuk TAMPILAN waka/kepala (waka tidak boleh membaca node staff). Otoritas tetap roles + staff.
+    // Admin menulis bebas. Waka: create-only email/nama, kelasUtama (harus sama dengan staff/{uid}/kelasUtama pada update yang sama),
+    // aktif (cabut/pasang kembali), HANYA untuk akun yang staff.role = 'wali'. kelasTambahan: HANYA admin.
+    waliAkun: {
+      ".read": anyOf(isAdmin, isKepala, isWaka),
+      $uid: {
+        ".write": adminSaja,
+        ".validate": "newData.hasChildren(['email', 'nama', 'kelasUtama', 'aktif'])",
+        email: { ".write": WALI_CERMIN_BUAT, ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        nama: { ".write": WALI_CERMIN_BUAT, ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+        kelasUtama: { ".write": `auth != null && ${isWaka} && newData.exists() && ${STF_BARU}.child('role').val() === 'wali' && newData.val() === ${STF_BARU}.child('kelasUtama').val()`, ".validate": `newData.isString() && newData.val().matches(${KELAS_KEY_RE})` },
+        aktif: { ".write": `auth != null && ${isWaka} && newData.exists() && ${STF_BARU}.child('role').val() === 'wali'`, ".validate": "newData.isBoolean()" },
+        kelasTambahan: { $kelas: { ".write": adminSaja, ".validate": `newData.val() === true && $kelas.matches(${KELAS_KEY_RE})` } },
+        $other: { ".validate": false },
+      },
+    },
+    // Indeks siswa -> kelas (kunci kelas = encodeKelas). Ditulis admin dalam update yang sama saat tambah/ubah/hapus siswa.
+    // Wali hanya boleh meng-QUERY (orderByValue + equalTo) kelas binaannya sendiri; staf pembaca membaca seluruh node.
+    siswaKelas: {
+      ".indexOn": [".value"],
+      ".read": `auth != null && (${isAdmin} || ${isKepala} || ${isWaka} || (${isWali} && query.orderByValue === true && query.equalTo != null && (query.equalTo === ${STF}.child('kelasUtama').val() || ${STF}.child('kelasTambahan').child(query.equalTo).val() === true)))`,
+      $nis: {
+        ".write": adminSaja,
+        ".validate": `$nis.matches(${nisRe}) && newData.isString() && newData.val().matches(${KELAS_KEY_RE})`,
+      },
+    },
+    pembinaan: pembinaanBlok(),
+    pembinaanStatus: pembinaanStatusBlok(),
+    usulRemisi: usulRemisiBlok(),
 
     config: {
       ".read": anyOf(isAdmin, isDevice),
@@ -190,7 +358,7 @@ export function buildRules() {
     profiles: {
       ".read": pembaca,
       $nis: {
-        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".read": milikAnak,
         ".write": adminSaja,
         // tanggal mulai dihitung hari efektif untuk siswa ini (siswa baru / pindahan); terbaca orang tua milik anak
         aktifSejak: { ".validate": `newData.isString() && newData.val().matches(${tglRe})` },
@@ -200,7 +368,7 @@ export function buildRules() {
     attendance: {
       ".read": pembaca,
       $nis: {
-        ".read": "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid",
+        ".read": milikAnak,
         $date: {
           ".read": anyOf(isPiket), // hanya satu tanggal milik satu siswa (cek "sudah tap masuk" sebelum izin); bukan seluruh riwayat
           // Alat boleh MEMBUAT node tanggal baru secara utuh; perubahan berikutnya lewat anak (masuk/pulang/status) di bawah.
@@ -222,11 +390,11 @@ export function buildRules() {
           // Keterangan harian Izin/Sakit/Dispensasi: waka & kepala (admin lewat $date). Piket hanya bila belum ada validasi Alfa
           // dan ada izinMeta (keterangan + surat) pada update yang sama. Alat TIDAK punya hak ke ket/catatan.
           ket: {
-            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(4, ["izin-harian"])} && ${metaBaruPiket(4, '$date', '$nis', "'H'")}) : ${actOk(4, ["hapus-izin"])})))`,
+            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(4, ["izin-harian"])} && ${metaBaruPiket(4, '$date', '$nis', "'H'")}) : ${actOk(4, ["hapus-izin"])})) || ${waliIzin(4, '$date', true)})`,
             ".validate": `${KET_IZIN} && (${orAdminDanStaf})`,
           },
           catatan: {
-            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(4, ["izin-harian"])} && ${metaBaruPiket(4, '$date', '$nis', "'H'")}) : ${actOk(4, ["hapus-izin"])})))`,
+            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(4, ["izin-harian"])} && ${metaBaruPiket(4, '$date', '$nis', "'H'")}) : ${actOk(4, ["hapus-izin"])})) || ${waliIzin(4, '$date', false)})`,
             ".validate": `newData.isString() && newData.val().length <= 200 && (${orAdminDanStaf})`,
           },
           $other: { ".validate": false },
@@ -291,7 +459,7 @@ export function buildRules() {
     discipline: {
       // Pengaturan piket: jendela input mundur (hari). Hanya waka yang mengubah.
       settings: {
-        ".read": pembacaPiket,
+        ".read": pembacaStafLuas,
         piketMundurHari: { ".write": anyOf(isWaka), ".validate": bulat(0, 14) },
         $other: { ".validate": false },
       },
@@ -332,6 +500,7 @@ export function buildRules() {
           ".validate": `$lvlId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['poin', 'tindakan'])`,
           poin: { ".validate": bulat(1, 100000) },
           tindakan: { ".validate": str(200) },
+          penanggungJawab: { ".validate": "newData.val() === 'wali' || newData.val() === 'bk' || newData.val() === 'kepala' || newData.val() === 'waka'" },
           $other: { ".validate": false },
         },
       },
@@ -355,8 +524,8 @@ export function buildRules() {
           ".validate": `$nis.matches(${nisRe})`,
           $recId: {
             // hapus (soft delete) hanya bila meta pada update yang sama menandai dihapus
-            ".write": `auth != null && ((${STAF_KESISWAAN.join(" || ")}) && (newData.exists() || ${metaBaru('$nis', '$recId')}.child('dihapus').val() === true) || (${isPiket} && ${piketRecordOk()}))`,
-            ".validate": `$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber']) && ${metaBaru('$nis', '$recId')}.exists() && !${metaBaru('$nis', '$recId')}.child('dihapus').exists() && (newData.child('sumber').val() !== 'saran' || (${saranSah()})) && (newData.child('sumber').val() !== 'piket' || ${isPiket} || data.exists()) && (!data.exists() || (${metaBaru('$nis', '$recId')}.child('diubahOleh').val() === auth.uid && ${metaBaru('$nis', '$recId')}.child('diubahTs').val() !== root.child('discipline').child('recordMeta').child($nis).child($recId).child('diubahTs').val()))`,
+            ".write": `auth != null && ((${STAF_KESISWAAN.join(" || ")}) && (newData.exists() || ${metaBaru('$nis', '$recId')}.child('dihapus').val() === true) || (${isPiket} && ${piketRecordOk()}) || (${isWali} && ${waliRecordOk()}))`,
+            ".validate": `$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['jenis', 'nama', 'poin', 'tanggal', 'ta', 'sumber']) && ${metaBaru('$nis', '$recId')}.exists() && !${metaBaru('$nis', '$recId')}.child('dihapus').exists() && (newData.child('sumber').val() !== 'saran' || (${saranSah()})) && (newData.child('sumber').val() !== 'piket' || ${isPiket} || data.exists()) && (newData.child('sumber').val() !== 'wali' || ${isWali} || data.exists()) && (newData.child('sumber').val() !== 'usul-wali' || data.exists() || (${usulSah()})) && (!data.exists() || (${metaBaru('$nis', '$recId')}.child('diubahOleh').val() === auth.uid && ${metaBaru('$nis', '$recId')}.child('diubahTs').val() !== root.child('discipline').child('recordMeta').child($nis).child($recId).child('diubahTs').val()))`,
             ...isiRecord(),
             $other: { ".validate": false },
           },
@@ -366,9 +535,10 @@ export function buildRules() {
       recordMeta: {
         ".read": pembaca,
         $nis: {
+          ".read": waliDari("$nis"), // catatan pencatat/riwayat terhapus siswa binaan terbaca wali kelasnya
           ".validate": `$nis.matches(${nisRe})`,
           $recId: {
-            ".write": `auth != null && newData.exists() && ((${STAF_KESISWAAN.join(" || ")}) || (${isPiket} && (${recordBaru('$nis', '$recId')}.child('sumber').val() === 'piket' || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'piket') && (${actOk(4, ["pelanggaran"])} || ${actOk(4, ["hapus-pelanggaran"])})))`, // meta tidak pernah dihapus fisik: ia jejak pencatat & riwayat terhapus
+            ".write": `auth != null && newData.exists() && ((${STAF_KESISWAAN.join(" || ")}) || (${isPiket} && (${recordBaru('$nis', '$recId')}.child('sumber').val() === 'piket' || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'piket') && (${actOk(4, ["pelanggaran"])} || ${actOk(4, ["hapus-pelanggaran"])})) || (${waliDari('$nis')} && (${recordBaru('$nis', '$recId')}.child('sumber').val() === 'wali' || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'wali') && (${actOk(4, ["pelanggaran"])} || ${actOk(4, ["hapus-pelanggaran"])})))`, // meta tidak pernah dihapus fisik: ia jejak pencatat & riwayat terhapus
             // Baru: dibuatOleh === pengguna. Lama: dibuatOleh & dibuatTs tidak boleh berubah (create kedua dengan id sama ditolak).
             // Dihapus: wajib alasan + snapshot dan record publik harus hilang. Tidak dihapus: record publik harus ada.
             ".validate": `$recId.matches(/^[A-Za-z0-9_-]{1,60}$/) && newData.hasChildren(['dibuatOleh', 'dibuatNama', 'dibuatTs']) && (data.exists() ? (newData.child('dibuatOleh').val() === data.child('dibuatOleh').val() && newData.child('dibuatTs').val() === data.child('dibuatTs').val()) : newData.child('dibuatOleh').val() === auth.uid) && (newData.child('dihapus').exists() ? (newData.child('alasanHapus').exists() && newData.child('snapshot').exists() && !${recordBaru('$nis', '$recId')}.exists()) : ${recordBaru('$nis', '$recId')}.exists())`,
@@ -377,6 +547,7 @@ export function buildRules() {
             dibuatTs: { ".validate": "newData.isNumber()" },
             diubahOleh: { ".validate": "newData.val() === auth.uid" },
             diubahTs: { ".validate": "newData.isNumber()" },
+            hariKe: { ".validate": "newData.isNumber() && newData.val() % 1 === 0" }, // wali: jendela waktu (hariKeSah) pada pembuatan catatan
             dihapus: { ".validate": "newData.val() === true" },
             alasanHapus: { ".validate": str(200) },
             snapshot: {
@@ -410,6 +581,7 @@ export function buildRules() {
       notes: {
         ".read": pembaca,
         $nis: {
+          ".read": waliDari("$nis"),
           $recId: {
             ".write": stafKesiswaan,
             ".validate": str(500),
@@ -441,10 +613,10 @@ export function buildRules() {
       $tgl: {
         ".validate": `$tgl.matches(${tglRe})`,
         $id: {
-          ".write": `${anyOf(isAdmin, isKepala, isWaka, isPiket)} && !data.exists() && newData.exists()`,
+          ".write": `${anyOf(isAdmin, isKepala, isWaka, isPiket, isWali)} && !data.exists() && newData.exists()`,
           ".validate": `$id.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['uid', 'peran', 'akunEmail', 'aksi', 'detail', 'deviceId', 'deviceLabel', 'ts', 'hariKe']) && newData.child('peran').val() === root.child('roles').child(auth.uid).val() && (newData.child('peran').val() === 'piket' ? (newData.child('aksi').val() === 'login' || newData.child('petugas').exists()) : !newData.child('petugas').exists())`,
           uid: { ".validate": "newData.val() === auth.uid" },
-          peran: { ".validate": "newData.val() === 'admin' || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket'" },
+          peran: { ".validate": "newData.val() === 'admin' || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali'" },
           akunEmail: { ".validate": str(120) },
           petugas: { ".validate": str(60) },
           aksi: { ".validate": AKSI_AKTIVITAS },
@@ -464,7 +636,7 @@ export function buildRules() {
     activityLast: {
       $uid: {
         ".read": `auth != null && (auth.uid === $uid || ${isAdmin} || ${isWaka})`,
-        ".write": `${anyOf(isAdmin, isKepala, isWaka, isPiket)} && auth.uid === $uid && newData.exists()`,
+        ".write": `${anyOf(isAdmin, isKepala, isWaka, isPiket, isWali)} && auth.uid === $uid && newData.exists()`,
         ".validate": "newData.hasChildren(['id', 'ts', 'tgl'])",
         id: { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,40}$/)" },
         ts: { ".validate": "newData.val() === now" },
@@ -503,7 +675,7 @@ export function buildRules() {
       ".read": adminSaja,
       backupTerakhir: { ".write": adminSaja, ".validate": "newData.isNumber() && newData.val() <= now" },
       // ambang hari efektif (bukti hadir minimal agar tanggal menjadi hari efektif); dibaca semua staf, diubah waka/admin
-      ambangHariEfektif: { ".read": pembacaPiket, ".write": anyOf(isAdmin, isWaka), ".validate": bulat(1, 500) },
+      ambangHariEfektif: { ".read": pembacaStafLuas, ".write": anyOf(isAdmin, isWaka), ".validate": bulat(1, 500) },
       $other: { ".validate": false },
     },
 
@@ -628,7 +800,7 @@ export function buildRules() {
       $date: {
         ".validate": `$date.matches(${tglRe})`,
         $nis: {
-          ".write": `auth != null && (${isAdmin} || ${isKepala} || ${isWaka} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(3, ["izin-harian"])} && ${metaBaruPiket(3, '$date', '$nis', "'H'")}) : ${actOk(3, ["hapus-izin"])})))`,
+          ".write": `auth != null && (${isAdmin} || ${isKepala} || ${isWaka} || (${isPiket} && !root.child('validasi').child($date).child($nis).exists() && (newData.exists() ? (${actOk(3, ["izin-harian"])} && ${metaBaruPiket(3, '$date', '$nis', "'H'")}) : ${actOk(3, ["hapus-izin"])})) || ${waliIzin(3, '$date', true)})`,
           ".validate": "newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi'",
         },
       },
@@ -643,8 +815,8 @@ export function buildRules() {
         $nis: {
           ".validate": `$nis.matches(${nisRe})`,
           $metaId: {
-            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && newData.exists() && (!data.exists() || data.child('oleh').val() === auth.uid) && ${actOk(4, ["izin-harian", "izin-jam"])}))`,
-            ".validate": `$metaId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['lingkup', 'ket', 'keterangan', 'suratDiterima', 'petugas', 'oleh', 'ts', 'hariKe']) && (newData.child('lingkup').val() === 'jam' ? newData.child('jam').exists() : !newData.child('jam').exists()) && (!(${isPiket}) || ($metaId.beginsWith(${ACT(4)}.child('id').val() + '_') && newData.child('ts').val() === now && ${hariKeSah("newData.child('hariKe')", 7)} && (newData.child('hariKe').val() <= ${hariIni} || newData.child('ket').val() !== 'Sakit')))`,
+            ".write": `auth != null && (${isWaka} || ${isKepala} || (${isPiket} && newData.exists() && (!data.exists() || data.child('oleh').val() === auth.uid) && ${actOk(4, ["izin-harian", "izin-jam"])}) || (${waliDari('$nis')} && newData.exists() && (!data.exists() || data.child('oleh').val() === auth.uid) && ${actOk(4, ["izin-harian"])}))`,
+            ".validate": `$metaId.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['lingkup', 'ket', 'keterangan', 'suratDiterima', 'petugas', 'oleh', 'ts', 'hariKe']) && (newData.child('lingkup').val() === 'jam' ? newData.child('jam').exists() : !newData.child('jam').exists()) && (!(${isPiket} || ${isWali}) || ($metaId.beginsWith(${ACT(4)}.child('id').val() + '_') && newData.child('ts').val() === now && ${hariKeSah("newData.child('hariKe')", 7)} && (newData.child('hariKe').val() <= ${hariIni} || newData.child('ket').val() !== 'Sakit')) && (!(${isWali}) || (newData.child('lingkup').val() === 'harian' && newData.child('ket').val() !== 'Dispensasi')))`,
             lingkup: { ".validate": "newData.val() === 'harian' || newData.val() === 'jam'" },
             jam: { $i: { ".validate": bulat(1, 9) } },
             ket: { ".validate": KET_IZIN },

@@ -16,7 +16,8 @@ export function usePiketMundur(): number {
 export function usePiketCtx(): PiketCtx {
   const { session } = useAuth();
   const { petugas } = usePetugas();
-  return { uid: session && session.role !== "ortu" ? session.uid : "", petugas: petugas?.nama ?? "" };
+  // wali kelas: akun per guru, jadi nama yang tercatat = nama akunnya (tanpa layar pilih petugas)
+  return { uid: session && session.role !== "ortu" ? session.uid : "", petugas: session?.role === "wali" ? session.nama : petugas?.nama ?? "" };
 }
 
 /** Catatan piket (piketHarian) untuk beberapa tanggal sekaligus (maks. N+1 listener kecil). */

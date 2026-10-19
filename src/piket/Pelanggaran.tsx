@@ -2,13 +2,16 @@ import { useMemo, useState, type FormEvent } from "react";
 import Icon from "../components/Icon";
 import StudentPicker from "../components/StudentPicker";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
+import { useAuth } from "../auth/AuthContext";
 import { useAdminData } from "../admin/AdminData";
-import { useToast } from "../admin/AdminLayout";
+import { usePanelMode, useToast } from "../admin/AdminLayout";
 import type { Rule } from "../lib/discipline";
 import { bolehDicatatPiket } from "../lib/piket";
 import { addDays, formatTanggal } from "../lib/time";
 import { useLive } from "../services/db";
 import { hapusPelanggaranPiket, pelanggaranPiket, pesanPiket, type PiketHarian } from "../services/piket";
+import { hapusPelanggaranWali, pelanggaranWali, type CatatanWali } from "../services/wali";
+import { useCatatanWali } from "../wali/useCatatanWali";
 import { usePiketCtx, usePiketHarian, usePiketMundur } from "./useJendela";
 
 /** Pelanggaran ringan / bertakziran dari master. Poin & takziran terisi otomatis dan TIDAK dapat diubah piket. */
@@ -16,6 +19,9 @@ export default function PelanggaranPiket() {
   const { students, today } = useAdminData();
   const mundur = usePiketMundur();
   const ctx = usePiketCtx();
+  const wali = usePanelMode() === "wali"; // wali kelas memakai halaman yang sama: sumber "wali", hanya siswa binaan, tanpa piketHarian
+  const { session } = useAuth();
+  const uidWali = session?.role === "wali" ? session.uid : "";
   const notify = useToast();
   const rules = useLive<Record<string, Rule>>("discipline/rules");
   const [nis, setNis] = useState<string[]>([]);
@@ -24,7 +30,7 @@ export default function PelanggaranPiket() {
   const [tanggal, setTanggal] = useState(today);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [hapus, setHapus] = useState<{ tanggal: string; id: string; item: PiketHarian } | null>(null);
+  const [hapus, setHapus] = useState<{ tanggal: string; id: string; item: PiketHarian | CatatanWali } | null>(null);
 
   const tersedia = useMemo(() => {
     const qq = cari.trim().toLowerCase();
@@ -34,8 +40,12 @@ export default function PelanggaranPiket() {
   const rule = ruleId ? rules.data?.[ruleId] : undefined;
 
   const tanggalList = useMemo(() => Array.from({ length: mundur + 1 }, (_, i) => addDays(today, -i)), [today, mundur]);
-  const harian = usePiketHarian(tanggalList);
-  const catatan = useMemo(() => tanggalList.flatMap((t) => Object.entries(harian.data[t] ?? {}).filter(([, x]) => !x.dihapus).map(([id, item]) => ({ tanggal: t, id, item }))), [tanggalList, harian.data]);
+  const harian = usePiketHarian(wali ? [] : tanggalList);
+  const catatanWali = useCatatanWali(students, tanggalList, uidWali, wali);
+  const catatan = useMemo<{ tanggal: string; id: string; item: PiketHarian | CatatanWali }[]>(
+    () => (wali ? catatanWali.catatan : tanggalList.flatMap((t) => Object.entries(harian.data[t] ?? {}).filter(([, x]) => !x.dihapus).map(([id, item]) => ({ tanggal: t, id, item })))),
+    [wali, catatanWali.catatan, tanggalList, harian.data]);
+  const memuatCatatan = wali ? catatanWali.loading : harian.loading;
 
   const simpan = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,7 +53,8 @@ export default function PelanggaranPiket() {
     if (!rule) { setErr("Pilih pelanggaran dari daftar"); return; }
     setBusy(true); setErr("");
     try {
-      await pelanggaranPiket({ siswa: students.filter((s) => nis.includes(s.nis)), ruleId, rule, tanggal }, ctx);
+      if (wali) await pelanggaranWali({ siswa: students.filter((s) => nis.includes(s.nis)), ruleId, rule, tanggal }, { uid: ctx.uid, nama: ctx.petugas });
+      else await pelanggaranPiket({ siswa: students.filter((s) => nis.includes(s.nis)), ruleId, rule, tanggal }, ctx);
       notify(`Pelanggaran dicatat untuk ${nis.length} siswa`);
       setNis([]); setRuleId("");
     } catch (ex) { setErr(pesanPiket(ex)); }
@@ -52,7 +63,7 @@ export default function PelanggaranPiket() {
 
   return (
     <section className="data-page">
-      <div className="section-heading"><div><p>Pelanggaran ringan</p><span>Hanya pelanggaran kategori Ringan atau yang memiliki takziran, dari daftar tata tertib</span></div></div>
+      <div className="section-heading"><div><p>Pelanggaran ringan</p><span>Hanya pelanggaran kategori Ringan atau yang memiliki takziran, dari daftar tata tertib{wali ? " · hanya siswa kelas binaan" : ""}</span></div></div>
 
       <form className="panel modal-form" onSubmit={simpan} noValidate>
         <Field label="Siswa (boleh lebih dari satu)"><StudentPicker students={students} value={nis} onChange={setNis} multiple /></Field>
@@ -77,12 +88,12 @@ export default function PelanggaranPiket() {
       </form>
 
       <article className="panel" style={{ marginTop: 16 }}>
-        <div className="panel-header"><div><p className="panel-title">Catatan piket</p><span>{mundur + 1} hari terakhir · hanya yang dicatat lewat akun piket</span></div></div>
-        {harian.loading ? <div className="page-loader"><Spinner dark /></div> : catatan.length === 0 ? <Empty icon="file" title="Belum ada catatan piket" /> : (
+        <div className="panel-header"><div><p className="panel-title">{wali ? "Catatan saya" : "Catatan piket"}</p><span>{mundur + 1} hari terakhir · {wali ? "hanya yang Anda catat sebagai wali kelas" : "hanya yang dicatat lewat akun piket"}</span></div></div>
+        {memuatCatatan ? <div className="page-loader"><Spinner dark /></div> : catatan.length === 0 ? <Empty icon="file" title={wali ? "Belum ada catatan" : "Belum ada catatan piket"} /> : (
           <div className="simple-list" data-testid="catatan-piket">
             {catatan.map(({ tanggal: t, id, item }) => (
               <div key={`${t}-${id}`} className="catatan-piket-row">
-                <span><b>{item.nama}</b><small>{item.kelas} · {formatTanggal(t, false)} · petugas {item.petugas}</small></span>
+                <span><b>{item.nama}</b><small>{item.kelas} · {formatTanggal(t, false)} · {wali ? "" : `petugas ${item.petugas}`}</small></span>
                 <span><b>{item.pelanggaran}</b>{item.takziran && <small>Takziran: {item.takziran}</small>}</span>
                 <button className="ghost-button" aria-label={`Hapus catatan ${item.nama} ${item.pelanggaran}`} onClick={() => setHapus({ tanggal: t, id, item })}><Icon name="trash" size={15} />Hapus</button>
               </div>
@@ -92,7 +103,8 @@ export default function PelanggaranPiket() {
       </article>
 
       {hapus && <HapusDialog data={hapus} onClose={() => setHapus(null)} onOk={async (alasan) => {
-        await hapusPelanggaranPiket({ tanggal: hapus.tanggal, id: hapus.id, item: hapus.item, alasan }, ctx);
+        if (wali) await hapusPelanggaranWali({ id: hapus.id, item: hapus.item as CatatanWali, alasan }, { uid: ctx.uid, nama: ctx.petugas });
+        else await hapusPelanggaranPiket({ tanggal: hapus.tanggal, id: hapus.id, item: hapus.item as PiketHarian, alasan }, ctx);
         notify("Catatan dihapus");
         setHapus(null);
       }} />}
@@ -100,7 +112,7 @@ export default function PelanggaranPiket() {
   );
 }
 
-function HapusDialog({ data, onClose, onOk }: { data: { item: PiketHarian }; onClose: () => void; onOk: (alasan: string) => Promise<void> }) {
+function HapusDialog({ data, onClose, onOk }: { data: { item: PiketHarian | CatatanWali }; onClose: () => void; onOk: (alasan: string) => Promise<void> }) {
   const [alasan, setAlasan] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");

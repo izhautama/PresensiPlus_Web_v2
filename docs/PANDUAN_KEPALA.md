@@ -28,6 +28,11 @@ Untuk: Kepala Madrasah
 1. Menu Kalender: lihat hari efektif tiap tanggal (otomatis dari bukti tap/presensi manual atau override libur/efektif).
 2. Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.
 
+## Pembinaan dan usulan remisi
+
+1. Menu Pembinaan: rekap pembinaan wali kelas dan pejabat; saring lalu Unduh CSV.
+2. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
+
 ## Yang tidak dapat dilakukan
 
 1. Mengelola akun staf, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.

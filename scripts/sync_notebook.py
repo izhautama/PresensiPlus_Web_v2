@@ -85,7 +85,7 @@ else:
 
 CATATAN = '''
 ### Keamanan data (baca sebelum menjalankan)
-- Notebook memakai **Admin SDK yang MELEWATI Security Rules**. Karena itu skrip hanya boleh menulis ke `config/`, `profiles/`, `parents/`, `attendance/`, `log/`, `izin/`;
+- Notebook memakai **Admin SDK yang MELEWATI Security Rules**. Karena itu skrip hanya boleh menulis ke `config/`, `siswaKelas/` (indeks kelas untuk wali kelas; ditulis bersama `config/students` dalam update yang sama), `profiles/`, `parents/`, `attendance/`, `log/`, `izin/`;
   jalur lain (`roles` milik kepala/waka/piket, `staff`, `discipline`, `lessons*`, `validasi*`, `izinMeta`, `activity*`, `piket*`, `manualTap*`, `sistem`) **ditolak** oleh skrip.
 - **DRY-RUN adalah bawaan**: sel 4 hanya memvalidasi data terhadap aturan database dan mencetak ringkasan. Ubah `DRY_RUN = False` (sel 2) setelah ringkasan benar.
 - Data yang sudah ada **tidak ditimpa**: presensi hasil alat dan keterangan izin/sakit/dispensasi dari piket/waka dilewati.

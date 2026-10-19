@@ -4,7 +4,7 @@ import Icon from "../components/Icon";
 import StudentPicker from "../components/StudentPicker";
 import { Empty, Field, StatusBadge } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
-import { useToast } from "../admin/AdminLayout";
+import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { initials, toneOf } from "../lib/attendance";
 import { opsiKet, rentangPiket, tanggalDiJendela, type KetPiket } from "../lib/piket";
 import { formatTanggal, weekday } from "../lib/time";
@@ -23,7 +23,8 @@ type Aksi = { siswa?: StudentRow; ket: KetPiket; bebas: boolean };
 export default function Beranda() {
   const { students, byNis, kelasList, today, now, schedule, ready } = useAdminData();
   const mundur = usePiketMundur();
-  useKalenderOtomatis(); // piket juga menghitung hari efektif (log aktivitas 'hitung-kalender' wajib untuk piket)
+  const wali = usePanelMode() === "wali"; // wali kelas: hanya Izin/Sakit, tanpa Dispensasi/presensi manual, tanpa hitung kalender
+  useKalenderOtomatis(!wali); // piket juga menghitung hari efektif (log aktivitas 'hitung-kalender' wajib untuk piket)
   const ctx = usePiketCtx();
   const notify = useToast();
   const libur = weekday(today) === 0;
@@ -53,7 +54,7 @@ export default function Beranda() {
   return (
     <section className="data-page">
       <div className="section-heading">
-        <div><p>Beranda piket</p><span>{formatTanggal(today)} · izin &amp; dispensasi seharian untuk siswa yang tidak masuk</span></div>
+        <div><p>{wali ? "Izin & kehadiran kelas" : "Beranda piket"}</p><span>{formatTanggal(today)} · {wali ? "izin atau sakit seharian untuk siswa kelas binaan yang tidak masuk" : "izin & dispensasi seharian untuk siswa yang tidak masuk"}</span></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => setAksi({ ket: "Izin", bebas: true })}>Izin tanggal lain / terencana</button></div>
       </div>
 
@@ -79,8 +80,8 @@ export default function Beranda() {
             <span className="aksi-cell">
               <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Izin", bebas: false })}>Izin</button>
               <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Sakit", bebas: false })}>Sakit</button>
-              <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Dispensasi", bebas: false })}>Dispensasi</button>
-              <button className="secondary-button sm" title="Siswa hadir tetapi tap alat tidak ada (KTM lupa/hilang, dsb.)" onClick={() => setManual(s)}>Hadir manual</button>
+              {!wali && <button className="secondary-button sm" onClick={() => setAksi({ siswa: s, ket: "Dispensasi", bebas: false })}>Dispensasi</button>}
+              {!wali && <button className="secondary-button sm" title="Siswa hadir tetapi tap alat tidak ada (KTM lupa/hilang, dsb.)" onClick={() => setManual(s)}>Hadir manual</button>}
             </span>
           </div>
         ))}
@@ -107,7 +108,7 @@ export default function Beranda() {
           }} />
       )}
 
-      {aksi && <IzinHarianDialog aksi={aksi} mundur={mundur} onClose={() => setAksi(null)} onOk={async (a) => {
+      {aksi && <IzinHarianDialog aksi={aksi} mundur={mundur} wali={wali} onClose={() => setAksi(null)} onOk={async (a) => {
         await izinHarianPiket(a, ctx);
         notify(`${students.find((s) => s.nis === a.nis)?.nama ?? a.nis}: ${a.ket} tercatat`);
         setAksi(null);
@@ -116,8 +117,8 @@ export default function Beranda() {
   );
 }
 
-function IzinHarianDialog({ aksi, mundur, onClose, onOk }: {
-  aksi: Aksi; mundur: number; onClose: () => void;
+function IzinHarianDialog({ aksi, mundur, wali, onClose, onOk }: {
+  aksi: Aksi; mundur: number; wali: boolean; onClose: () => void;
   onOk: (a: { tanggal: string; nis: string; ket: KetPiket; keterangan: string; suratDiterima: boolean }) => Promise<void>;
 }) {
   const { students, today } = useAdminData();
@@ -125,7 +126,7 @@ function IzinHarianDialog({ aksi, mundur, onClose, onOk }: {
   const [tanggal, setTanggal] = useState(today);
   const [ket, setKet] = useState<KetPiket>(aksi.ket);
   const { min, max } = rentangPiket(today, mundur);
-  const opsi = opsiKet(tanggal, today);
+  const opsi = opsiKet(tanggal, today).filter((k) => !wali || k !== "Dispensasi"); // wali: hanya Izin/Sakit
   const ketAktif = opsi.includes(ket) ? ket : opsi[0];
   const siswa = students.find((s) => s.nis === pilih[0]);
 
@@ -137,8 +138,11 @@ function IzinHarianDialog({ aksi, mundur, onClose, onOk }: {
         if (!tanggalDiJendela(tanggal, today, mundur)) throw new Error(`Tanggal harus antara ${min} dan ${max}`);
         // Izin/Sakit tidak berlaku bila siswa sudah tap masuk pada tanggal tsb; Dispensasi boleh (siswa tap lalu berangkat lomba)
         if (ketAktif !== "Dispensasi") {
-          const log = (await get(r(`log/${tanggal}`))).val() as Record<string, { nis: string }> | null;
-          if (Object.entries(log ?? {}).some(([k, e]) => k.endsWith("_M") && e.nis === siswa.nis)) throw new Error("Siswa sudah tap masuk pada tanggal tersebut; Izin/Sakit tidak berlaku.");
+          // wali tidak boleh membaca `log`: cek lewat presensi siswa binaan itu sendiri
+          const sudahTap = wali
+            ? Boolean((await get(r(`attendance/${siswa.nis}/${tanggal}/status`))).val())
+            : Object.entries(((await get(r(`log/${tanggal}`))).val() ?? {}) as Record<string, { nis: string }>).some(([k, e]) => k.endsWith("_M") && e.nis === siswa.nis);
+          if (sudahTap) throw new Error("Siswa sudah tap masuk pada tanggal tersebut; Izin/Sakit tidak berlaku.");
         }
         try { await onOk({ tanggal, nis: siswa.nis, ket: ketAktif, keterangan, suratDiterima }); }
         catch (e) { throw new Error(pesanPiket(e)); }

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PANDUAN, URUTAN_PANDUAN, hitungKata, keMarkdown } from "../src/lib/panduan.ts";
 
-assert.deepEqual(URUTAN_PANDUAN, ["admin", "kepala", "waka", "piket", "ortu", "sop"]);
-const BERKAS = { admin: "PANDUAN_ADMIN.md", kepala: "PANDUAN_KEPALA.md", waka: "PANDUAN_WAKA.md", piket: "PANDUAN_PIKET.md", ortu: "PANDUAN_ORANG_TUA.md", sop: "SOP_HARIAN.md" };
+assert.deepEqual(URUTAN_PANDUAN, ["admin", "kepala", "waka", "piket", "wali", "ortu", "sop"]);
+const BERKAS = { admin: "PANDUAN_ADMIN.md", kepala: "PANDUAN_KEPALA.md", waka: "PANDUAN_WAKA.md", piket: "PANDUAN_PIKET.md", wali: "PANDUAN_WALI.md", ortu: "PANDUAN_ORANG_TUA.md", sop: "SOP_HARIAN.md" };
 for (const k of URUTAN_PANDUAN) {
   const p = PANDUAN[k];
   assert.equal(p.berkas, BERKAS[k]);
@@ -12,6 +12,7 @@ for (const k of URUTAN_PANDUAN) {
   assert.equal(md, keMarkdown(p), `${p.berkas} tidak sinkron dengan src/lib/panduan.ts (jalankan: node scripts/buat-panduan.mjs)`);
   assert.ok(hitungKata(p) <= 700, `${p.berkas} terlalu panjang (${hitungKata(p)} kata; batas 2 halaman ~700)`);
   assert.ok(p.bagian.length >= 3, `${k}: minimal 3 bagian`);
+  assert.equal(new Set(p.bagian.map((b) => b.judul)).size, p.bagian.length, `${k}: judul bagian harus unik (dipakai sebagai key React)`);
   for (const b of p.bagian) assert.ok(b.langkah.length >= 2, `${k}/${b.judul}: langkah bernomor minimal 2`);
   assert.ok(/^1\. /m.test(md) && /^2\. /m.test(md), `${p.berkas}: langkah harus bernomor`);
 }
@@ -29,6 +30,10 @@ assert.match(teks("admin"), /Kalender/); assert.match(teks("admin"), /Hitung ula
 assert.match(teks("waka"), /Tap rendah/); assert.match(teks("waka"), /Konfirmasi hari ini normal/); assert.match(teks("waka"), /bukan hari efektif/);
 assert.match(teks("kepala"), /Kalender/); assert.match(teks("ortu"), /Hari efektif ke-N/); assert.match(teks("ortu"), /tidak ada kegiatan presensi/);
 assert.match(teks("sop"), /bukan hari efektif/); assert.match(teks("piket"), /hari efektif/);
+// wali kelas: topik wajib (pembinaan, usulan remisi, wewenang terbatas)
+assert.match(teks("wali"), /Perlu dibina/); assert.match(teks("wali"), /Catat pembinaan/); assert.match(teks("wali"), /Usulan remisi/);
+assert.match(teks("wali"), /Dispensasi/); assert.match(teks("wali"), /kelas binaan/); assert.match(teks("wali"), /tidak dapat dihapus/);
+assert.match(teks("admin"), /Wali kelas/); assert.match(teks("admin"), /Indeks siswa-kelas/); assert.match(teks("waka"), /Wali kelas/);
 // tidak ada rahasia/URL nyata di panduan
 for (const k of URUTAN_PANDUAN) assert.doesNotMatch(teks(k), /AIza|firebaseio|password-uji|@gmail/i);
 console.log("panduan.test: OK");

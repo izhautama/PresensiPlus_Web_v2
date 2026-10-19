@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { endAt, get, orderByKey, query, startAt } from "firebase/database";
 import Icon from "../components/Icon";
@@ -12,11 +12,13 @@ import { daftarRecord, labelTa, levelDari, poinBertanda, ringkas, urutLevel, typ
 import { KODE_LABEL, type LessonsSiswa } from "../lib/perjam";
 import type { DayRecord, Kategori, ScheduleRow } from "../lib/types";
 import type { ManualTapAnak } from "../lib/manual";
+import type { PembinaanStatus } from "../lib/pembinaan";
 import { logout } from "../services/auth";
+import { waktuServer } from "../services/aktivitas";
 import { r } from "../services/db";
 import { bacaSekali } from "../services/koneksi";
 
-type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level> };
+type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level>; pembinaan: Record<string, Record<string, PembinaanStatus>> };
 type PerJamData = { jam: Record<string, Record<string, LessonsSiswa>>; alfa: Record<string, { status: "Alfa" }> };
 /** `alat` = attendance/{nis} MENTAH (tap alat + keterangan); `manual` = salinan presensi manual; `hariEfektif` = kalenderEfektif (agregat, tanpa data siswa).
  *  Semua rekap memakai SATU rumus: rekapSiswa() (lib/hariEfektif.ts). */
@@ -24,7 +26,11 @@ type Data = { profil: { nama: string; kelas: string; aktifSejak?: string }; alat
 
 const LABEL: Partial<Record<Kategori, string>> = { Hadir: "Tepat waktu", Alpha: "Tanpa keterangan", "Belum Tap": "Belum tap" };
 
-export default function StudentPage() {
+/**
+ * Portal siswa. `embedded` = dipakai di dalam panel wali kelas (tanpa header portal/Keluar); `ekstra` = bagian tambahan khusus wali
+ * (catatan internal, pembinaan). Orang tua melihat status pembinaan (dijadwalkan/selesai + tanggal) tanpa isi dan tanpa nama.
+ */
+export default function StudentPage({ embedded = false, ekstra }: { embedded?: boolean; ekstra?: (nis: string, profil: { nama: string; kelas: string }) => ReactNode } = {}) {
   const { nis = "" } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState<Data | null>(null);
@@ -37,25 +43,26 @@ export default function StudentPage() {
   const muat = useCallback(async () => {
     try {
       // Data kedisiplinan bersifat tambahan: gagal memuat tidak boleh merusak halaman presensi
-      const mulaiTa = `${tahunAjaran(todayWIB()) - 1}-07-01`; // dua tahun ajaran terakhir cukup untuk rekap & pilihan TA
-      const [p, a, s, dr, dl, lj, va, mn, he] = await bacaSekali(() => Promise.all([
+      const mulaiTa = `${tahunAjaran(todayWIB(new Date(waktuServer()))) - 1}-07-01`; // dua tahun ajaran terakhir cukup untuk rekap & pilihan TA
+      const [p, a, s, dr, dl, lj, va, mn, he, ps] = await bacaSekali(() => Promise.all([
         get(r(`profiles/${nis}`)), get(r(`attendance/${nis}`)), get(r("config/schedule")),
         get(r(`discipline/records/${nis}`)).catch(() => null), get(r("discipline/levels")).catch(() => null),
         get(r(`lessonsByStudent/${nis}`)).catch(() => null), get(r(`validasiByStudent/${nis}`)).catch(() => null),
         get(r(`manualTapByStudent/${nis}`)).catch(() => null),
-        get(query(r("kalenderEfektif"), orderByKey(), startAt(mulaiTa), endAt(todayWIB()))).catch(() => null),
+        get(query(r("kalenderEfektif"), orderByKey(), startAt(mulaiTa), endAt(todayWIB(new Date(waktuServer()))))).catch(() => null),
+        get(r(`pembinaanStatus/${nis}`)).catch(() => null),
       ]));
       if (!p.exists()) { setErr("Data siswa tidak ditemukan. Hubungi TU sekolah."); return; }
       setData({
         profil: p.val(), alat: (a.val() ?? {}) as Record<string, DayRecord>, manual: (mn?.val() ?? {}) as Record<string, ManualTapAnak>,
         hariEfektif: (he?.val() ?? {}) as PetaHari, schedule: Object.values(s.val() ?? {}) as ScheduleRow[],
-        disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} },
+        disiplin: { records: dr?.val() ?? {}, levels: dl?.val() ?? {}, pembinaan: ps?.val() ?? {} }, perJam: { jam: lj?.val() ?? {}, alfa: va?.val() ?? {} },
         validasi: (va?.val() ?? {}) as Record<string, { status: "Alfa" }>,
       });
       setUpdated(new Date());
       setErr("");
     } catch (e) {
-      const code = (e as { code?: string }).code ?? "";
+      const code = `${(e as { code?: string }).code ?? ""} ${(e as Error).message ?? ""}`.toLowerCase();
       setErr(code.includes("permission") ? "Akses ditolak. PIN mungkin telah diganti — silakan login ulang." : "Gagal memuat data. Periksa koneksi internet.");
     }
   }, [nis]);
@@ -73,13 +80,13 @@ export default function StudentPage() {
   if (err && !data) {
     return (
       <main className="student-page">
-        <Header onLogout={keluar} />
+        {!embedded && <Header onLogout={keluar} />}
         <section className="student-content"><div className="notice warn"><Icon name="warning" size={17} /><span>{err}</span></div></section>
       </main>
     );
   }
   if (!data) return <div className="route-loader"><Spinner dark /></div>;
-  return <Portal nis={nis} data={data} updated={updated} onRefresh={muat} onLogout={keluar} ta={ta} setTa={setTa} mode={mode} setMode={setMode} />;
+  return <Portal nis={nis} data={data} updated={updated} onRefresh={muat} onLogout={keluar} ta={ta} setTa={setTa} mode={mode} setMode={setMode} embedded={embedded} ekstra={ekstra} />;
 }
 
 function Header({ onLogout, nama, nis }: { onLogout: () => void; nama?: string; nis?: string }) {
@@ -98,13 +105,14 @@ function Header({ onLogout, nama, nis }: { onLogout: () => void; nama?: string; 
   );
 }
 
-function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setMode }: {
-  nis: string; data: Data; updated: Date | null; onRefresh: () => void; onLogout: () => void;
+function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setMode, embedded, ekstra }: {
+  nis: string; data: Data; updated: Date | null; onRefresh: () => void; onLogout: () => void; embedded: boolean; ekstra?: (nis: string, profil: { nama: string; kelas: string }) => ReactNode;
   ta: number | null; setTa: (n: number) => void; mode: "minggu" | "bulan"; setMode: (m: "minggu" | "bulan") => void;
 }) {
   const { profil, alat, manual, hariEfektif, schedule, disiplin, perJam, validasi } = data;
-  const today = todayWIB();
-  const now = new Date();
+  // tanggal menurut SERVER (staf/wali: selisih sudah diketahui; portal orang tua tanpa koneksi realtime: selisih 0 = jam perangkat)
+  const now = new Date(waktuServer());
+  const today = todayWIB(now);
   const hari = namaHari(today);
   const batas = batasJam(schedule, profil.kelas, hari);
   // SATU rumus untuk semua tampilan: hari efektif berbasis bukti (kalenderEfektif) + data alat/manual/izin siswa ini
@@ -167,7 +175,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
 
   return (
     <main className="student-page">
-      <Header onLogout={onLogout} nama={profil.nama} nis={nis} />
+      {!embedded && <Header onLogout={onLogout} nama={profil.nama} nis={nis} />}
       <section className="student-content">
         <div className="parent-hero no-print">
           <div>
@@ -289,6 +297,7 @@ function Portal({ nis, data, updated, onRefresh, onLogout, ta, setTa, mode, setM
         <KehadiranPerJam data={perJam} today={today} />
 
         <Kedisiplinan disiplin={disiplin} ta={`${taPilih}-${taPilih + 1}`} />
+        {ekstra?.(nis, profil)}
 
         <section className="panel no-print">
           <div className="panel-header"><div><p className="panel-title">Riwayat terbaru</p><span>10 hari terakhir</span></div></div>
@@ -317,6 +326,7 @@ function Kedisiplinan({ disiplin, ta }: { disiplin: Disiplin; ta: string }) {
   const levels = urutLevel(disiplin.levels);
   const { sekarang, berikut } = levelDari(r.saldo, levels);
   const daftar = daftarRecord(disiplin.records, undefined, ta, false);
+  const pembinaan = Object.values(disiplin.pembinaan[ta] ?? {}).sort((a, b) => a.levelPoin - b.levelPoin);
   return (
     <section className="panel no-print">
       <div className="panel-header"><div><p className="panel-title">Kedisiplinan</p><span>{labelTa(ta)} · poin pelanggaran dikurangi remisi</span></div></div>
@@ -330,6 +340,17 @@ function Kedisiplinan({ disiplin, ta }: { disiplin: Disiplin; ta: string }) {
         <span>{sekarang ? sekarang[1].tindakan : r.sangatBerat ? "Ada pelanggaran kategori Sangat Berat." : "Tidak ada tindak lanjut."}</span>
         {berikut && <small>Ambang berikutnya: {berikut[1].poin} poin</small>}
       </div>
+      {pembinaan.length > 0 && (
+        <div className="simple-list" data-testid="status-pembinaan">
+          {pembinaan.map((p) => (
+            <div key={p.id} data-status={p.status}>
+              <b>Pembinaan {p.levelPoin} poin</b>
+              <small>{levels.find(([id]) => id === p.id.slice(ta.length + 1))?.[1].tindakan ?? "Pembinaan oleh sekolah"}</small>
+              <StatusBadge status={p.status === "selesai" ? `Selesai ${formatTanggal(p.tanggal, false)}` : `Dijadwalkan ${formatTanggal(p.tanggal, false)}`} />
+            </div>
+          ))}
+        </div>
+      )}
       {daftar.length === 0 ? <p className="muted small">Belum ada catatan pelanggaran atau remisi.</p> : (
         <div className="disc-list">
           {daftar.map(({ id, rec: x }) => (

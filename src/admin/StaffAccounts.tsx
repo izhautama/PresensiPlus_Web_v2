@@ -4,7 +4,7 @@ import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { ORTU_DOMAIN } from "../lib/firebase";
 import { formatTanggal } from "../lib/time";
 import {
-  MAKS_STAF, PERAN_STAF, PeranGagal, buatAkunStaf, cabutAkunStaf, kirimResetPassword, kunciAkunPiket, pasangPeranStaf, useLive,
+  MAKS_STAF, PERAN_STAF, PERAN_STAF_UMUM, PeranGagal, buatAkunStaf, cabutAkunStaf, kirimResetPassword, kunciAkunPiket, pasangPeranStaf, useLive,
   type PeranStaf, type Staff,
 } from "../services/db";
 import { useToast } from "./AdminLayout";
@@ -18,7 +18,8 @@ export default function StaffAccounts() {
   const [tambah, setTambah] = useState(false);
   const [cabut, setCabut] = useState<{ uid: string; s: Staff } | null>(null);
   const [reset, setReset] = useState("");
-  const daftar = Object.entries(staff.data ?? {}).sort((a, b) => a[1].dibuat - b[1].dibuat);
+  // wali kelas punya panel sendiri (Wali kelas) karena butuh pemetaan kelas; tidak dihitung dalam batas akun pimpinan/staf
+  const daftar = Object.entries(staff.data ?? {}).filter(([, s]) => s.role !== "wali").sort((a, b) => a[1].dibuat - b[1].dibuat);
   const penuh = daftar.length >= MAKS_STAF;
 
   const [kunciBusy, setKunciBusy] = useState("");
@@ -134,7 +135,7 @@ function TambahDialog({ onClose }: { onClose: () => void }) {
       <form className="modal-form" onSubmit={submit} noValidate>
         <Field label="Peran" hint={role === "kepala" ? "Memantau seluruh data, mencatat izin/sakit, dan mengelola kesiswaan." : role === "waka" ? "Mengelola validasi harian, presensi per jam, dan pelanggaran/remisi." : "Akun BERSAMA meja piket: izin harian & per jam (S/I/D) dan pelanggaran ringan. Gunakan nama akun seperti 'Meja Piket'; nama petugas dipilih di aplikasi."}>
           <select className="text-input" value={role} onChange={(e) => setRole(e.target.value as PeranStaf)}>
-            {(Object.keys(PERAN_STAF) as PeranStaf[]).map((k) => <option key={k} value={k}>{PERAN_STAF[k]}</option>)}
+            {PERAN_STAF_UMUM.map((k) => <option key={k} value={k}>{PERAN_STAF[k]}</option>)}
           </select>
         </Field>
         <Field label="Nama lengkap" error={err.nama}><input className="text-input" value={f.nama} maxLength={60} onChange={(e) => setF({ ...f, nama: e.target.value })} /></Field>

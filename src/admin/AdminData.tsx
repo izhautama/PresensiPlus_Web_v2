@@ -2,15 +2,19 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { DeviceStatus, KetHarian, LogEntry, ScheduleRow, Student, StudentRow } from "../lib/types";
 import { gabungTap, type ManualTap, type PemakaianManual } from "../lib/manual";
 import { todayWIB } from "../lib/time";
-import { ONLINE_MS, useLive, useNow, useServerOffset } from "../services/db";
+import { ONLINE_MS, useLive, useNow, useServerClock } from "../services/db";
 
 /** `manual` = entri presensi manual hari ini + bagian mana yang dipakai (alat selalu menang; `diabaikan` bila ada tap alat). */
 export type TodayEntry = { masuk?: LogEntry; pulang?: LogEntry; ket?: KetHarian; manual?: PemakaianManual };
 
-type AdminData = {
+export type AdminDataValue = {
   ready: boolean;
   /** log & presensi manual HARI INI sudah termuat (hitungan hari efektif tidak boleh dibuat sebelum ini) */
   buktiSiap: boolean;
+  /** selisih jam server - perangkat (ms): positif = perangkat tertinggal */
+  selisihJamMs: number;
+  /** selisih jam server sudah diterima: halaman baru dirender setelah ini agar nilai awal "hari ini" memakai tanggal server */
+  jamSiap: boolean;
   /** profiles/{nis}/aktifSejak (hanya admin/kepala/waka; piket tidak punya akses profiles) */
   aktifSejak: Record<string, string>;
   today: string;
@@ -30,13 +34,14 @@ type AdminData = {
   errors: string[];
 };
 
-const Ctx = createContext<AdminData | null>(null);
+export const AdminDataCtx = createContext<AdminDataValue | null>(null);
 
 /** `tanpaAlat`: peran yang tidak boleh melihat status alat (piket) tidak berlangganan device/status. */
 export function AdminDataProvider({ children, tanpaAlat = false }: { children: ReactNode; tanpaAlat?: boolean }) {
-  const now = useNow(15000);
+  // "Hari ini" mengikuti jam SERVER (jam perangkat staf bisa salah); selisihnya juga dipakai banner peringatan
+  const { offset, siap: jamSiap } = useServerClock();
+  const now = useNow(15000, offset);
   const today = todayWIB(now);
-  const offset = useServerOffset();
   const studentsLive = useLive<Record<string, Student>>("config/students");
   const scheduleLive = useLive<Record<string, ScheduleRow>>("config/schedule");
   const logLive = useLive<Record<string, LogEntry>>(`log/${today}`);
@@ -45,7 +50,7 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
   const deviceLive = useLive<DeviceStatus>(tanpaAlat ? null : "device/status");
   const profilLive = useLive<Record<string, { aktifSejak?: string }>>(tanpaAlat ? null : "profiles");
 
-  const value = useMemo<AdminData>(() => {
+  const value = useMemo<AdminDataValue>(() => {
     const studentMap = studentsLive.data ?? {};
     const students = Object.entries(studentMap)
       .map(([uid, s]) => ({ uid, ...s }))
@@ -70,7 +75,9 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
     const serverNow = () => Date.now() + offset;
     const device = deviceLive.data;
     return {
-      ready: !studentsLive.loading && !scheduleLive.loading,
+      ready: jamSiap && !studentsLive.loading && !scheduleLive.loading,
+      selisihJamMs: offset,
+      jamSiap,
       buktiSiap: !logLive.loading && !manualLive.loading,
       aktifSejak: Object.fromEntries(Object.entries(profilLive.data ?? {}).filter(([, p]) => p?.aktifSejak).map(([nis, p]) => [nis, p.aktifSejak as string])),
       today, now, students, studentMap,
@@ -81,13 +88,13 @@ export function AdminDataProvider({ children, tanpaAlat = false }: { children: R
       kelasList: [...new Set(students.map((s) => s.kelas))].sort(),
       errors: [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, profilLive].map((l) => l.error).filter((e): e is string => Boolean(e)),
     };
-  }, [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, profilLive, offset, today, now]);
+  }, [studentsLive, scheduleLive, logLive, izinLive, manualLive, deviceLive, profilLive, offset, jamSiap, today, now]);
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return <AdminDataCtx.Provider value={value}>{children}</AdminDataCtx.Provider>;
 }
 
 export function useAdminData() {
-  const v = useContext(Ctx);
+  const v = useContext(AdminDataCtx);
   if (!v) throw new Error("useAdminData di luar AdminDataProvider");
   return v;
 }

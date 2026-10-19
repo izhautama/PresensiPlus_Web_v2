@@ -3,10 +3,14 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "reac
 import Icon, { type IconName } from "../components/Icon";
 import { useAuth } from "../auth/AuthContext";
 import { logout } from "../services/auth";
-import { useConnected } from "../services/db";
+import { useConnected, useLive } from "../services/db";
 import { formatTanggal, relatif } from "../lib/time";
 import { AdminDataProvider, useAdminData } from "./AdminData";
 import PetugasBar from "../piket/PetugasBar";
+import KelasBar from "../wali/KelasBar";
+import { useDisiplinKelasOpsional } from "../wali/DisiplinKelas";
+import { antreanUsul, type UsulRemisi } from "../lib/pembinaan";
+import { jamPerangkatBeda, pesanJamBeda } from "../lib/waktu";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const Students = lazy(() => import("./Students"));
@@ -24,10 +28,13 @@ const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
 const Panduan = lazy(() => import("../pages/Panduan"));
+const PembinaanRekap = lazy(() => import("../kesiswaan/PembinaanRekap"));
+const UsulanRemisi = lazy(() => import("../kesiswaan/UsulanRemisi"));
+const WaliKelas = lazy(() => import("../kesiswaan/WaliKelas"));
 const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 
-export type PanelMode = "admin" | "kepala" | "waka" | "piket";
+export type PanelMode = "admin" | "kepala" | "waka" | "piket" | "wali";
 type NavItem = { to: string; label: string; icon: IconName; title: string; section?: string };
 
 /** Menu Kesiswaan dipakai bersama tiga peran; hak ubah ditegakkan Security Rules (admin hanya baca). */
@@ -42,11 +49,14 @@ const laporanKes = (base: string, label: string): NavItem => ({ to: `${base}/lap
 const kesiswaan = (base: string, denganHarian: boolean): NavItem[] => {
   const baru: NavItem[] = [
     { to: `${base}/pelanggaran`, label: "Pelanggaran", icon: "warning", title: "Pelanggaran & remisi" },
+    { to: `${base}/pembinaan`, label: "Pembinaan", icon: "users", title: "Rekap pembinaan" },
+    { to: `${base}/usulan-remisi`, label: "Usulan remisi", icon: "file", title: "Usulan remisi dari wali kelas" },
     { to: `${base}/tata-tertib`, label: "Tata tertib", icon: "file", title: "Tata tertib" },
     { to: `${base}/audit`, label: "Jejak audit", icon: "activity", title: "Jejak audit kesiswaan" },
   ];
-  baru.splice(2, 0, laporanKes(base, "Laporan kesiswaan"));
+  baru.splice(baru.findIndex((x) => x.to.endsWith("/audit")), 0, laporanKes(base, "Laporan kesiswaan"));
   if (base === "/admin") baru.push({ to: `${base}/petugas-piket`, label: "Petugas piket", icon: "users", title: "Petugas piket" });
+  if (base === "/admin") baru.push({ to: `${base}/wali-kelas`, label: "Wali kelas", icon: "users", title: "Wali kelas" });
   if (base === "/admin") baru.push({ to: `${base}/log-aktivitas`, label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" });
   const daftar = denganHarian ? [...harian(base), ...baru] : baru;
   return daftar.map((x, i) => (i === 0 ? { ...x, section: "KESISWAAN" } : x));
@@ -86,6 +96,18 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/piket/panduan", label: "Panduan", icon: "file", title: "Panduan" },
     ],
   },
+  wali: {
+    base: "/wali", role: "Wali Kelas", short: "WL", menuLabel: "Menu wali kelas",
+    nav: [
+      { to: "/wali", label: "Dashboard", icon: "grid", title: "Dashboard wali kelas" },
+      { to: "/wali/izin", label: "Izin & kehadiran", icon: "check", title: "Izin & kehadiran kelas" },
+      { to: "/wali/siswa", label: "Siswa kelas", icon: "users", title: "Siswa kelas binaan" },
+      { to: "/wali/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
+      { to: "/wali/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
+      { to: "/wali/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
+      { to: "/wali/panduan", label: "Panduan", icon: "file", title: "Panduan wali kelas" },
+    ],
+  },
   waka: {
     base: "/waka", role: "Waka Kesiswaan", short: "WK", menuLabel: "Menu waka kesiswaan",
     nav: [
@@ -93,6 +115,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       ...harian("/waka"),
       laporanKes("/waka", "Laporan"),
       { to: "/waka/petugas-piket", label: "Petugas piket", icon: "users", title: "Petugas piket" },
+      { to: "/waka/wali-kelas", label: "Wali kelas", icon: "users", title: "Wali kelas" },
       ...kesiswaan("/waka", false).filter((x) => x.to !== "/waka/laporan-kesiswaan"),
       { to: "/waka/log-aktivitas", label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" },
       { to: "/waka/panduan", label: "Panduan", icon: "file", title: "Panduan" },
@@ -128,9 +151,12 @@ export default function AdminLayout() {
           <Route path="laporan-kesiswaan" element={<LaporanKes />} />
           <Route path="per-jam" element={<PerJam />} />
           <Route path="pelanggaran" element={<Pelanggaran />} />
+          <Route path="pembinaan" element={<PembinaanRekap />} />
+          <Route path="usulan-remisi" element={<UsulanRemisi />} />
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
+          <Route path="wali-kelas" element={<WaliKelas />} />
           <Route path="kalender" element={<Kalender />} />
           <Route path="panduan" element={<Panduan peran="admin" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />
@@ -149,10 +175,17 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { session } = useAuth();
-  const { today, device, online, serverNow, errors } = useAdminData();
+  const { today, device, online, serverNow, errors, selisihJamMs, jamSiap } = useAdminData();
   const connected = useConnected();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
+  // lencana menu: usulan remisi yang menunggu (admin/kepala/waka) atau siswa yang perlu dibina (wali)
+  const usul = useLive<Record<string, UsulRemisi>>(mode === "admin" || mode === "kepala" || mode === "waka" ? "usulRemisi" : null);
+  const dibina = useDisiplinKelasOpsional();
+  const lencana: Record<string, number> = {
+    [`${P.base}/usulan-remisi`]: antreanUsul(usul.data).length,
+    "/wali/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
+  };
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
     setToast({ msg, kind });
@@ -179,6 +212,7 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
                 <NavLink to={item.to} end={item.to === P.base} onClick={() => setMobileOpen(false)}
                   className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
                   <Icon name={item.icon} /><span>{item.label}</span>
+                  {lencana[item.to] > 0 && <b className="nav-badge" data-testid={`lencana-${item.to.split("/").pop()}`} aria-label={`${lencana[item.to]} menunggu`}>{lencana[item.to]}</b>}
                 </NavLink>
               </Fragment>
             ))}
@@ -221,17 +255,21 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
             </div>
             <div className="top-actions">
               {mode === "piket" && <PetugasBar />}
+              {mode === "wali" && <KelasBar />}
               {mode === "kepala" && <span className="mode-pill no-print"><Icon name="eye" size={14} /> Pantau &amp; kesiswaan</span>}
               {!connected && <span className="conn-pill"><Icon name="alert" size={14} /> Koneksi terputus</span>}
             </div>
           </header>
 
           <div className="content">
+            {jamPerangkatBeda(selisihJamMs) && (
+              <div className="notice warn" role="alert" data-testid="banner-jam"><Icon name="warning" size={17} /><span>{pesanJamBeda(selisihJamMs)}</span></div>
+            )}
             {errors.length > 0 && (
               <div className="notice warn" role="alert"><Icon name="warning" size={17} /><span>Sebagian data tidak dapat dimuat ({errors[0]}). Muat ulang halaman; bila berlanjut, hubungi administrator.</span></div>
             )}
             <Suspense fallback={<div className="page-loader"><span className="spinner spinner-dark" /></div>}>
-              {children}
+              {jamSiap ? children : <div className="page-loader"><span className="spinner spinner-dark" /></div>}
             </Suspense>
           </div>
         </main>

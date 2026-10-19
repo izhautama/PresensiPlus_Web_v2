@@ -18,6 +18,8 @@ const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
 const Panduan = lazy(() => import("../pages/Panduan"));
+const PembinaanRekap = lazy(() => import("../kesiswaan/PembinaanRekap"));
+const UsulanRemisi = lazy(() => import("../kesiswaan/UsulanRemisi"));
 const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 
 /** Panel Kepala Madrasah. AdminDataProvider hanya berlangganan path yang diizinkan Security Rules untuk kepala. */
@@ -36,6 +38,8 @@ export default function KepalaLayout() {
           <Route path="laporan-kesiswaan" element={<LaporanKes />} />
           <Route path="per-jam" element={<PerJam />} />
           <Route path="pelanggaran" element={<Pelanggaran />} />
+          <Route path="pembinaan" element={<PembinaanRekap />} />
+          <Route path="usulan-remisi" element={<UsulanRemisi />} />
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />

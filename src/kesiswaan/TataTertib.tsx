@@ -2,9 +2,11 @@ import { useState, type FormEvent } from "react";
 import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner, StatusBadge } from "../components/ui";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
-import { KATEGORI_LIST, type KategoriPelanggaran, type Kelompok, type Level, type Remisi, type Rule } from "../lib/discipline";
+import { KATEGORI_LIST, type KategoriPelanggaran, type Kelompok, type Level, type PenanggungJawab, type Remisi, type Rule } from "../lib/discipline";
+import { PJ_LABEL, PJ_LIST } from "../lib/pembinaan";
 import { SEMUA_TIPE_SARAN, TIPE_LABEL, cariAturanBawaan } from "../lib/saran";
 import { hapusLevel, isiDataAwal, simpanAutoMap, simpanMaster, type Actor, type MasterJenis } from "../services/discipline";
+import { isiPenanggungJawabBawaan } from "../services/pembinaan";
 import { useActor, useDiscipline } from "./useDiscipline";
 
 type Tab = "rules" | "remisi" | "levels" | "map";
@@ -19,6 +21,13 @@ export default function TataTertib() {
   const [edit, setEdit] = useState<Edit>(null);
   const [seed, setSeed] = useState(false);
   const [ambilNonaktif, setAmbilNonaktif] = useState(false);
+  const [pjBusy, setPjBusy] = useState(false);
+  const isiPj = async () => {
+    setPjBusy(true);
+    try { const n = await isiPenanggungJawabBawaan(d.levels, actor); notify(n ? `Penanggung jawab diisi untuk ${n} ambang` : "Tidak ada ambang yang dapat diisi otomatis; atur manual"); }
+    catch (e) { notify((e as Error).message, "err"); }
+    finally { setPjBusy(false); }
+  };
 
   const isi = async () => {
     setSeed(true);
@@ -117,11 +126,15 @@ export default function TataTertib() {
 
           {tab === "levels" && (
             <article className="panel master-group">
-              <div className="panel-header"><div><p className="panel-title">Ambang akumulasi poin</p><span>Level siswa = ambang tertinggi yang sudah dilewati saldo poinnya</span></div></div>
+              <div className="panel-header"><div><p className="panel-title">Ambang akumulasi poin</p><span>Level siswa = ambang tertinggi yang sudah dilewati saldo poinnya. Penanggung jawab menentukan siapa yang membina siswa pada ambang itu (daftar "Perlu dibina" wali kelas memakai ambang berpenanggung jawab wali).</span></div></div>
+              {bisaTulis && Object.values(d.levels).some((l) => !l.penanggungJawab) && (
+                <div className="notice warn" data-testid="pj-belum"><Icon name="warning" size={17} /><span>Sebagian ambang belum punya penanggung jawab, sehingga wali kelas belum menerima daftar "Perlu dibina".
+                  <button className="primary-button sm" disabled={pjBusy} onClick={isiPj}>{pjBusy ? <Spinner /> : null}Isi penanggung jawab bawaan</button></span></div>
+              )}
               {Object.entries(d.levels).sort((a, b) => a[1].poin - b[1].poin).map(([id, x]) => (
-                <div className="master-row" key={id}>
+                <div className="master-row" key={id} data-level={id}>
                   <em className="poin-pill">{x.poin}</em>
-                  <span className="master-text"><b>{x.tindakan}</b></span>
+                  <span className="master-text"><b>{x.tindakan}</b><small data-testid="pj-level">{x.penanggungJawab ? `Penanggung jawab: ${PJ_LABEL[x.penanggungJawab]}` : "Penanggung jawab belum diatur"}</small></span>
                   {bisaTulis && <span className="row-actions"><button title="Ubah" aria-label="Ubah ambang" onClick={() => setEdit({ jenis: "levels", id })}><Icon name="edit" size={16} /></button></span>}
                 </div>
               ))}
@@ -165,6 +178,7 @@ function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d:
     takziran: lama?.takziran ?? "",
     syarat: lama?.syarat ?? "",
     tindakan: lama?.tindakan ?? "",
+    penanggungJawab: (lama?.penanggungJawab ?? "") as PenanggungJawab | "",
     aktif: lama?.aktif ?? true,
   });
   const [err, setErr] = useState("");
@@ -186,7 +200,7 @@ function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d:
         ? { kategori: f.kategori, nama: f.nama.trim(), poin: p, takziran: f.takziran.trim(), aktif: f.aktif }
         : jenis === "remisi"
           ? { kelompok: f.kelompok, nama: f.nama.trim(), poin: p, syarat: f.syarat.trim(), aktif: f.aktif }
-          : { poin: p, tindakan: f.tindakan.trim() };
+          : { poin: p, tindakan: f.tindakan.trim(), penanggungJawab: f.penanggungJawab || undefined };
       await simpanMaster(jenis, id, data, lama ? stripMeta(lama) : null, actor);
       notify("Tersimpan");
       onClose();
@@ -199,7 +213,15 @@ function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d:
         {jenis === "rules" && <Field label="Kategori"><select className="text-input" value={f.kategori} onChange={(e) => setF({ ...f, kategori: e.target.value as KategoriPelanggaran })}>{KATEGORI_LIST.map((k) => <option key={k}>{k}</option>)}</select></Field>}
         {jenis === "remisi" && <Field label="Kelompok"><select className="text-input" value={f.kelompok} onChange={(e) => setF({ ...f, kelompok: e.target.value as Kelompok })}><option>Prestasi</option><option>Tanpa prestasi</option></select></Field>}
         {jenis === "levels" ? (
-          <Field label="Tindakan"><textarea className="text-input area" rows={2} maxLength={200} value={f.tindakan} onChange={(e) => setF({ ...f, tindakan: e.target.value })} /></Field>
+          <>
+            <Field label="Tindakan"><textarea className="text-input area" rows={2} maxLength={200} value={f.tindakan} onChange={(e) => setF({ ...f, tindakan: e.target.value })} /></Field>
+            <Field label="Penanggung jawab" hint="Wali kelas: ambang ini muncul di daftar Perlu dibina wali.">
+              <select className="text-input" value={f.penanggungJawab} aria-label="Penanggung jawab" onChange={(e) => setF({ ...f, penanggungJawab: e.target.value as PenanggungJawab | "" })}>
+                <option value="">Belum diatur</option>
+                {PJ_LIST.map((k) => <option key={k} value={k}>{PJ_LABEL[k]}</option>)}
+              </select>
+            </Field>
+          </>
         ) : (
           <Field label="Nama"><textarea className="text-input area" rows={2} maxLength={200} value={f.nama} onChange={(e) => setF({ ...f, nama: e.target.value })} /></Field>
         )}

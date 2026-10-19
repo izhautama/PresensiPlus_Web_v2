@@ -43,6 +43,17 @@ Untuk: Administrator / TU sekolah
 4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).
 5. Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal "aktif sejak" siswa lama.
 
+## Wali kelas
+
+1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.
+2. Bila kelas yang dipilih sudah punya wali, muncul peringatan. Hanya admin yang boleh menambah wali kedua untuk kelas yang sama.
+3. Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkannya lagi.
+4. Pergantian tahun ajaran: ubah kelas utama semua wali sekaligus di kartu Wali kelas per tahun ajaran, lalu simpan satu kali. Indeks siswa-kelas ikut disinkronkan pada penyimpanan yang sama (ubah kelas siswa dulu di menu Data siswa).
+5. Kartu Indeks kelas (Dashboard dan menu Wali kelas) membandingkan daftar siswa dengan indeks siswa-kelas, serta akun wali dengan cermin waliAkun. Pemeriksaan berjalan otomatis saat Dashboard dibuka.
+6. Bila ada selisih, tekan Perbaiki: baca pratinjau (dry-run), lalu Terapkan perbaikan. Data dibaca ulang sebelum ditulis dan perbaikan tercatat di log aktivitas.
+
+> Catatan: Indeks siswa-kelas dipakai aturan keamanan untuk membatasi wali pada siswa kelasnya; ia terisi otomatis saat siswa ditambah, diubah, atau dihapus.
+
 ## Log aktivitas dan backup
 
 1. Menu Log aktivitas: pilih tanggal, lihat siapa (nama petugas yang dipilih sendiri), perangkat, dan aksinya. Perangkat baru diberi tanda.

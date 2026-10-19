@@ -1,10 +1,11 @@
 // Uji mutasi Security Rules: rusak rules satu per satu, suite uji HARUS gagal untuk masing-masing.
-// Jalankan: npm run test:mutation  (di dalam emulator; rules asli di repo tidak diubah).
-import { spawnSync } from "node:child_process";
+// Jalankan: npm run test:mutation  (mengelola emulatornya sendiri: restart berkala + batas waktu per mutan; rules asli di repo tidak diubah).
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildRules } from "../scripts/build-rules.mjs";
+import { hashRules } from "./emu.mjs";
 
 const ADMIN = "root.child('roles').child(auth.uid).val() === 'admin'";
 const PIKET = "root.child('roles').child(auth.uid).val() === 'piket'";
@@ -18,6 +19,40 @@ const ENT = (n) => `${nav(n)}.child('activity').child(${ACT(n)}.child('tgl').val
 const actOk = (n, aksi) => `${ACT(n)}.child('ts').val() === now && ${ENT(n)}.child('ts').val() === now && ${ENT(n)}.child('uid').val() === auth.uid && (${aksi.map((a) => `${ENT(n)}.child('aksi').val() === '${a}'`).join(" || ")})`;
 const metaBaruPiket = (n, tgl, nis, sufiks) => `${nav(n)}.child('izinMeta').child(${tgl}).child(${nis}).child(${ACT(n)}.child('id').val() + '_' + ${sufiks}).child('ts').val() === now`;
 const MILIK_ANAK = "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid";
+
+
+// ---- pembantu mutasi WALI (salinan helper rules; harus identik dengan scripts/build-rules.mjs)
+const WALI = "root.child('roles').child(auth.uid).val() === 'wali'";
+const STFT = "root.child('staff').child(auth.uid)";
+const SKT = (nis) => `root.child('siswaKelas').child(${nis})`;
+const waliDariT = (nis) => `(${WALI} && ${SKT(nis)}.exists() && (${STFT}.child('kelasUtama').val() === ${SKT(nis)}.val() || ${STFT}.child('kelasTambahan').child(${SKT(nis)}.val()).val() === true))`;
+const waliIzinT = (n, tgl, cekKet) => `(${WALI} && ${waliDariT("$nis")} && !root.child('validasi').child(${tgl}).child($nis).exists() && (newData.exists() ? (${cekKet ? "newData.val() !== 'Dispensasi' && " : ""}${actOk(n, ["izin-harian"])} && ${metaBaruPiket(n, tgl, "$nis", "'H'")}) : ${actOk(n, ["hapus-izin"])}))`;
+// ---- pembantu mutasi PEMBINAAN / USUL REMISI (salinan helper rules; harus identik dengan scripts/build-rules.mjs)
+const LEVEL_WALI_T = (lvl) => `root.child('discipline').child('levels').child(${lvl}).child('penanggungJawab').val() === 'wali'`;
+const PS_DARI_PB = `${nav(3)}.child('pembinaanStatus').child($nis).child(newData.child('ta').val()).child(newData.child('levelId').val())`;
+const PB_DARI_PS = `${nav(4)}.child('pembinaan').child($nis).child($ta + '_' + $levelId)`;
+const REC_USUL_T = `${nav(2)}.child('discipline').child('records').child(newData.child('nis').val()).child($id)`;
+const MASTER_REMISI_T = "root.child('discipline').child('remisi').child(newData.child('remId').val())";
+const USUL_BARU_FN = (id) => `${nav(3)}.parent().child('usulRemisi').child(${id})`;
+const USUL_BARU_T = USUL_BARU_FN('$recId');
+const USUL_SAH_T = `root.child('usulRemisi').child($recId).child('status').val() === 'menunggu' && ${USUL_BARU_T}.child('status').val() === 'disetujui' && ${USUL_BARU_T}.child('recId').val() === $recId && ${USUL_BARU_T}.child('diputuskanOleh').val() === auth.uid && ${USUL_BARU_T}.child('nis').val() === $nis && newData.child('jenis').val() === 'remisi' && newData.child('refId').val() === ${USUL_BARU_T}.child('remId').val() && newData.child('poin').val() === ${USUL_BARU_T}.child('poin').val() && newData.child('nama').val() === ${USUL_BARU_T}.child('nama').val()`;
+const RULE = "root.child('discipline').child('rules').child(newData.child('refId').val())";
+/** ganti SEMUA kemunculan teks pada seluruh rules (JSON) */
+function ubahJson(r, dari, ke) {
+  const s = JSON.stringify(r);
+  if (!s.includes(dari)) throw new Error(`teks target tidak ditemukan: ${dari.slice(0, 60)}`);
+  const baru = JSON.parse(s.split(dari).join(ke));
+  Object.keys(r).forEach((k) => delete r[k]); Object.assign(r, baru);
+}
+/** ubah `dari` -> `ke` HANYA pada kemunculan pertama SETELAH `jangkar` di dalam teks aturan node[kunci] */
+function ubahTeksSetelah(teks, jangkar, dari, ke) {
+  const i = teks.indexOf(jangkar);
+  if (i < 0) throw new Error(`jangkar tidak ditemukan: ${jangkar.slice(0, 60)}`);
+  const j = teks.indexOf(dari, i);
+  if (j < 0) throw new Error(`teks target tidak ditemukan setelah jangkar: ${dari.slice(0, 60)}`);
+  return teks.slice(0, j) + ke + teks.slice(j + dari.length);
+}
+function ubahSetelah(node, kunci, jangkar, dari, ke) { node[kunci] = ubahTeksSetelah(node[kunci], jangkar, dari, ke); }
 
 /** Setiap mutasi mengubah objek rules hasil build (salinan segar) dan WAJIB benar-benar mengubah sesuatu. */
 const mutasi = [
@@ -35,8 +70,8 @@ const mutasi = [
   { nama: "ortu boleh baca discipline/recordMeta (nama staf)", ubah: (r) => { r.discipline.recordMeta.$nis[".read"] = MILIK_ANAK; } },
   { nama: "admin boleh membuat role 'admin' (eskalasi)", ubah: (r) => {
     const n = r.roles.$uid;
-    n[".write"] = ganti(n[".write"], "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket')", "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'admin')");
-    n[".validate"] = "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'admin'";
+    n[".write"] = ganti(n[".write"], "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali')", "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'admin')");
+    n[".validate"] = "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'admin'";
   } },
   { nama: "recordMeta: dibuatOleh/dibuatTs boleh diubah", ubah: (r) => {
     const n = r.discipline.recordMeta.$nis.$recId;
@@ -131,7 +166,7 @@ const mutasi = [
   } },
   { nama: "izinMeta: jendela hariKe piket tidak ditegakkan", ubah: (r) => {
     const n = r.izinMeta.$tgl.$nis.$metaId;
-    const baru = n[".validate"].replace(/ && \(!\(root\.child\('roles'\)\.child\(auth\.uid\)\.val\(\) === 'piket'\) \|\| \([^]*\)\)$/, "");
+    const baru = n[".validate"].replace(/ && \(!\(root\.child\('roles'\)\.child\(auth\.uid\)\.val\(\) === 'piket' \|\| root\.child\('roles'\)\.child\(auth\.uid\)\.val\(\) === 'wali'\) \|\| \([^]*\)\)$/, "");
     if (baru === n[".validate"]) throw new Error("pola jendela izinMeta tidak ditemukan");
     n[".validate"] = baru;
   } },
@@ -455,6 +490,168 @@ const mutasi = [
   { nama: "sistem: waka boleh membaca seluruh node sistem", ubah: (r) => { r.sistem[".read"] = `(${r.sistem[".read"]}) || (auth != null && ${WAKA})`; } },
   { nama: "sistem: waka boleh menulis backupTerakhir", ubah: (r) => { const n = r.sistem.backupTerakhir; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
   { nama: "profiles: aktifSejak format bebas", ubah: (r) => { r.profiles.$nis.aktifSejak[".validate"] = "newData.isString()"; } },
+  // ---------------------------------------------------------------- WALI KELAS (grup "wali")
+  // Salinan helper rules (harus identik dengan scripts/build-rules.mjs) untuk menyusun teks yang dirusak mutasi.
+  { nama: "wali: indeks siswaKelas tidak diperiksa ada (null === null membuka siswa tanpa indeks)", ubah: (r) => ubahJson(r, "root.child('siswaKelas').child($nis).exists() && ", "") },
+  { nama: "wali: kelas utama tidak dicocokkan (semua siswa terindeks terbuka)", ubah: (r) => ubahJson(r, "root.child('staff').child(auth.uid).child('kelasUtama').val() === root.child('siswaKelas').child($nis).val()", "true") },
+  { nama: "wali: kelas tambahan tidak dicocokkan", ubah: (r) => ubahJson(r, "root.child('staff').child(auth.uid).child('kelasTambahan').child(root.child('siswaKelas').child($nis).val()).val() === true", "true") },
+  { nama: "wali: peran 'wali' tidak diperiksa (akun lain dengan kelasUtama)", ubah: (r) => ubahJson(r, `(${WALI} && root.child('siswaKelas').child($nis).exists()`, "(true && root.child('siswaKelas').child($nis).exists()") },
+  { nama: "wali izin: kelas binaan tidak diperiksa (semua jalur izin)", ubah: (r) => {
+    for (const [lok, n, tgl, cek] of [[r.izin.$date.$nis, 3, "$date", true], [r.attendance.$nis.$date.ket, 4, "$date", true], [r.attendance.$nis.$date.catatan, 4, "$date", false]]) lok[".write"] = ganti(lok[".write"], waliIzinT(n, tgl, cek), waliIzinT(n, tgl, cek).replace(waliDariT("$nis"), "true"));
+    const m = r.izinMeta.$tgl.$nis.$metaId; m[".write"] = ganti(m[".write"], `(${waliDariT("$nis")} && newData.exists()`, "(true && newData.exists()");
+  } },
+  { nama: "wali izin: Alfa yang sudah divalidasi diabaikan", ubah: (r) => {
+    for (const [lok, n, tgl, cek] of [[r.izin.$date.$nis, 3, "$date", true], [r.attendance.$nis.$date.ket, 4, "$date", true], [r.attendance.$nis.$date.catatan, 4, "$date", false]]) lok[".write"] = ganti(lok[".write"], waliIzinT(n, tgl, cek), waliIzinT(n, tgl, cek).replace(`!root.child('validasi').child(${tgl}).child($nis).exists() && `, ""));
+  } },
+  { nama: "wali izin: Dispensasi diterima (semua lapisan)", ubah: (r) => {
+    for (const [lok, n, tgl, cek] of [[r.izin.$date.$nis, 3, "$date", true], [r.attendance.$nis.$date.ket, 4, "$date", true]]) lok[".write"] = ganti(lok[".write"], waliIzinT(n, tgl, cek), waliIzinT(n, tgl, cek).replace("newData.val() !== 'Dispensasi' && ", ""));
+    const m = r.izinMeta.$tgl.$nis.$metaId; m[".validate"] = ganti(m[".validate"], " && newData.child('ket').val() !== 'Dispensasi')))", ")))");
+  } },
+  { nama: "wali izin: log aktivitas tidak wajib (semua jalur)", ubah: (r) => {
+    for (const [lok, n, tgl, cek] of [[r.izin.$date.$nis, 3, "$date", true], [r.attendance.$nis.$date.ket, 4, "$date", true], [r.attendance.$nis.$date.catatan, 4, "$date", false]]) {
+      const t = waliIzinT(n, tgl, cek);
+      lok[".write"] = ganti(lok[".write"], t, t.replace(`${actOk(n, ["izin-harian"])} && `, "").replace(actOk(n, ["hapus-izin"]), "true"));
+    }
+    const m = r.izinMeta.$tgl.$nis.$metaId; m[".write"] = ganti(m[".write"], `data.child('oleh').val() === auth.uid) && ${actOk(4, ["izin-harian"])}))`, "data.child('oleh').val() === auth.uid)))");
+  } },
+  { nama: "wali izin: izinMeta baru tidak wajib (izin tanpa keterangan/surat)", ubah: (r) => {
+    for (const [lok, n, tgl, cek] of [[r.izin.$date.$nis, 3, "$date", true], [r.attendance.$nis.$date.ket, 4, "$date", true], [r.attendance.$nis.$date.catatan, 4, "$date", false]]) {
+      const t = waliIzinT(n, tgl, cek);
+      lok[".write"] = ganti(lok[".write"], t, t.replace(` && ${metaBaruPiket(n, tgl, "$nis", "'H'")}`, ""));
+    }
+  } },
+  { nama: "wali izin: izinMeta berlingkup 'jam' diterima", ubah: (r) => { const m = r.izinMeta.$tgl.$nis.$metaId; m[".validate"] = ganti(m[".validate"], "(!(" + WALI + ") || (newData.child('lingkup').val() === 'harian' && ", "(!(" + WALI + ") || (true && "); } },
+  { nama: "wali pelanggaran: kelas binaan tidak diperiksa", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId; n[".write"] = ganti(n[".write"], `(newData.exists() ? (!data.exists() && ${waliDariT("$nis")} && `, "(newData.exists() ? (!data.exists() && true && ");
+    n[".write"] = ganti(n[".write"], `: (${waliDariT("$nis")} && data.child('sumber').val() === 'wali'`, ": (true && data.child('sumber').val() === 'wali'");
+    const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = ganti(m[".write"], `|| (${waliDariT("$nis")} && (`, "|| (true && (");
+  } },
+  { nama: "wali pelanggaran: Sedang/Berat tanpa takziran diterima", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && (${RULE}.child('kategori').val() === 'Ringan' || ${RULE}.child('takziran').val().length > 0)`, "") },
+  { nama: "wali pelanggaran: aturan nonaktif diterima", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && ${RULE}.child('aktif').val() === true`, "") },
+  { nama: "wali pelanggaran: poin tidak dicocokkan dengan master", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && newData.child('poin').val() === ${RULE}.child('poin').val()`, "") },
+  { nama: "wali pelanggaran: nama tidak dicocokkan dengan master", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && newData.child('nama').val() === ${RULE}.child('nama').val()`, "") },
+  { nama: "wali pelanggaran: kategori tidak dicocokkan dengan master", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && newData.child('kategori').val() === ${RULE}.child('kategori').val()`, "") },
+  { nama: "wali pelanggaran: takziran tidak dicocokkan dengan master", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "newData.child('sumber').val() === 'wali' && ", ` && newData.child('takziran').val() === ${RULE}.child('takziran').val()`, "") },
+  { nama: "wali pelanggaran: sumber tidak dikunci 'wali' (hanya lapisan records; recordMeta mengunci sumber 'wali' juga)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".write"] = ganti(n[".write"], " && newData.child('sumber').val() === 'wali' && " + RULE + ".child('aktif')", " && " + RULE + ".child('aktif')"); } },
+  { nama: "wali pelanggaran: REMISI diterima (jenis tidak dikunci)", ubah: (r) => ubahSetelah(r.discipline.records.$nis.$recId, ".write", "(newData.exists() ? (!data.exists() && " + waliDariT("$nis") + " && ", "newData.child('jenis').val() === 'pelanggaran' && ", "") },
+  { nama: "wali pelanggaran: log aktivitas tidak wajib", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId;
+    n[".write"] = ubahTeksSetelah(n[".write"], "newData.child('sumber').val() === 'wali' && ", ` && ${actOk(4, ["pelanggaran"])}`, "");
+    const m = r.discipline.recordMeta.$nis.$recId;
+    m[".write"] = ubahTeksSetelah(m[".write"], `|| (${waliDariT("$nis")} && (`, `(${actOk(4, ["pelanggaran"])} || ${actOk(4, ["hapus-pelanggaran"])})`, "true");
+  } },
+  { nama: "wali pelanggaran: jendela hariKe tidak ditegakkan (recordMeta.hariKe)", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId;
+    const baru = n[".write"].replace(/ && newData\.parent\(\)\.parent\(\)\.parent\(\)\.child\('recordMeta'\)\.child\(\$nis\)\.child\(\$recId\)\.child\('hariKe'\)\.isNumber\(\)[^]*?<= \(\(now \+ 25200000\) \/ 86400000\) \+ 0/, "");
+    if (baru === n[".write"]) throw new Error("pola hariKe wali tidak ditemukan");
+    n[".write"] = baru;
+  } },
+  { nama: "wali hapus: catatan milik wali lain boleh dihapus", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".write"] = ganti(n[".write"], " && root.child('discipline').child('recordMeta').child($nis).child($recId).child('dibuatOleh').val() === auth.uid && ", " && "); } },
+  { nama: "wali hapus: catatan non-wali (waka/piket) boleh dihapus", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId; n[".write"] = ganti(n[".write"], ` && data.child('sumber').val() === 'wali' && root.child('discipline')`, " && root.child('discipline')");
+    const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = ganti(m[".write"], " || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'wali')", " || true)");
+  } },
+  { nama: "wali: recordMeta siswa lain terbaca", ubah: (r) => { r.discipline.recordMeta.$nis[".read"] = `auth != null && ${WALI}`; } },
+  { nama: "wali: catatan internal (notes) siswa lain terbaca", ubah: (r) => { r.discipline.notes.$nis[".read"] = `auth != null && ${WALI}`; } },
+  { nama: "wali: siswaKelas dapat dibaca utuh tanpa query", ubah: (r) => { r.siswaKelas[".read"] = `(${r.siswaKelas[".read"]}) || (auth != null && ${WALI})`; } },
+  { nama: "wali: query siswaKelas kelas lain diterima", ubah: (r) => { r.siswaKelas[".read"] = ganti(r.siswaKelas[".read"], "(query.equalTo === root.child('staff').child(auth.uid).child('kelasUtama').val() || root.child('staff').child(auth.uid).child('kelasTambahan').child(query.equalTo).val() === true)", "true"); } },
+  { nama: "wali: waka boleh menulis siswaKelas", ubah: (r) => { const n = r.siswaKelas.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "wali: nilai siswaKelas bebas", ubah: (r) => { r.siswaKelas.$nis[".validate"] = "true"; } },
+  { nama: "wali: waka boleh menambah kelasTambahan", ubah: (r) => { const n = r.staff.$uid.kelasTambahan.$kelas; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "wali: waka boleh mengatur kelasUtama akun non-wali", ubah: (r) => { const n = r.staff.$uid.kelasUtama; n[".write"] = ganti(n[".write"], "newData.parent().child('role').val() === 'wali' && ", ""); } },
+  { nama: "wali: waka boleh menghapus kelasUtama", ubah: (r) => { const n = r.staff.$uid.kelasUtama; n[".write"] = ganti(n[".write"], " && newData.exists()", ""); } },
+  { nama: "wali: format kelasUtama bebas", ubah: (r) => { r.staff.$uid.kelasUtama[".validate"] = "newData.isString()"; } },
+  { nama: "wali: nilai kelasTambahan bebas (bukan true)", ubah: (r) => { const n = r.staff.$uid.kelasTambahan.$kelas; n[".validate"] = ganti(n[".validate"], "newData.val() === true && ", ""); } },
+  { nama: "wali: waka boleh membuat entri staff untuk role selain wali (hanya lapisan field role; email/nama/dibuat tetap mensyaratkan role wali)", ekuivalen: true, ubah: (r) => { const n = r.staff.$uid.role; n[".write"] = ganti(n[".write"], " && newData.val() === 'wali'", ""); } },
+  { nama: "wali: waka boleh memberi role tanpa entri staff wali", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], " && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'", ""); } },
+  { nama: "wali: waka boleh memberi role selain wali (staff wali ada)", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], "(!data.exists() && newData.val() === 'wali' && newData.parent()", "(!data.exists() && newData.parent()"); } },
+  { nama: "wali: waka boleh mencabut role apa pun", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], "(data.val() === 'wali' && !newData.exists())", "(!newData.exists())"); } },
+  { nama: "wali: waka boleh menimpa role wali yang ada", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], "(!data.exists() && newData.val() === 'wali' && newData.parent()", "(newData.val() === 'wali' && newData.parent()"); } },
+  { nama: "wali: waliAkun kelasUtama cermin tidak dicocokkan dengan staff", ubah: (r) => { const n = r.waliAkun.$uid.kelasUtama; n[".write"] = ganti(n[".write"], " && newData.val() === newData.parent().parent().parent().child('staff').child($uid).child('kelasUtama').val()", ""); } },
+  { nama: "wali: waka boleh menulis cermin waliAkun akun non-wali", ubah: (r) => {
+    for (const k of ["email", "nama"]) { const n = r.waliAkun.$uid[k]; n[".write"] = ganti(n[".write"], " && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'wali'", ""); }
+    for (const k of ["kelasUtama", "aktif"]) { const n = r.waliAkun.$uid[k]; n[".write"] = ganti(n[".write"], " && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'wali'", ""); }
+  } },
+  { nama: "wali: waka boleh menulis kelasTambahan cermin", ubah: (r) => { const n = r.waliAkun.$uid.kelasTambahan.$kelas; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
+  { nama: "wali: waliAkun dapat dibaca wali/piket", ubah: (r) => { r.waliAkun[".read"] = "auth != null"; } },
+  // ---------------------------------------------------------------- v2.3 Tahap 2: pembinaan, pembinaanStatus, usulRemisi, penanggung jawab ambang
+  // pembinaan dan salinan pembinaanStatus selalu ditulis bersama dan masing-masing memeriksa kelas binaan/ambang wali/peran: merusak satu lapisan saja ekuivalen, jadi kedua lapisan dirusak bersamaan.
+  { nama: "pembinaan: kelas binaan tidak diperiksa (pembinaan + status)", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], waliDariT("$nis"), WALI); const t = r.pembinaanStatus.$nis.$ta.$levelId; t[".write"] = ganti(t[".write"], waliDariT("$nis"), WALI); } },
+  { nama: "pembinaan: ambang bukan tanggung jawab wali diterima (pembinaan + status)", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], ` && ${LEVEL_WALI_T("newData.child('levelId').val()")}`, ""); const t = r.pembinaanStatus.$nis.$ta.$levelId; t[".write"] = ganti(t[".write"], ` && ${LEVEL_WALI_T("$levelId")}`, ""); } },
+  { nama: "pembinaan: log aktivitas tidak wajib", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], ` && ${actOk(3, ["catat-pembinaan"])}`, ""); } },
+  { nama: "pembinaan: log aksi apa pun diterima", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], `(${ENT(3)}.child('aksi').val() === 'catat-pembinaan')`, "true"); } },
+  { nama: "pembinaan: pembinaan selesai dapat diubah wali (kunci selesai dibuang)", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], ` && (!data.exists() || data.child('status').val() !== 'selesai' || ${WAKA} || ${KEPALA})`, ""); } },
+  { nama: "pembinaan: admin boleh menulis (pembinaan + status)", ubah: (r) => { for (const n of [r.pembinaan.$nis.$id, r.pembinaanStatus.$nis.$ta.$levelId]) n[".write"] = ganti(n[".write"], `((${WAKA} || ${KEPALA}) || (`, `((${WAKA} || ${KEPALA} || ${ADMIN}) || (`); } },
+  { nama: "pembinaan: piket boleh menulis (pembinaan + status)", ubah: (r) => { for (const n of [r.pembinaan.$nis.$id, r.pembinaanStatus.$nis.$ta.$levelId]) n[".write"] = ganti(n[".write"], `((${WAKA} || ${KEPALA}) || (`, `((${WAKA} || ${KEPALA} || ${PIKET}) || (`); } },
+  { nama: "pembinaan: hapus fisik diizinkan", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".write"] = ganti(n[".write"], "auth != null && newData.exists() && ((", "auth != null && (("); } },
+  { nama: "pembinaan: id bukan {ta}_{levelId} diterima (hanya lapisan id pembinaan; salinan status memaksa id yang sama)", ekuivalen: true, ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], " && $id === newData.child('ta').val() + '_' + newData.child('levelId').val()", ""); } },
+  { nama: "pembinaan: salinan status id tidak dicocokkan (hanya lapisan pembinaan; lapisan status memeriksa id yang sama)", ekuivalen: true, ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${PS_DARI_PB}.child('id').val() === $id`, ""); } },
+  { nama: "pembinaan: salinan status tidak dicocokkan (status)", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${PS_DARI_PB}.child('status').val() === newData.child('status').val()`, ""); } },
+  { nama: "pembinaan: salinan status tidak dicocokkan (tanggal)", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${PS_DARI_PB}.child('tanggal').val() === newData.child('tanggal').val()`, ""); } },
+  { nama: "pembinaan: salinan status tidak dicocokkan (levelPoin; hanya lapisan pembinaan, status + immutabilitas menahan)", ekuivalen: true, ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${PS_DARI_PB}.child('levelPoin').val() === newData.child('levelPoin').val()`, ""); } },
+  { nama: "pembinaan: ubah: 'oleh' dapat diganti", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "(newData.child('oleh').val() === data.child('oleh').val() && ", "("); } },
+  { nama: "pembinaan: ubah: dibuatTs dapat diganti", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "newData.child('dibuatTs').val() === data.child('dibuatTs').val() && newData.child('levelPoin')", "newData.child('levelPoin')"); } },
+  { nama: "pembinaan: ubah: levelPoin dapat diganti", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "newData.child('levelPoin').val() === data.child('levelPoin').val() && newData.child('diubahOleh')", "newData.child('diubahOleh')"); } },
+  { nama: "pembinaan: ubah: diubahOleh tidak diwajibkan", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "newData.child('diubahOleh').val() === auth.uid && ", ""); } },
+  { nama: "pembinaan: ubah: diubahTs tidak diwajibkan now", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], " && newData.child('diubahTs').val() === now", ""); } },
+  { nama: "pembinaan: buat: 'oleh' dapat dipalsukan", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "(newData.child('oleh').val() === auth.uid && newData.child('dibuatTs')", "(newData.child('dibuatTs')"); } },
+  { nama: "pembinaan: buat: dibuatTs bukan waktu server diterima", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], "newData.child('dibuatTs').val() === now && root.child('discipline')", "root.child('discipline')"); } },
+  { nama: "pembinaan: buat: levelPoin tidak dicocokkan dengan ambang master", ubah: (r) => { const n = r.pembinaan.$nis.$id; n[".validate"] = ganti(n[".validate"], " && root.child('discipline').child('levels').child(newData.child('levelId').val()).child('poin').val() === newData.child('levelPoin').val()", ""); } },
+  { nama: "pembinaan: hasil minimal 10 karakter tidak ditegakkan", ubah: (r) => { const n = r.pembinaan.$nis.$id.hasil; n[".validate"] = ganti(n[".validate"], ">= 10", ">= 1"); } },
+  { nama: "pembinaan: hasil maksimal 1000 karakter tidak ditegakkan", ubah: (r) => { const n = r.pembinaan.$nis.$id.hasil; n[".validate"] = ganti(n[".validate"], "<= 1000", "<= 1000000"); } },
+  { nama: "pembinaan: tindak lanjut maksimal 500 karakter tidak ditegakkan", ubah: (r) => { const n = r.pembinaan.$nis.$id.tindakLanjut; n[".validate"] = ganti(n[".validate"], "<= 500", "<= 500000"); } },
+  { nama: "pembinaan: metode bebas", ubah: (r) => { r.pembinaan.$nis.$id.metode[".validate"] = "newData.isString()"; } },
+  { nama: "pembinaan: status bebas (hanya lapisan pembinaan; pembinaanStatus menahan karena salinan status wajib sama)", ekuivalen: true, ubah: (r) => { r.pembinaan.$nis.$id.status[".validate"] = "newData.isString()"; } },
+  { nama: "pembinaan: status bebas (kedua lapisan: pembinaan dan salinan pembinaanStatus)", ubah: (r) => { r.pembinaan.$nis.$id.status[".validate"] = "newData.isString()"; r.pembinaanStatus.$nis.$ta.$levelId.status[".validate"] = "newData.isString()"; } },
+  { nama: "pembinaan: field tak dikenal diterima", ubah: (r) => { r.pembinaan.$nis.$id.$other[".validate"] = true; } },
+  { nama: "pembinaan: baca: wali kelas binaan tidak diizinkan membaca", ubah: (r) => { const n = r.pembinaan.$nis; n[".read"] = ganti(n[".read"], ` || ${waliDariT("$nis")}`, ""); } },
+  { nama: "pembinaan: baca: siapa pun yang login membaca isi pembinaan", ubah: (r) => { r.pembinaan.$nis[".read"] = "auth != null"; } },
+  { nama: "pembinaan: baca: piket membaca seluruh node", ubah: (r) => { r.pembinaan[".read"] = `(${r.pembinaan[".read"]}) || (auth != null && ${PIKET})`; } },
+  { nama: "pembinaanStatus: wali boleh menulis status ambang non-wali", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".write"] = ganti(n[".write"], ` && ${LEVEL_WALI_T("$levelId")}`, ""); } },
+  { nama: "pembinaanStatus: kelas binaan tidak diperiksa", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".write"] = ganti(n[".write"], waliDariT("$nis"), WALI); } },
+  { nama: "pembinaanStatus: status tidak dicocokkan dengan pembinaan", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".validate"] = ganti(n[".validate"], ` && ${PB_DARI_PS}.child('status').val() === newData.child('status').val()`, ""); } },
+  { nama: "pembinaanStatus: tanggal tidak dicocokkan dengan pembinaan", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".validate"] = ganti(n[".validate"], ` && ${PB_DARI_PS}.child('tanggal').val() === newData.child('tanggal').val()`, ""); } },
+  { nama: "pembinaanStatus: levelPoin tidak dicocokkan dengan pembinaan", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".validate"] = ganti(n[".validate"], ` && ${PB_DARI_PS}.child('levelPoin').val() === newData.child('levelPoin').val()`, ""); } },
+  { nama: "pembinaanStatus: id tidak dicocokkan", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".validate"] = ganti(n[".validate"], " && newData.child('id').val() === $ta + '_' + $levelId", ""); } },
+  { nama: "pembinaanStatus: hapus fisik diizinkan", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".write"] = ganti(n[".write"], "auth != null && newData.exists() && ((", "auth != null && (("); } },
+  { nama: "pembinaanStatus: field tambahan (isi/nama) diterima", ubah: (r) => { r.pembinaanStatus.$nis.$ta.$levelId.$other[".validate"] = true; } },
+  { nama: "pembinaanStatus: baca: ortu membaca status anak lain", ubah: (r) => { r.pembinaanStatus.$nis[".read"] = "auth != null"; } },
+  { nama: "pembinaanStatus: baca: seluruh node dapat dibaca ortu", ubah: (r) => { r.pembinaanStatus[".read"] = "auth != null"; } },
+  { nama: "usul: buat: kelas binaan tidak diperiksa", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], waliDariT("newData.child('nis').val()"), WALI); } },
+  { nama: "usul: buat: log aktivitas tidak wajib", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], ` && ${actOk(2, ["usul-remisi"])}`, ""); } },
+  { nama: "usul: batal: usulan wali lain dapat dihapus", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], "!newData.exists() && data.child('oleh').val() === auth.uid && ", "!newData.exists() && "); } },
+  { nama: "usul: batal: usulan yang sudah diputuskan dapat dihapus", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], "data.child('oleh').val() === auth.uid && data.child('status').val() === 'menunggu' && ", "data.child('oleh').val() === auth.uid && "); } },
+  { nama: "usul: batal: log aktivitas tidak wajib", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], ` && ${actOk(2, ["batal-usul"])}`, ""); } },
+  { nama: "usul: keputusan: admin boleh memutuskan", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], `((${WAKA} || ${KEPALA}) && data.exists()`, `((${WAKA} || ${KEPALA} || ${ADMIN}) && data.exists()`); } },
+  { nama: "usul: keputusan: dapat diputuskan berkali-kali (data.status menunggu tidak diwajibkan)", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = ganti(n[".write"], " && data.child('status').val() === 'menunggu' && newData.child('status').val() !== 'menunggu'", ""); } },
+  { nama: "usul: buat: nama tidak dicocokkan dengan master", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], ` && ${MASTER_REMISI_T}.child('nama').val() === newData.child('nama').val()`, ""); } },
+  { nama: "usul: buat: poin tidak dicocokkan dengan master", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], ` && ${MASTER_REMISI_T}.child('poin').val() === newData.child('poin').val()`, ""); } },
+  { nama: "usul: buat: remisi nonaktif diterima", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], `${MASTER_REMISI_T}.child('aktif').val() === true && `, ""); } },
+  { nama: "usul: buat: oleh dapat dipalsukan", ubah: (r) => { r.usulRemisi.$id.oleh[".validate"] = "true"; } },
+  { nama: "usul: buat: ts bukan waktu server diterima", ubah: (r) => { r.usulRemisi.$id.ts[".validate"] = "true"; } },
+  { nama: "usul: alasan minimal 10 karakter tidak ditegakkan", ubah: (r) => { const n = r.usulRemisi.$id.alasan; n[".validate"] = ganti(n[".validate"], ">= 10", ">= 1"); } },
+  { nama: "usul: alasan maksimal 300 karakter tidak ditegakkan", ubah: (r) => { const n = r.usulRemisi.$id.alasan; n[".validate"] = ganti(n[".validate"], "<= 300", "<= 300000"); } },
+  { nama: "usul: field tak dikenal diterima", ubah: (r) => { r.usulRemisi.$id.$other[".validate"] = true; } },
+  { nama: "usul: nis usulan dapat diubah saat keputusan", ubah: (r) => { const n = r.usulRemisi.$id.nis; n[".validate"] = ganti(n[".validate"], " && (!data.exists() || newData.val() === data.val())", ""); } },
+  { nama: "usul: poin usulan dapat diubah saat keputusan", ubah: (r) => { const n = r.usulRemisi.$id.poin; n[".validate"] = ganti(n[".validate"], " && (!data.exists() || newData.val() === data.val())", ""); } },
+  { nama: "usul: alasan usulan dapat diubah saat keputusan", ubah: (r) => { const n = r.usulRemisi.$id.alasan; n[".validate"] = ganti(n[".validate"], " && (!data.exists() || newData.val() === data.val())", ""); } },
+  { nama: "usul: keputusan: diputuskanOleh dapat dipalsukan", ubah: (r) => { r.usulRemisi.$id.diputuskanOleh[".validate"] = "true"; const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], "newData.child('diputuskanOleh').val() === auth.uid && ", ""); } },
+  { nama: "usul: keputusan: setuju dengan recId bukan id usulan (kedua lapisan)", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], "newData.child('recId').val() === $id && ", ""); const k = r.discipline.records.$nis.$recId; k[".validate"] = ganti(k[".validate"], `${USUL_BARU_T}.child('recId').val() === $recId && `, ""); } },
+  { nama: "usul: keputusan: setuju tanpa record remisi usul-wali", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], ` && ${REC_USUL_T}.child('sumber').val() === 'usul-wali' && ${REC_USUL_T}.child('jenis').val() === 'remisi'`, ""); } },
+  { nama: "usul: keputusan: tolak tanpa alasan", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], "(newData.child('alasanKeputusan').exists() && !newData.child('recId').exists())", "(!newData.child('recId').exists())"); } },
+  { nama: "usul: keputusan: tolak dengan recId", ubah: (r) => { const n = r.usulRemisi.$id; n[".validate"] = ganti(n[".validate"], "(newData.child('alasanKeputusan').exists() && !newData.child('recId').exists())", "(newData.child('alasanKeputusan').exists())"); } },
+  { nama: "usul: baca: wali meng-query usulan wali lain", ubah: (r) => { r.usulRemisi[".read"] = ganti(r.usulRemisi[".read"], " && query.equalTo === auth.uid", ""); } },
+  { nama: "usul: baca: usulan wali lain dapat dibaca per id", ubah: (r) => { r.usulRemisi.$id[".read"] = ganti(r.usulRemisi.$id[".read"], " && data.child('oleh').val() === auth.uid", ""); } },
+  { nama: "usul: baca: seluruh node dapat dibaca piket", ubah: (r) => { r.usulRemisi[".read"] = `(${r.usulRemisi[".read"]}) || (auth != null && ${PIKET})`; } },
+  { nama: "usul: record usul-wali tanpa usulan sah (validasi sumber dibuang)", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], `(newData.child('sumber').val() !== 'usul-wali' || data.exists() || (${USUL_SAH_T})) && `, ""); } },
+  { nama: "usul: record usul-wali: usulan harus berstatus menunggu SEBELUM update", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], "root.child('usulRemisi').child($recId).child('status').val() === 'menunggu' && ", ""); } },
+  { nama: "usul: record usul-wali: usulan harus disetujui pada update yang sama (hanya lapisan record; recId===id + diputuskanOleh hanya sah pada status disetujui)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], `${USUL_BARU_T}.child('status').val() === 'disetujui' && `, ""); } },
+  { nama: "usul: record usul-wali: poin tidak dicocokkan dengan usulan", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], ` && newData.child('poin').val() === ${USUL_BARU_T}.child('poin').val()`, ""); } },
+  { nama: "usul: record usul-wali: nama tidak dicocokkan dengan usulan", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], ` && newData.child('nama').val() === ${USUL_BARU_T}.child('nama').val()`, ""); } },
+  { nama: "usul: record usul-wali: refId tidak dicocokkan dengan remisi usulan", ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], ` && newData.child('refId').val() === ${USUL_BARU_T}.child('remId').val()`, ""); } },
+  { nama: "usul: record usul-wali: jenis harus remisi (hanya lapisan record; usulan memeriksa jenis record yang sama)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], " && newData.child('jenis').val() === 'remisi' && newData.child('refId')", " && newData.child('refId')"); } },
+  { nama: "usul: record usul-wali: siswa harus sama dengan usulan (hanya lapisan record; usulan mencari record di siswa yang sama)", ekuivalen: true, ubah: (r) => { const n = r.discipline.records.$nis.$recId; n[".validate"] = ganti(n[".validate"], ` && ${USUL_BARU_T}.child('nis').val() === $nis`, ""); } },
+  { nama: "ambang: penanggung jawab bebas", ubah: (r) => { r.discipline.levels.$lvlId.penanggungJawab[".validate"] = "newData.isString()"; } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
 
@@ -468,12 +665,123 @@ let selamat = 0;
 const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
-// Kelompok: manual | piket | saran | kalender | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+// Kelompok: manual | piket | saran | kalender | wali | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
+const GRUP = (nama) => /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
+// ---- Pengelola emulator: mutasi memakai emulator SENDIRI (bukan firebase emulators:exec) supaya dapat direstart ----
+// Penyebab macet sebelumnya: satu emulator Java melayani ratusan run suite; memorinya menumpuk (+-3 GB) hingga tiap suite timeout.
+//  * restart tiap MUTASI_RESTART_N mutan (bawaan 15) dan tiap pindah grup;
+//  * namespace uji dihapus setelah tiap mutan;
+//  * batas waktu per mutan MUTASI_TIMEOUT_MS (bawaan 90 dtk) -> TIDAK TERVERIFIKASI, emulator direstart, mutan lain lanjut;
+//  * di akhir, mutan TIDAK TERVERIFIKASI diulang otomatis (satu kali) pada emulator baru.
+const DB_URL = process.env.DB_URL ?? "http://127.0.0.1:9000";
+const AUTH_URL = process.env.AUTH_URL ?? "http://127.0.0.1:9099";
+const RESTART_N = Number(process.env.MUTASI_RESTART_N ?? 15);
+const TIMEOUT_MS = Number(process.env.MUTASI_TIMEOUT_MS ?? 90000);
+const kelola = !process.env.FIREBASE_DATABASE_EMULATOR_HOST && !process.env.MUTASI_KERING; // di dalam emulators:exec: perilaku lama (tanpa restart)
+const tidur = (ms) => new Promise((s) => setTimeout(s, ms));
+let emu = null, restartKe = 0;
+
+const hidup = async (url) => { try { await fetch(url, { signal: AbortSignal.timeout(1500) }); return true; } catch { return false; } }; // respons HTTP apa pun = server hidup
+function bunuhPohon(pid) { try { execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" }); } catch { /* sudah mati */ } }
+function bunuhPort(port) {
+  try {
+    const out = execFileSync("netstat", ["-ano", "-p", "TCP"], { encoding: "utf8" });
+    const pid = out.split(/\r?\n/).find((l) => l.includes(`:${port} `) && /LISTENING/i.test(l))?.trim().split(/\s+/).pop();
+    if (pid && pid !== "0") bunuhPohon(pid);
+  } catch { /* tidak ada pemilik */ }
+}
+async function matikanEmulator() {
+  if (!emu) return;
+  bunuhPohon(emu.pid);
+  emu = null;
+  for (let k = 0; k < 20; k++) {
+    if (!(await hidup(`${DB_URL}/`)) && !(await hidup(`${AUTH_URL}/`))) return;
+    if (k === 5) { bunuhPort(9000); bunuhPort(9099); }
+    await tidur(1000);
+  }
+  throw new Error("emulator tidak mau berhenti (port 9000/9099 masih dipakai)");
+}
+async function mulaiEmulator(alasan) {
+  if (!kelola) return;
+  await matikanEmulator();
+  emu = spawn("npx firebase-tools emulators:start --only auth,database --project demo-presensi", { shell: true, stdio: "ignore", windowsHide: true });
+  for (let k = 0; k < 90; k++) {
+    if (await hidup(`${DB_URL}/`) && await hidup(`${AUTH_URL}/`)) { restartKe++; console.log(`  ↻ emulator ${restartKe === 1 ? "dimulai" : "direstart"} (${alasan})`); return; }
+    await tidur(1000);
+  }
+  throw new Error("emulator tidak siap dalam 90 detik");
+}
+process.on("exit", () => { if (emu) bunuhPohon(emu.pid); });
+
+/** Hapus data namespace uji supaya memori emulator tidak menumpuk. */
+async function bersihkanNs(ns) {
+  if (!ns) return;
+  try { await fetch(`${DB_URL}/.json?ns=${ns}`, { method: "DELETE", headers: { Authorization: "Bearer owner" }, signal: AbortSignal.timeout(5000) }); } catch { /* abaikan */ }
+}
+
+/** Jalankan suite rules.test dengan rules tertentu; kembalikan hasil + pemeriksaan hash rules yang dimuat emulator. */
+async function jalankanSuite(rules, nama) {
+  const file = join(dir, `${nama}.json`);
+  const teks = JSON.stringify(rules);
+  writeFileSync(file, teks);
+  const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file }, encoding: "utf8", timeout: TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
+  const stdout = r.stdout ?? "", stderr = r.stderr ?? "";
+  await bersihkanNs(/Namespace uji: (rules-[0-9a-f]+)/.exec(stdout)?.[1]);
+  const gagal = stdout.split("\n").filter((l) => l.startsWith("  ✗")).map((l) => l.replace("  ✗ ", ""));
+  const tertangkap = r.status === 1 && gagal.length > 0;
+  const waktuHabis = r.error?.code === "ETIMEDOUT" || r.signal === "SIGKILL";
+  const infra = !tertangkap && (waktuHabis || (r.status !== 0 && gagal.length === 0 && /fetch failed|Timeout|ECONNREFUSED|ECONNRESET/i.test(`${stderr}${stdout.slice(-400)}`)));
+  const hDiuji = hashRules(teks);
+  const hMuat = /RULES_SHA256=([0-9a-f]{64})/.exec(stdout)?.[1];
+  return { r: { status: r.status, stderr }, gagal, tertangkap, infra, hashOk: hMuat === hDiuji, hDiuji, hMuat };
+}
+
+/**
+ * MUTAN KONTROL (canary): dijalankan SEBELUM mutan sungguhan. Rules yang jelas-jelas bocor HARUS tertangkap suite. Bila tidak,
+ * lingkungan uji rusak (mis. emulator sisa memakai rules lama), seluruh hasil run tidak valid, dan run dibatalkan.
+ */
+const CANARY = [
+  { nama: "CANARY: semua boleh baca root", ubah: (r) => { r[".read"] = true; } },
+  { nama: "CANARY: semua boleh tulis root", ubah: (r) => { r[".write"] = true; } },
+];
+const mulaiWaktu = Date.now();
+if (!process.env.MUTASI_KERING) {
+  await mulaiEmulator("awal");
+  for (const [i, c] of CANARY.entries()) {
+    const rules = JSON.parse(JSON.stringify(buildRules()));
+    if (!process.env.MUTASI_CANARY_NETRAL) c.ubah(rules.rules); // MUTASI_CANARY_NETRAL=1: hanya untuk membuktikan bahwa run DIBATALKAN bila canary tidak tertangkap
+    const x = await jalankanSuite(rules, `canary${i}`);
+    if (!(x.tertangkap && x.hashOk)) {
+      console.error(`\n✗✗ ${c.nama} TIDAK TERTANGKAP${x.hashOk ? "" : " (hash rules di emulator tidak cocok)"}: RUN TIDAK VALID.`);
+      console.error("   Seluruh hasil mutasi pada run ini TIDAK VALID dan tidak ditampilkan. Periksa emulator sisa (taskkill /F /IM java.exe), lalu ulangi.");
+      await matikanEmulator();
+      process.exit(3);
+    }
+    console.log(`✓ ${c.nama}: tertangkap (${x.gagal.length} uji gagal), hash rules ${x.hDiuji.slice(0, 12)}… cocok`);
+  }
+}
 console.log(`Uji mutasi (${mutasi.length} mutasi)\n`);
+
+let sejakRestart = 0, grupSebelumnya = null;
+/** Jalankan satu mutan. Kembalikan "tertangkap" | "ekuivalen" | "lolos" | "infra". */
+async function jalankanMutan(i, m, rules, { ulang = false } = {}) {
+  const { r, gagal, tertangkap, infra, hashOk, hDiuji, hMuat } = await jalankanSuite(rules, `m${i}`);
+  sejakRestart++;
+  // suite yang MATI (emulator kelebihan beban/timeout) bukan bukti mutasi lolos maupun tertangkap: laporkan terpisah agar tidak salah tafsir
+  if (infra) { console.log(`? TIDAK TERVERIFIKASI${ulang ? " (setelah diulang)" : ""} (emulator macet/lewat ${TIMEOUT_MS / 1000} dtk; MUTASI_HANYA=${i + 1})  [${i + 1}] ${m.nama}`); return "infra"; }
+  // rules yang dimuat emulator HARUS sama dengan mutan yang dimaksud; bila tidak, hasil run ini tidak valid
+  if (!hashOk) { console.log(`? TIDAK VALID (hash rules di emulator ${hMuat?.slice(0, 12) ?? "tidak ada"} != mutan ${hDiuji.slice(0, 12)}; emulator sisa?)  [${i + 1}] ${m.nama}`); return "infra"; }
+  const label = tertangkap ? "✓ TERTANGKAP" : m.ekuivalen ? "≈ EKUIVALEN (tidak dapat dieksploitasi; lapisan kedua menahan)" : "✗ LOLOS (suite TIDAK mendeteksi!)";
+  console.log(`${ulang ? "  (ulang) " : ""}${label}  [${i + 1}] ${m.nama}`);
+  if (tertangkap) console.log(`    ${gagal.length} uji gagal, mis.: ${gagal.slice(0, 2).join(" | ")}`);
+  else console.log(`    status keluar ${r.status}${m.ekuivalen ? " (seluruh uji lain tetap lolos)" : `\n${r.stderr?.slice(0, 300) ?? ""}`}`);
+  return tertangkap ? "tertangkap" : m.ekuivalen ? "ekuivalen" : "lolos";
+}
+
+const antreanUlang = [];
 for (const [i, m] of mutasi.entries()) {
   const rules = JSON.parse(JSON.stringify(buildRules()));
   const sebelum = JSON.stringify(rules);
@@ -482,23 +790,35 @@ for (const [i, m] of mutasi.entries()) {
   if (grupDipilih !== "semua" && GRUP(m.nama) !== grupDipilih) continue;
   if (hanya && !hanya.has(i + 1)) continue; // MUTASI_HANYA=39,56 : jalankan subset saja (iterasi cepat)
   if (process.env.MUTASI_KERING) { console.log(`  pola OK [${i + 1}] ${m.nama}`); continue; } // hanya validasi pola, tanpa emulator
+  const g = GRUP(m.nama);
+  if (kelola && ((grupSebelumnya && g !== grupSebelumnya) || sejakRestart >= RESTART_N)) { await mulaiEmulator(g !== grupSebelumnya && grupSebelumnya ? `pindah grup ${grupSebelumnya} → ${g}` : `setiap ${RESTART_N} mutan`); sejakRestart = 0; }
+  grupSebelumnya = g;
   dijalankan++; if (m.ekuivalen) dijalankanEkuivalen++;
-  const file = join(dir, `m${i}.json`);
-  writeFileSync(file, JSON.stringify(rules));
-  const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file }, encoding: "utf8" });
-  const gagal = r.stdout.split("\n").filter((l) => l.startsWith("  ✗")).map((l) => l.replace("  ✗ ", ""));
-  const tertangkap = r.status === 1 && gagal.length > 0;
-  // suite yang MATI (emulator kelebihan beban/timeout) bukan bukti mutasi lolos maupun tertangkap: laporkan terpisah agar tidak salah tafsir
-  const infra = !tertangkap && r.status !== 0 && gagal.length === 0 && /fetch failed|Timeout|ECONNREFUSED|ECONNRESET/i.test(`${r.stderr}${r.stdout.slice(-400)}`);
-  if (infra) { tidakTerverifikasi.push(`[${i + 1}] ${m.nama}`); console.log(`? TIDAK TERVERIFIKASI (emulator macet, jalankan ulang dengan MUTASI_HANYA=${i + 1})  [${i + 1}] ${m.nama}`); continue; }
-  if (!tertangkap && !m.ekuivalen) selamat++;
-  const label = tertangkap ? "✓ TERTANGKAP" : m.ekuivalen ? "≈ EKUIVALEN (tidak dapat dieksploitasi; lapisan kedua menahan)" : "✗ LOLOS (suite TIDAK mendeteksi!)";
-  console.log(`${label}  [${i + 1}] ${m.nama}`);
-  if (tertangkap) console.log(`    ${gagal.length} uji gagal, mis.: ${gagal.slice(0, 2).join(" | ")}`);
-  else console.log(`    status keluar ${r.status}${m.ekuivalen ? " (seluruh uji lain tetap lolos)" : `\n${r.stderr?.slice(0, 300) ?? ""}`}`);
+  const hasil = await jalankanMutan(i, m, rules);
+  if (hasil === "infra") { antreanUlang.push(i); if (kelola) { await mulaiEmulator("setelah mutan macet"); sejakRestart = 0; } }
+  else if (hasil === "lolos") selamat++;
 }
+
+// Ulangi otomatis (satu kali) mutan yang TIDAK TERVERIFIKASI pada emulator baru.
+if (antreanUlang.length && kelola) {
+  console.log(`\nMengulang ${antreanUlang.length} mutan TIDAK TERVERIFIKASI pada emulator baru…`);
+  await mulaiEmulator("ulang mutan tak terverifikasi"); sejakRestart = 0;
+  for (const i of antreanUlang) {
+    const m = mutasi[i];
+    const rules = JSON.parse(JSON.stringify(buildRules()));
+    m.ubah(rules.rules);
+    if (sejakRestart >= RESTART_N) { await mulaiEmulator(`setiap ${RESTART_N} mutan`); sejakRestart = 0; }
+    const hasil = await jalankanMutan(i, m, rules, { ulang: true });
+    if (hasil === "infra") { tidakTerverifikasi.push(`[${i + 1}] ${m.nama}`); await mulaiEmulator("setelah mutan macet"); sejakRestart = 0; }
+    else if (hasil === "lolos") selamat++;
+  }
+} else for (const i of antreanUlang) tidakTerverifikasi.push(`[${i + 1}] ${mutasi[i].nama}`);
+
+await matikanEmulator();
+const menit = ((Date.now() - mulaiWaktu) / 60000).toFixed(1);
 console.log(`
 ${dijalankan - dijalankanEkuivalen - selamat}/${dijalankan - dijalankanEkuivalen} mutasi non-ekuivalen tertangkap (${dijalankanEkuivalen} ekuivalen terdokumentasi) [grup: ${grupDipilih}${process.env.MUTASI_HANYA ? ", subset" : ""}]`);
+console.log(`Durasi: ${menit} menit, emulator dimulai/direstart ${restartKe}×`);
 if (tidakTerverifikasi.length) console.log(`
-${tidakTerverifikasi.length} mutasi TIDAK TERVERIFIKASI (emulator macet): jalankan ulang dalam kelompok lebih kecil, mis. MUTASI_HANYA=${tidakTerverifikasi.map((x) => x.match(/\d+/)[0]).join(",")}`);
+${tidakTerverifikasi.length} mutasi TIDAK TERVERIFIKASI (emulator macet, juga setelah diulang): jalankan ulang, mis. MUTASI_HANYA=${tidakTerverifikasi.map((x) => x.match(/\d+/)[0]).join(",")}`);
 process.exit(selamat ? 1 : tidakTerverifikasi.length ? 2 : 0);

@@ -4,7 +4,7 @@ SUMBER TUNGGAL: berkas ini disalin ke sel notebook `Setup_Migrasi_Firebase.ipynb
 Dijalankan dari Colab (lihat notebook) atau terhadap Emulator untuk uji (`npm run test:migrasi`).
 
 PENTING: Admin SDK MELEWATI Security Rules. Karena itu berkas ini:
-  * hanya boleh menulis ke JALUR YANG DIIZINKAN (config/, profiles/, parents/, attendance/, log/, izin/) dan ke
+  * hanya boleh menulis ke JALUR YANG DIIZINKAN (config/, siswaKelas/, profiles/, parents/, attendance/, log/, izin/) dan ke
     roles/{uid} milik admin & alat sendiri; semua jalur lain DITOLAK (roles milik kepala/waka/piket, staff, discipline,
     lessons*, validasi*, izinMeta, activity*, piket*, manualTap*, sistem) agar data modul baru tidak tertimpa/terhapus;
   * memvalidasi setiap nilai dengan aturan yang sama dengan database.rules.json (format jam, panjang, nilai izin ...);
@@ -31,7 +31,7 @@ RE_TGL = re.compile(r"^20[0-9]{2}-[01][0-9]-[0-3][0-9]$")
 HARI_VALID = {"Semua", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"}
 
 # Jalur yang BOLEH ditulis (awalan). Selain itu -> ditolak, apa pun alasannya.
-JALUR_BOLEH = ("config/students/", "config/schedule", "config/version", "profiles/", "parents/", "attendance/", "log/", "izin/")
+JALUR_BOLEH = ("config/students/", "siswaKelas/", "config/schedule", "config/version", "profiles/", "parents/", "attendance/", "log/", "izin/")
 # Jalur yang tidak pernah boleh disentuh (daftar eksplisit agar pesan galatnya jelas; JALUR_BOLEH sudah menolak semuanya)
 JALUR_TERLARANG = ("staff", "discipline", "lessons", "lessonsByStudent", "validasi", "validasiByStudent", "izinMeta",
                    "activity", "activityLast", "piketRoster", "piketAkun", "piketPerangkat", "piketHarian",
@@ -40,6 +40,11 @@ JALUR_TERLARANG = ("staff", "discipline", "lessons", "lessonsByStudent", "valida
 
 class MigrasiError(Exception):
     pass
+
+
+def kunci_kelas(kelas: str) -> str:
+    """Kunci kelas untuk indeks siswaKelas: SAMA dengan encodeKelas() di web (src/lib/perjam.ts). Karakter terlarang kunci RTDB -> %XX."""
+    return re.sub(r"[%.#$\[\]/]", lambda m: "%%%02X" % ord(m.group(0)), kelas)
 
 
 def email_ortu(nis: str, ver: int) -> str:
@@ -68,13 +73,15 @@ def _periksa_jalur(path: str):
         raise MigrasiError(f"jalur '{path}' tidak boleh ditulis oleh skrip migrasi (data modul lain dilindungi)")
 
 
-def _update_batch(paths: dict, label: str, dry_run: bool):
+def _update_batch(paths: dict, label: str, dry_run: bool, unit: int = 1):
+    """unit = jumlah path yang harus selalu berada dalam satu update (satu siswa = config + profil + indeks kelas): batch tidak memecahnya."""
     for k in paths:
         _periksa_jalur(k)
     items = list(paths.items())
+    ukuran = max(unit, (BATCH // unit) * unit)
     if not dry_run:
-        for i in range(0, len(items), BATCH):
-            db.reference("/").update(dict(items[i:i + BATCH]))
+        for i in range(0, len(items), ukuran):
+            db.reference("/").update(dict(items[i:i + ukuran]))
     print(f"  {label}: {len(items)} path {'AKAN ditulis (dry-run)' if dry_run else 'ditulis'}")
 
 
@@ -187,7 +194,20 @@ def migrasi_siswa(induk_rows: list, csv_path: str, dry_run: bool = True) -> dict
         # per-field: JANGAN menimpa profiles/{nis}/aktifSejak (tanggal mulai dihitung hari efektif)
         paths[f"profiles/{s['nis']}/nama"] = s["nama"]
         paths[f"profiles/{s['nis']}/kelas"] = s["kelas"]
-    _update_batch(paths, "siswa & profil", dry_run)
+        # WAJIB: setiap penulisan config/students juga menulis indeks siswaKelas (dasar wewenang wali kelas) dalam update yang sama
+        paths[f"siswaKelas/{s['nis']}"] = kunci_kelas(s["kelas"])
+    _update_batch(paths, "siswa, profil & indeks kelas", dry_run, unit=4)
+
+    # laporan indeks siswaKelas terhadap data yang ADA di database (dry-run ikut melaporkan; hanya membaca)
+    ada_idx = db.reference("siswaKelas").get() or {}
+    nis_baru = {s["nis"]: kunci_kelas(s["kelas"]) for s in siswa.values()}
+    indeks = {
+        "baru": sum(1 for n in nis_baru if n not in ada_idx),
+        "berubah": sum(1 for n, k in nis_baru.items() if n in ada_idx and ada_idx[n] != k),
+        "sama": sum(1 for n, k in nis_baru.items() if ada_idx.get(n) == k),
+        "usang": sum(1 for n in ada_idx if n not in nis_baru),   # hanya dilaporkan (siswa lain mungkin sah); bersihkan lewat kartu "Indeks kelas" di web
+    }
+    print(f"  indeks siswaKelas: {indeks['baru']} baru, {indeks['berubah']} berubah kelas, {indeks['sama']} sudah sesuai, {indeks['usang']} usang (tidak dihapus oleh migrasi){' (dry-run: belum ditulis)' if dry_run else ''}")
 
     # Akun ortu: hanya dibuat jika belum ada -> PIN lama tidak berubah saat skrip diulang
     ada = db.reference("parents").get() or {}
@@ -214,7 +234,7 @@ def migrasi_siswa(induk_rows: list, csv_path: str, dry_run: bool = True) -> dict
             w.writerow(["NIS", "Nama", "Kelas", "PIN"])
             w.writerows(sorted(baru, key=lambda x: (x[2], x[1])))
     print(f"  {len(siswa)} siswa valid, {len(baru)} akun ortu baru{' (dry-run: belum dibuat)' if dry_run else ''}, {len(masalah)} baris dilewati")
-    return {"nis_ke_uid": nis_ke_uid, "masalah": masalah, "ortu_baru": len(baru)}
+    return {"nis_ke_uid": nis_ke_uid, "masalah": masalah, "ortu_baru": len(baru), "indeks": indeks}
 
 
 # ------------------------------------------------------------------ 4. jadwal

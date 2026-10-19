@@ -31,7 +31,7 @@ export type InputRecord = {
   tanggal: string;
   ta: string;
   takziran?: string;
-  sumber?: "manual" | "saran";
+  sumber?: DiscRecord["sumber"];
   catatan?: string; // catatan internal -> discipline/notes
 };
 

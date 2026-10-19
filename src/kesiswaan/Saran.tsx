@@ -5,7 +5,7 @@ import { useAdminData } from "../admin/AdminData";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
 import { initials, toneOf } from "../lib/attendance";
 import { SEMUA_TIPE_SARAN, TIPE_LABEL, cariAturanBawaan, type Saran } from "../lib/saran";
-import { addDays, formatTanggal, weekday } from "../lib/time";
+import { addDays, formatTanggal, hariKerjaSebelum, weekday } from "../lib/time";
 import { simpanAutoMap } from "../services/discipline";
 import { abaikanSaran, setujuiSaran, SudahDiputuskan } from "../services/saran";
 import { rentang, useSaran } from "./useSaran";
@@ -17,7 +17,7 @@ export default function SaranHalaman() {
   const bisaTulis = useBisaTulisKesiswaan();
   const actor = useActor();
   const notify = useToast();
-  const [dari, setDari] = useState(addDays(today, -1));
+  const [dari, setDari] = useState(hariKerjaSebelum(today)); // Senin: mulai Sabtu (Minggu libur)
   const [sampai, setSampai] = useState(today);
   const tanggal = useMemo(() => rentang(dari, sampai), [dari, sampai]);
   const { saran, loading, error, rules, autoMap } = useSaran(tanggal);

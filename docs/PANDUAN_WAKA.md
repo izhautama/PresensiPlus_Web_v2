@@ -36,6 +36,22 @@ Untuk: Waka Kesiswaan
 3. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.
 4. Ambang hari efektif dan Hitung ulang rentang tanggal ada di halaman Kalender.
 
+## Wali kelas
+
+1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu pilih kelas utama (tepat satu kelas).
+2. Ubah kelas, Cabut, dan Pasang kembali tersedia pada tiap baris. Kelas tambahan dan pergantian massal per tahun ajaran hanya dapat diatur admin.
+3. Kelas yang sudah punya wali tidak dapat diberi wali kedua oleh Waka; hubungi admin.
+
+> Catatan: Wali hanya melihat siswa kelasnya, mencatat Izin/Sakit seharian dan pelanggaran Ringan atau bertakziran; tidak dapat memberi Dispensasi, mengubah presensi per jam, atau memvalidasi Alfa. Semua tindakannya tercatat di log aktivitas.
+
+## Pembinaan dan usulan remisi
+
+1. Menu Pembinaan: rekap pembinaan oleh wali kelas dan pejabat. Saring menurut tahun ajaran, status, atau kelas; tekan Unduh CSV untuk arsip. Anda dapat mencatat atau mengoreksi pembinaan, termasuk yang sudah Selesai.
+2. Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.
+3. Tata tertib, tab Ambang pembinaan: atur Penanggung jawab tiap ambang (wali kelas, BK, Kepala, atau Waka). Pada data lama tekan Isi penanggung jawab bawaan.
+
+> Catatan: Remisi Tanpa prestasi hanya untuk siswa yang punya catatan pelanggaran pada tahun ajaran ini; usulan yang tidak memenuhi syarat tidak dapat disetujui.
+
 ## Pelanggaran, piket, dan pengawasan
 
 1. Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (dengan alasan), atau pulihkan.

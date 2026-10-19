@@ -3,7 +3,7 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { PROJECTS } from "./setup.mjs";
-import { hariNyata, hitungTanggal } from "./tanggal.mjs";
+import { hitungTanggal } from "./tanggal.mjs";
 
 const T = hitungTanggal(); // sama dengan setup.mjs: tanggal relatif hari nyata
 
@@ -12,14 +12,35 @@ const SEKARANG = T.waktu; // Rabu 16:00 WIB: hari kerja, jendela pulang default 
 const MINGGU = T.waktuMinggu; //  Minggu 16:00 WIB: libur
 
 test.describe.configure({ mode: "serial" });
+// Aplikasi memakai jam SERVER dan rules memeriksa hari server NYATA: skenario hari kerja butuh hari nyata Senin-Sabtu.
+test.beforeEach(({}, ti) => { ti.skip(!T.dapatDijalankan, "Hari nyata = Minggu (libur): skenario hari kerja E2E tidak dapat dijalankan (jam server nyata). Jalankan Senin-Sabtu."); });
 
 const proyek = () => test.info().project.name; // "desktop" | "mobile"
 const emailStaf = (peran) => `${peran}.${proyek()}@e2e.test`;
 
-/** Siapkan halaman: waktu tetap, blok semua request non-lokal (jaminan tidak menyentuh produksi), kumpulkan galat. */
-async function siapkan(page, waktu = SEKARANG) {
+/** Ganti `ts` pada jabat tangan RTDB (server -> klien) agar jam SERVER yang dilihat aplikasi = `ts` (deterministik). */
+function ubahJabatTangan(pesan, ts) {
+  if (typeof pesan !== "string" || !pesan.includes('"t":"h"')) return pesan;
+  try {
+    const j = JSON.parse(pesan);
+    if (j?.d?.t === "h" && j.d.d) { j.d.d.ts = ts; return JSON.stringify(j); }
+  } catch { /* bukan JSON: teruskan apa adanya */ }
+  return pesan;
+}
+
+/**
+ * Siapkan halaman: blok semua request non-lokal (jaminan tidak menyentuh produksi), kumpulkan galat.
+ * Jam SERVER uji = `waktu` (jabat tangan RTDB dipatok ke `waktu`, jadi tanggal/jam yang dipakai aplikasi deterministik).
+ * Jam PERANGKAT = `opsi.perangkat` (bawaan = `waktu`); isi berbeda untuk menguji jam perangkat yang salah.
+ */
+async function siapkan(page, waktu = SEKARANG, opsi = {}) {
   const laporan = { permission: [], error: [], nonLokal: [], sockets: [] }; // sockets: koneksi WebSocket RTDB (uji batas 100 koneksi)
-  await page.clock.setFixedTime(waktu);
+  await page.clock.setFixedTime(opsi.perangkat ?? waktu);
+  await page.routeWebSocket(/\/\.ws\?/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => ws.send(ubahJabatTangan(m, waktu.getTime())));
+  });
   await page.route("**/*", (route) => {
     const u = new URL(route.request().url());
     if (["127.0.0.1", "localhost"].includes(u.hostname) || u.protocol === "data:" || u.protocol === "blob:") return route.continue();
@@ -54,7 +75,7 @@ async function loginStaf(page, peran) {
   await page.locator("#email").fill(emailStaf(peran));
   await page.locator("#password").fill(PASSWORD);
   await page.locator("button.login-submit").click();
-  await page.waitForURL(/\/(admin|kepala|waka|piket)$/);
+  await page.waitForURL(/\/(admin|kepala|waka|piket|wali)$/);
   await sehat(page);
 }
 
@@ -73,7 +94,9 @@ async function menu(page, nama) {
   await page.locator("aside.sidebar").waitFor({ state: "attached" }); // layout (chunk lazy) harus sudah termuat sebelum menilai hamburger
   const burger = page.locator("button.mobile-menu");
   if (await burger.isVisible()) await burger.click();
-  await page.locator("aside.sidebar").getByRole("link", { name: nama, exact: true }).click();
+  // lencana menu (mis. "Pembinaan 2 menunggu") menambah nama aksesibel: cocokkan nama dengan atau tanpa lencana
+  const polos = nama.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  await page.locator("aside.sidebar").getByRole("link", { name: new RegExp(`^${polos}( \\d+ menunggu)?$`) }).click();
   await sehat(page);
 }
 const judul = (page) => page.locator(".page-title p");
@@ -96,9 +119,10 @@ async function pilihSiswa(page, dialog, kata, nama) {
 
 /** Buang paling banyak `n` penolakan "update at /" (+ frame WebSocket pendampingnya) yang memang diuji; selebihnya tetap pelanggaran. */
 function kecualikan(l, n = 1) {
-  let sisa = n, sisaWs = n;
+  let sisa = n, sisaWs = n, sisaLog = n + 2; // log best-effort: login + penulisan otomatis (hari efektif) ditolak pada hari server palsu
   return { ...l, permission: l.permission.filter((x) => {
     if (/update at \/ failed: permission_denied/.test(x) && sisa > 0) { sisa--; return false; }
+    if (/Gagal mencatat aktivitas|Log aktivitas ditolak; data tersimpan tanpa log/.test(x) && sisaLog > 0) { sisaLog--; return false; } // log aktivitas best-effort ditolak (hari server palsu != hari nyata)
     if (x.startsWith("WebSocket:") && sisaWs > 0) { sisaWs--; return false; }
     return true;
   }) };
@@ -757,12 +781,12 @@ test("waka melihat hasil input piket: laporan izin & surat, nama petugas, menimp
 });
 
 test("piket pada hari Minggu (libur): tidak ada daftar belum tap", async ({ page }) => {
-  const lap = await siapkan(page, MINGGU);
+  const lap = await siapkan(page, MINGGU); // jam server palsu (Minggu) != hari nyata: log aktivitas (best-effort) ditolak rules, memang begitu
   await masukPiket(page);
   await expect(page.getByTestId("belum-tap")).toHaveText("0");
   await expect(page.getByText("Hari Minggu — libur").first()).toBeVisible();
   await expect(page.locator(".piket-grid[data-nis]")).toHaveCount(0);
-  bersih(lap, "piket (Minggu)");
+  bersih(kecualikan(lap, 3), "piket (Minggu)");
 });
 
 test("hari Minggu (libur): tidak ada saran dan tidak ada daftar belum tap", async ({ page }) => {
@@ -786,7 +810,7 @@ test("hari Minggu (libur): tidak ada saran dan tidak ada daftar belum tap", asyn
 
   await menu(page, "Presensi per jam");
   await expect(page.getByText("Hari Minggu — libur")).toBeVisible();
-  bersih(lap, "waka (Minggu)");
+  bersih(kecualikan(lap, 3), "waka (Minggu)");
 });
 
 // ===================================================================== TAHAP B (lanjutan; bergantung pada aktivitas piket di atas)
@@ -795,8 +819,8 @@ test("log aktivitas: waka & admin melihat petugas + perangkat + 'Perangkat baru'
   await loginStaf(page, "waka");
   await menu(page, "Log aktivitas");
   await expect(judul(page)).toHaveText("Log aktivitas akun");
-  // kunci `activity/{tgl}` memakai jam SERVER (nyata); jam browser dipalsukan oleh uji
-  await page.locator("input[type=date]").fill(hariNyata());
+  // tanggal bawaan = tanggal SERVER (kunci `activity/{tgl}` memakai jam server): entri tampil tanpa memilih tanggal
+  await expect(page.locator("input[type=date]")).toHaveValue(T.hariIni);
   await expect(page.getByText("Nama petugas dipilih sendiri oleh pengguna")).toBeVisible();
   await expect(page.getByTestId("log-ringkasan")).toHaveText(/^\d+ aktivitas, [1-9]\d* petugas, [1-9]\d* perangkat baru$/);
   const baris = page.locator(".table-row.log-grid");
@@ -831,7 +855,7 @@ test("log aktivitas: waka & admin melihat petugas + perangkat + 'Perangkat baru'
   const lapA = await siapkan(pa);
   await loginStaf(pa, "admin");
   await menu(pa, "Log aktivitas");
-  await pa.locator("input[type=date]").fill(hariNyata());
+  await expect(pa.locator("input[type=date]")).toHaveValue(T.hariIni);
   await expect(pa.getByTestId("log-ringkasan")).toHaveText(/^\d+ aktivitas, [1-9]\d* petugas, [1-9]\d* perangkat baru$/);
   await expect(pa.locator(".table-row.log-grid", { hasText: "Bu Rina" }).first()).toBeVisible();
   bersih(lapA, "admin (log aktivitas)");
@@ -1217,7 +1241,7 @@ test("presensi manual — orang tua melihat 'Hadir (dicatat manual: Lupa KTM)'; 
   await menu(pm, "Presensi manual");
   await expect(pm.getByText("Hari Minggu — libur").first()).toBeVisible();
   await expect(pm.getByRole("button", { name: "Hadir manual" })).toHaveCount(0);
-  bersih(lapM, "piket (Minggu, presensi manual)");
+  bersih(kecualikan(lapM, 3), "piket (Minggu, presensi manual)");
   await kM.close();
 });
 
@@ -1565,4 +1589,421 @@ test("panduan: menu Panduan di setiap peran (statis) + tautan di portal orang tu
   await expect(po).toHaveURL(/\/siswa\/111$/);
   bersih(lapO, "ortu (panduan)");
   await kO.close();
+});
+
+// ===================================================================== v2.3 — WALI KELAS (Tahap 1)
+const isiFormWali = async (dlg, { nama, email, utama, tambahan = [] }) => {
+  await dlg.getByLabel("Nama lengkap guru").fill(nama);
+  await dlg.getByLabel("Email (harus email asli)").fill(email);
+  await dlg.getByLabel("Password sementara").fill("sementara-123");
+  await dlg.getByLabel("Ulangi password").fill("sementara-123");
+  await dlg.getByLabel("Kelas utama").selectOption(utama);
+  for (const k of tambahan) await dlg.getByRole("group", { name: "Kelas tambahan" }).getByLabel(k).check();
+};
+
+test("wali: admin membuat wali dengan 2 kelas; waka membuat wali 1 kelas tanpa opsi kelas tambahan", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  await menu(page, "Wali kelas");
+  await expect(judul(page)).toHaveText("Wali kelas");
+  await expect(page.getByTestId("daftar-wali")).toContainText("Bu Wali X IPA");
+  await page.getByRole("button", { name: "Tambah wali kelas" }).click();
+  const dlg = page.getByRole("dialog", { name: "Tambah wali kelas" });
+  await expect(dlg.getByRole("group", { name: "Kelas tambahan" })).toBeVisible(); // admin: kelas tambahan tersedia
+  await isiFormWali(dlg, { nama: "Pak Dua Kelas", email: `wali2.${proyek()}@e2e.test`, utama: "XI IPS", tambahan: ["X IPA"] });
+  await expect(dlg.getByTestId("wali-bentrok")).toContainText("sudah dipegang Bu Wali X IPA"); // peringatan: kelas X IPA sudah punya wali
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Akun wali Pak Dua Kelas dibuat");
+  const baris = page.locator("[data-testid=daftar-wali] [data-uid]", { hasText: "Pak Dua Kelas" });
+  await expect(baris).toContainText("Utama: XI IPS");
+  await expect(baris).toContainText("tambahan: X IPA");
+  bersih(lap, "admin (wali kelas)");
+
+  // waka: boleh membuat akun wali, HANYA kelas utama (tidak ada opsi kelas tambahan)
+  const k = await browser.newContext(opsiKonteks());
+  const pw = await k.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await menu(pw, "Wali kelas");
+  await expect(pw.getByTestId("daftar-wali")).toContainText("Pak Dua Kelas");
+  await pw.getByRole("button", { name: "Tambah wali kelas" }).click();
+  const d2 = pw.getByRole("dialog", { name: "Tambah wali kelas" });
+  await expect(d2.getByRole("group", { name: "Kelas tambahan" })).toHaveCount(0);
+  await expect(pw.getByTestId("wali-per-ta")).toHaveCount(0); // pembaruan massal & sinkronisasi indeks: admin saja
+  await isiFormWali(d2, { nama: "Bu Satu Kelas", email: `wali3.${proyek()}@e2e.test`, utama: "X IPA" });
+  await d2.getByRole("button", { name: "Simpan" }).click();
+  await expect(d2).toContainText("sudah punya wali"); // wali kedua untuk satu kelas: hanya admin
+  await d2.getByRole("button", { name: "Batal" }).click();
+  bersih(lapW, "waka (wali kelas)");
+  await k.close();
+});
+
+test("wali: hanya melihat siswa kelas binaan, Izin/Sakit tanpa Dispensasi, pelanggaran ringan, kelas lain terkunci", async ({ page }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "wali");
+  await expect(page).toHaveURL(/\/wali$/);
+  await expect(page.getByTestId("petugas-aktif")).toHaveCount(0); // akun per guru: tanpa layar pilih petugas
+  await expect(page.getByText("Siapa yang bertugas?")).toHaveCount(0);
+  const sidebar = page.locator("aside.sidebar");
+  for (const n of ["Izin & kehadiran", "Siswa kelas", "Pelanggaran", "Pengaturan"]) await expect(sidebar.getByRole("link", { name: n, exact: true })).toHaveCount(1); // Pengaturan = ganti password akun sendiri
+  for (const n of ["Laporan", "Tata tertib", "Jejak audit", "Validasi harian", "Log aktivitas", "Status alat"]) await expect(sidebar.getByRole("link", { name: n, exact: true })).toHaveCount(0);
+  for (const tujuan of ["/waka", "/admin", "/piket", "/kepala/siswa"]) { await page.goto(tujuan); await expect(page).toHaveURL(/\/wali$/); }
+
+  // daftar siswa: hanya X IPA (333,444,555,666,777); XI IPS (111,222) tidak tampil
+  await menu(page, "Siswa kelas");
+  for (const nis of ["333", "444", "555", "666", "777"]) await expect(page.locator(`[data-nis='${nis}']`)).toHaveCount(1);
+  for (const nis of ["111", "222"]) await expect(page.locator(`[data-nis='${nis}']`)).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("ANDI TEST");
+  await sehat(page);
+
+  // pelanggaran ringan: hanya siswa binaan di pemilih, poin dari master, catatan sendiri, hapus (soft delete)
+  await menu(page, "Pelanggaran");
+  const opsi = (t) => page.locator("button[role=option]", { hasText: t });
+  await expect(opsi("Berkelahi")).toHaveCount(0);
+  await page.getByPlaceholder("Ketik NIS atau nama siswa...").fill("111");
+  await expect(page.locator(".picker-list li[role=option]", { hasText: "ANDI TEST" })).toHaveCount(0); // siswa kelas lain tidak muncul
+  await page.getByPlaceholder("Ketik NIS atau nama siswa...").fill("333");
+  await page.locator(".picker-list li[role=option]", { hasText: "CITRA TEST" }).click();
+  await opsi("Rambut tidak sesuai ketentuan").click();
+  await page.getByRole("button", { name: /^Catat/ }).click();
+  await expect(toast(page)).toContainText("Pelanggaran dicatat untuk 1 siswa");
+  const baris = page.locator("[data-testid=catatan-piket] .catatan-piket-row");
+  await expect(baris).toHaveCount(1);
+  await expect(baris).toContainText("CITRA TEST");
+  await page.getByRole("button", { name: /Hapus catatan CITRA TEST/ }).click();
+  const dlg = page.getByRole("dialog", { name: "Hapus catatan piket?" });
+  await dlg.getByLabel("Alasan penghapusan (wajib)").fill("salah siswa");
+  await dlg.getByRole("button", { name: "Hapus", exact: true }).click();
+  await expect(toast(page)).toContainText("Catatan dihapus");
+  await expect(baris).toHaveCount(0);
+
+  // izin: tidak ada Dispensasi / Hadir manual; beranda hanya siswa binaan
+  await menu(page, "Izin & kehadiran");
+  await expect(page.getByRole("button", { name: "Dispensasi" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Hadir manual" })).toHaveCount(0);
+  await expect(page.locator(".piket-grid[data-nis='111'], .piket-grid[data-nis='222']")).toHaveCount(0);
+  await menu(page, "Pengaturan");
+  await expect(page.getByText("Ganti password").first()).toBeVisible();
+  bersih(lap, "wali (siswa kelas, pelanggaran, izin)");
+});
+
+// ===================================================================== v2.3 — WALI KELAS (Tahap 2): indeks kelas, pembinaan, usul remisi
+const dbRest = async (method, path, body) => {
+  const res = await fetch(`${DB_URL}/${path}.json?ns=${PROJECTS[proyek()].ns}`, { method, headers: OWNER, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!res.ok) throw new Error(`REST ${method} ${path}: ${res.status} ${await res.text()}`);
+  return res.json();
+};
+const taDari = (tgl) => { const y = Number(tgl.slice(0, 4)), m = Number(tgl.slice(5, 7)); return m >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`; };
+async function loginDengan(page, email, password) {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Admin" }).click();
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(password);
+  await page.locator("button.login-submit").click();
+  await page.waitForURL(/\/(admin|kepala|waka|piket|wali)$/);
+  await sehat(page);
+}
+const uidWaliSeed = async () => {
+  const staff = await dbRest("GET", "staff");
+  return Object.entries(staff).find(([, s]) => s.email === `wali.${proyek()}@e2e.test`)?.[0];
+};
+
+test("admin: kartu Indeks kelas — selisih terdeteksi otomatis, Perbaiki (dry-run lalu terapkan), Wali kelas per TA menyinkronkan indeks", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  const kartu = page.getByTestId("kartu-indeks");
+  await expect(kartu, "pemeriksaan otomatis saat Dashboard dibuka").not.toHaveAttribute("data-status", /^(memeriksa|)$/);
+
+  // siswa uji yang dibuat lewat REST oleh uji lain tidak punya indeks: kartu menemukannya, Perbaiki menyelesaikannya
+  if ((await kartu.getAttribute("data-status")) === "selisih") {
+    await page.getByRole("button", { name: "Perbaiki", exact: true }).click();
+    const dlg0 = page.getByRole("dialog", { name: "Perbaiki indeks kelas" });
+    await expect(dlg0.getByTestId("rencana-ringkasan")).toContainText("path akan ditulis");
+    await dlg0.getByRole("button", { name: "Terapkan perbaikan" }).click();
+    await expect(toast(page)).toContainText("path diperbaiki");
+  }
+  await expect(kartu).toHaveAttribute("data-status", "konsisten");
+
+  // rusak 4 hal: kelas siswa beda, indeks hilang, indeks usang, cermin akun wali beda
+  const uid = await uidWaliSeed();
+  await dbRest("PUT", "siswaKelas/333", "XI IPS");
+  await dbRest("DELETE", "siswaKelas/777");
+  await dbRest("PUT", "siswaKelas/9999", "X IPA");
+  await dbRest("PUT", `waliAkun/${uid}/kelasUtama`, "XI IPS");
+  await page.goto("/admin"); // pemeriksaan berjalan otomatis
+  await expect(kartu).toHaveAttribute("data-selisih", "4");
+  await expect(page.getByTestId("indeks-peringatan")).toContainText("4 selisih");
+  for (const nis of ["333", "777", "9999"]) await expect(page.getByTestId("selisih-siswa").locator(`[data-nis='${nis}']`)).toHaveCount(1);
+  await expect(page.getByTestId("selisih-akun")).toContainText("Bu Wali X IPA");
+  await expect(page.getByTestId("selisih-akun")).toContainText("kelas utama");
+
+  // dry-run dulu: tidak ada yang ditulis sebelum "Terapkan"
+  await page.getByRole("button", { name: "Perbaiki", exact: true }).click();
+  const dlg = page.getByRole("dialog", { name: "Perbaiki indeks kelas" });
+  await expect(dlg.getByTestId("rencana-ringkasan")).toContainText("4 path akan ditulis");
+  expect(await dbRest("GET", "siswaKelas/333"), "dry-run tidak menulis").toBe("XI IPS");
+  await dlg.getByRole("button", { name: "Terapkan perbaikan" }).click();
+  await expect(toast(page)).toContainText("4 path diperbaiki");
+  await expect(kartu).toHaveAttribute("data-status", "konsisten");
+  expect(await dbRest("GET", "siswaKelas/333")).toBe("X IPA");
+  expect(await dbRest("GET", "siswaKelas/777")).toBe("X IPA");
+  expect(await dbRest("GET", "siswaKelas/9999")).toBeNull();
+  expect(await dbRest("GET", `waliAkun/${uid}/kelasUtama`)).toBe("X IPA");
+
+  // perbaikan tercatat di log aktivitas
+  const semuaLog = Object.values(await dbRest("GET", "activity")).flatMap((per) => Object.values(per));
+  expect(semuaLog.filter((e) => e.aksi === "perbaiki-indeks" && /Perbaiki konsistensi/.test(e.detail) && e.peran === "admin").length, "entri log 'perbaiki-indeks' tercatat").toBeGreaterThanOrEqual(1);
+
+  // halaman Wali kelas (admin) memuat kartu yang sama; pembaruan massal wajib menyinkronkan indeks pada update yang sama
+  await menu(page, "Wali kelas");
+  await expect(page.getByTestId("kartu-indeks")).toHaveAttribute("data-status", "konsisten");
+  await dbRest("PUT", "siswaKelas/444", "XI IPS");
+  const perTa = page.getByTestId("wali-per-ta");
+  await perTa.getByLabel("Kelas utama Bu Wali X IPA").selectOption("XI IPS");
+  await perTa.getByRole("button", { name: /Simpan perubahan/ }).click();
+  await expect(toast(page)).toContainText("indeks siswa-kelas disinkronkan (1 selisih)");
+  expect(await dbRest("GET", "siswaKelas/444"), "indeks ikut tersinkron di update yang sama").toBe("X IPA");
+  await perTa.getByLabel("Kelas utama Bu Wali X IPA").selectOption("X IPA"); // kembalikan
+  await perTa.getByRole("button", { name: /Simpan perubahan/ }).click();
+  await expect(toast(page)).toContainText("0 selisih");
+  expect(await dbRest("GET", `staff/${uid}/kelasUtama`)).toBe("X IPA");
+  bersih(lap, "admin (indeks kelas)");
+
+  // waka tidak melihat kartu (hanya admin membaca config/students dan menulis indeks)
+  const k = await browser.newContext(opsiKonteks());
+  const pw = await k.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await menu(pw, "Wali kelas");
+  await expect(pw.getByTestId("kartu-indeks")).toHaveCount(0);
+  bersih(lapW, "waka (wali kelas, tanpa kartu indeks)");
+  await k.close();
+});
+
+test("waka: penanggung jawab ambang — data lama tanpa penanggung jawab diisi bawaan", async ({ page }) => {
+  const lap = await siapkan(page);
+  for (const id of ["lv01", "lv02", "lv03", "lv04", "lv05", "lv06"]) await dbRest("DELETE", `discipline/levels/${id}/penanggungJawab`);
+  await loginStaf(page, "waka");
+  await menu(page, "Tata tertib");
+  await page.getByRole("tab", { name: "Ambang pembinaan" }).click();
+  await expect(page.getByTestId("pj-belum")).toBeVisible();
+  await expect(page.locator("[data-level=lv01] [data-testid=pj-level]")).toContainText("belum diatur");
+  await page.getByRole("button", { name: "Isi penanggung jawab bawaan" }).click();
+  await expect(toast(page)).toContainText("Penanggung jawab diisi untuk 6 ambang");
+  await expect(page.getByTestId("pj-belum")).toHaveCount(0);
+  await expect(page.locator("[data-level=lv01] [data-testid=pj-level]")).toContainText("Wali kelas");
+  await expect(page.locator("[data-level=lv02] [data-testid=pj-level]")).toContainText("BK");
+  await expect(page.locator("[data-level=lv03] [data-testid=pj-level]")).toContainText("Kepala Madrasah");
+  await expect(page.locator("[data-level=lv05] [data-testid=pj-level]")).toContainText("Waka Kesiswaan");
+  // ubah penanggung jawab lewat dialog
+  await page.locator("[data-level=lv04]").getByRole("button", { name: "Ubah ambang" }).click();
+  const dlg = page.getByRole("dialog", { name: /Ubah ambang/ });
+  await dlg.getByLabel("Penanggung jawab").selectOption("kepala");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Tersimpan");
+  await expect(page.locator("[data-level=lv04] [data-testid=pj-level]")).toContainText("Kepala Madrasah");
+  await dbRest("PUT", "discipline/levels/lv04/penanggungJawab", "waka");
+  bersih(lap, "waka (penanggung jawab ambang)");
+});
+
+test("wali: Perlu dibina -> pembinaan selesai -> hilang -> ortu melihat status tanpa isi; usul remisi disetujui waka; kelas lain terkunci", async ({ page, browser }) => {
+  const HASIL = "Siswa dipanggil, diberi nasihat, dan berjanji memperbaiki kedisiplinan";
+  const WALI2 = { email: `wali2.${proyek()}@e2e.test`, password: "sementara-123" };
+  const tgl = T.hariIni, ta = taDari(tgl);
+  // siswa 111 (ANDI, XI IPS) pasti melewati ambang 100
+  await dbRest("PUT", "discipline/records/111/e2ePB1", { jenis: "pelanggaran", nama: "Uji pembinaan", poin: 100, tanggal: tgl, ta, sumber: "manual" });
+  await dbRest("PUT", "discipline/recordMeta/111/e2ePB1", { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: Date.now() });
+
+  const lap = await siapkan(page);
+  await loginDengan(page, WALI2.email, WALI2.password);
+  await expect(page).toHaveURL(/\/wali$/);
+  await expect(page.getByTestId("wali-jumlah-siswa")).not.toHaveText("0");
+  await expect(page.getByTestId("lencana-pembinaan"), "lencana menu Pembinaan").toHaveText(/^[1-9]/);
+  await expect(page.getByTestId("wali-perlu-dibina")).not.toHaveText("0");
+
+  await menu(page, "Pembinaan");
+  const baris = page.getByTestId("daftar-perlu-dibina").locator("[data-nis='111']");
+  await expect(baris).toHaveCount(1);
+  await expect(baris).toContainText("Ambang 100 poin");
+  await baris.getByRole("button", { name: "Catat pembinaan" }).click();
+  const dlg = page.getByRole("dialog", { name: "Catat pembinaan" });
+  await dlg.getByLabel("Hasil pembinaan").fill("pendek");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(dlg).toContainText("minimal 10 karakter");
+  await dlg.getByLabel("Hasil pembinaan").fill(HASIL);
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Pembinaan dicatat selesai");
+  await expect(page.getByTestId("daftar-perlu-dibina").locator("[data-nis='111']"), "hilang dari daftar setelah selesai").toHaveCount(0);
+  await expect(page.getByTestId("riwayat-pembinaan").locator("[data-nis='111']")).toContainText("Selesai");
+
+  // siswa lain terjadwal lalu dilanjutkan: tetap di daftar dengan label Dijadwalkan
+  await dbRest("PUT", "discipline/records/222/e2ePB2", { jenis: "pelanggaran", nama: "Uji pembinaan", poin: 100, tanggal: tgl, ta, sumber: "manual" });
+  await dbRest("PUT", "discipline/recordMeta/222/e2ePB2", { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: Date.now() });
+  const b222 = page.getByTestId("daftar-perlu-dibina").locator("[data-nis='222']");
+  await expect(b222).toHaveCount(1);
+  await b222.getByRole("button", { name: "Catat pembinaan" }).click();
+  const d2 = page.getByRole("dialog", { name: "Catat pembinaan" });
+  await d2.getByLabel("Status pembinaan").selectOption("dijadwalkan");
+  await d2.getByLabel("Hasil pembinaan").fill("Dijadwalkan bertemu orang tua minggu depan");
+  await d2.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Pembinaan dijadwalkan");
+  await expect(page.getByTestId("daftar-perlu-dibina").locator("[data-nis='222']").getByTestId("status-dijadwalkan")).toBeVisible();
+
+  // saldo turun: remisi mengurangi saldo 222 di bawah ambang, tetapi belum dibina -> tetap tampil dengan label
+  await dbRest("PUT", "discipline/records/222/e2eRem", { jenis: "remisi", nama: "Uji remisi", poin: 1000, tanggal: tgl, ta, sumber: "manual" });
+  await dbRest("PUT", "discipline/recordMeta/222/e2eRem", { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: Date.now() + 1 });
+  await expect(page.getByTestId("daftar-perlu-dibina").locator("[data-nis='222']").getByTestId("saldo-turun")).toBeVisible();
+
+  // detail siswa binaan: portal siswa + catatan wali
+  await menu(page, "Siswa kelas");
+  await page.getByRole("link", { name: "Detail ANDI TEST" }).click();
+  await expect(page.getByTestId("ekstra-wali")).toBeVisible();
+  await expect(page.getByTestId("pembinaan-siswa")).toContainText("Selesai");
+  await expect(page.getByTestId("riwayat-pencatat")).toContainText("Dicatat oleh");
+  await expect(page.locator("aside.sidebar")).toHaveCount(1); // tetap di dalam panel wali (tanpa header portal orang tua)
+
+  // usulan remisi: kirim, batalkan satu, satu lagi diputuskan waka
+  await menu(page, "Usulan remisi");
+  const kirimUsul = async (nis, nama, remId, alasan) => {
+    await page.getByTestId("form-usulan").getByPlaceholder("Ketik NIS atau nama siswa...").fill(nis);
+    await page.locator(".picker-list li[role=option]", { hasText: nama }).click();
+    await page.getByLabel("Remisi", { exact: true }).selectOption(remId);
+    await page.getByLabel("Alasan usulan").fill(alasan);
+    await page.getByRole("button", { name: "Kirim usulan" }).click();
+    await expect(toast(page)).toContainText("Usulan dikirim ke Waka/Kepala");
+  };
+  await kirimUsul("111", "ANDI TEST", "rm03", "Juara lomba cerdas cermat tingkat kota");
+  await expect(page.getByTestId("daftar-usulan").locator("[data-nis='111']")).toContainText("Menunggu keputusan");
+  await kirimUsul("222", "BUDI TEST", "rm05", "Peserta lomba pidato tingkat kecamatan");
+  await page.getByRole("button", { name: /Batalkan usulan Peserta lomba/ }).click();
+  await expect(toast(page)).toContainText("Usulan dibatalkan");
+  await expect(page.getByTestId("daftar-usulan").locator("[data-nis='222']")).toHaveCount(0);
+  await kirimUsul("222", "BUDI TEST", "rm05", "Peserta lomba pidato tingkat kecamatan");
+  // usulan duplikat yang masih menunggu ditolak oleh validasi
+  await page.getByTestId("form-usulan").getByPlaceholder("Ketik NIS atau nama siswa...").fill("222");
+  await page.locator(".picker-list li[role=option]", { hasText: "BUDI TEST" }).click();
+  await page.getByLabel("Remisi", { exact: true }).selectOption("rm05");
+  await page.getByLabel("Alasan usulan").fill("Usulan ganda untuk remisi yang sama");
+  await page.getByRole("button", { name: "Kirim usulan" }).click();
+  await expect(page.getByTestId("form-usulan")).toContainText("masih menunggu keputusan");
+  // panduan wali
+  await menu(page, "Panduan");
+  await expect(page.getByTestId("panduan-wali")).toContainText("Perlu dibina");
+  bersih(lap, "wali (pembinaan, usulan)");
+
+  // orang tua 111: status pembinaan tanpa isi dan tanpa nama pelaksana
+  const kO = await browser.newContext(opsiKonteks());
+  const po = await kO.newPage();
+  const lapO = await siapkan(po);
+  await loginOrtu(po, "111", "482915");
+  await expect(po.getByTestId("status-pembinaan")).toContainText("Selesai");
+  await expect(po.getByTestId("status-pembinaan")).toContainText("Pembinaan 100 poin");
+  await expect(po.locator("body")).not.toContainText(HASIL);
+  await expect(po.locator("body")).not.toContainText("Pak Dua Kelas");
+  bersih(lapO, "ortu (status pembinaan)");
+  await kO.close();
+
+  // waka: antrean usulan + lencana, rekap pembinaan (+CSV), setujui -> saldo berkurang
+  const kW = await browser.newContext(opsiKonteks());
+  const pw = await kW.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await expect(pw.getByTestId("lencana-usulan-remisi")).toHaveText("2");
+  await menu(pw, "Pelanggaran");
+  await pw.locator("button.row-button", { hasText: "ANDI TEST" }).click();
+  const detail = pw.getByRole("dialog", { name: "ANDI TEST" });
+  const sebelum = Number(await detail.locator(".disc-summary .strong b").textContent());
+  await detail.getByRole("button", { name: "Tutup" }).click();
+  await menu(pw, "Usulan remisi");
+  await expect(pw.getByTestId("jumlah-usulan")).toHaveText("2");
+  await pw.getByRole("button", { name: /Setujui usulan .* untuk ANDI TEST/ }).click();
+  await pw.getByRole("dialog", { name: "Setujui usulan remisi" }).getByRole("button", { name: "Setujui", exact: true }).click();
+  await expect(toast(pw)).toContainText("Usulan disetujui");
+  await expect(pw.getByTestId("jumlah-usulan")).toHaveText("1");
+  await pw.getByRole("button", { name: /Tolak usulan .* untuk BUDI TEST/ }).click();
+  const dt = pw.getByRole("dialog", { name: "Tolak usulan remisi" });
+  await dt.getByRole("button", { name: "Tolak", exact: true }).click();
+  await expect(dt).toContainText("Alasan penolakan wajib");
+  await dt.getByLabel("Alasan penolakan").fill("Belum ada bukti sertifikat lomba");
+  await dt.getByRole("button", { name: "Tolak", exact: true }).click();
+  await expect(toast(pw)).toContainText("Usulan ditolak");
+  await expect(pw.getByTestId("riwayat-usulan")).toContainText("Disetujui");
+  await expect(pw.getByTestId("riwayat-usulan")).toContainText("Belum ada bukti sertifikat lomba");
+  await menu(pw, "Pelanggaran");
+  await pw.locator("button.row-button", { hasText: "ANDI TEST" }).click();
+  const detail2 = pw.getByRole("dialog", { name: "ANDI TEST" });
+  await expect(detail2.locator(".disc-summary .strong b"), "saldo berkurang sebesar remisi yang disetujui (50)").toHaveText(String(Math.max(0, sebelum - 50)));
+  await expect(detail2).toContainText("Juara lomba tingkat kota/kabupaten");
+  await detail2.getByRole("button", { name: "Tutup" }).click();
+  // rekap pembinaan: filter, lihat isi, CSV, lembar memuat riwayat
+  await menu(pw, "Pembinaan");
+  const r111 = pw.getByTestId("baris-pembinaan").locator("[data-nis='111']");
+  await expect(r111).toContainText("Selesai");
+  await r111.getByRole("button", { name: "Lihat isi" }).click();
+  await expect(pw.getByTestId("isi-pembinaan")).toContainText(HASIL);
+  const [unduh] = await Promise.all([pw.waitForEvent("download"), pw.getByRole("button", { name: "Unduh CSV" }).click()]);
+  expect(unduh.suggestedFilename()).toBe(`pembinaan_${ta}.csv`);
+  bersih(lapW, "waka (usulan, rekap pembinaan)");
+  await kW.close();
+
+  // wali: kartu usulan menunjukkan keputusan; wali kelas lain TIDAK dapat membuka siswa kelas yang bukan binaannya
+  await page.goto("/wali/usulan");
+  await expect(page.getByTestId("daftar-usulan").locator("[data-nis='111']")).toContainText("Disetujui");
+  await expect(page.getByTestId("daftar-usulan").locator("[data-nis='222']")).toContainText("Keputusan: Belum ada bukti sertifikat lomba");
+  const kX = await browser.newContext(opsiKonteks());
+  const px = await kX.newPage();
+  await siapkan(px);
+  await loginStaf(px, "wali"); // Bu Wali X IPA: bukan wali kelas XI IPS
+  await px.goto("/wali/siswa/111");
+  await expect(px.getByText(/Akses ditolak|tidak ditemukan/)).toBeVisible();
+  await expect(px.locator("body")).not.toContainText("ANDI TEST");
+  await px.goto("/wali/pembinaan");
+  await expect(px.locator("[data-nis='111']")).toHaveCount(0);
+  await kX.close();
+});
+
+test("admin dan kepala: rekap pembinaan & usulan hanya lihat (tanpa tombol tulis)", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  await menu(page, "Pembinaan");
+  await expect(page.getByTestId("baris-pembinaan").locator("[data-nis='111']")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Catat pembinaan" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Koreksi" })).toHaveCount(0);
+  await menu(page, "Usulan remisi");
+  await expect(page.getByRole("button", { name: /Setujui usulan|Tolak usulan/ })).toHaveCount(0);
+  bersih(lap, "admin (pembinaan hanya lihat)");
+  const k = await browser.newContext(opsiKonteks());
+  const pk = await k.newPage();
+  const lapK = await siapkan(pk);
+  await loginStaf(pk, "kepala");
+  await menu(pk, "Pembinaan");
+  await expect(pk.getByRole("button", { name: "Catat pembinaan" })).toBeVisible();
+  await expect(pk.getByTestId("baris-pembinaan").locator("[data-nis='111']").getByRole("button", { name: "Koreksi" })).toBeVisible();
+  bersih(lapK, "kepala (pembinaan)");
+  await k.close();
+});
+
+// ===================================================================== JAM PERANGKAT SALAH (tanggal mengikuti server)
+test("jam perangkat salah: tanggal mengikuti SERVER — Log aktivitas menampilkan entri, banner peringatan, Dashboard memakai tanggal server", async ({ page }) => {
+  const perangkat = new Date(SEKARANG.getTime() + 3 * 86_400_000 + 2 * 3_600_000); // perangkat 3 hari 2 jam lebih maju dari server
+  const lap = await siapkan(page, SEKARANG, { perangkat });
+  await loginStaf(page, "admin");
+  await expect(page.getByTestId("banner-jam")).toHaveText("Jam perangkat Anda tidak sesuai (selisih 4440 menit). Tanggal mengikuti server.");
+
+  // Dashboard: sapaan/tanggal topbar mengikuti server (T.hariIni), bukan perangkat
+  await expect(page.locator(".topbar")).toContainText(new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(SEKARANG));
+
+  // Log aktivitas: tanggal bawaan = tanggal server, entri tampil di UI walau jam perangkat dipalsukan
+  await menu(page, "Log aktivitas");
+  await expect(page.locator("input[type=date]")).toHaveValue(T.hariIni);
+  await expect(page.getByTestId("log-ringkasan")).toHaveText(/^[1-9]\d* aktivitas/);
+  const baris = page.locator(".table-row", { hasText: emailStaf("admin") });
+  await expect(baris.first()).toContainText("Masuk");
+
+  // asersi tambahan: data langsung (kunci tanggal = tanggal server, bukan tanggal perangkat)
+  const log = Object.values(await dbRest("GET", `activity/${T.hariIni}`));
+  expect(log.some((e) => e.akunEmail === emailStaf("admin") && e.aksi === "login"), "entri login tersimpan pada tanggal server").toBe(true);
+  const tglPerangkat = new Date(perangkat.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+  expect(await dbRest("GET", `activity/${tglPerangkat}`), "tidak ada entri pada tanggal perangkat yang salah").toBeNull();
+  bersih(lap, "admin (jam perangkat salah)");
 });

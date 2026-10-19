@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "firebase/auth";
 import {
   get, limitToLast, onValue, orderByChild, query, ref, serverTimestamp, set, update,
@@ -6,8 +6,10 @@ import {
 } from "firebase/database";
 import { emailOrtu, fb, getSecondaryAuth } from "../lib/firebase";
 import type { Ack, CommandName, DayRecord, KetHarian, ScheduleRow, Student } from "../lib/types";
-import { kirimUpdate, setOffsetServer, sisipkanAktivitas } from "./aktivitas";
+import { kirimUpdate, setOffsetServer, sisipkanAktivitas, waktuServer } from "./aktivitas";
+import { encodeKelas } from "../lib/perjam";
 import { todayWIB } from "../lib/time";
+import { waktuServerDari } from "../lib/waktu";
 
 export const r = (path: string) => ref(fb().db, path);
 
@@ -30,11 +32,22 @@ export function useLive<T>(path: string | null, build?: (ref: DatabaseReference)
 }
 
 /** Selisih jam server Firebase vs jam perangkat (ms) — utk deteksi alat offline yang akurat. */
-export function useServerOffset() {
+/**
+ * Jam server: `offset` = server - perangkat (ms). `siap` = selisih sudah diterima dari server (koneksi terhubung; batas tunggu 3 detik agar
+ * tidak menggantung saat offline). Sebelum siap, tanggal sementara mengikuti jam perangkat.
+ */
+export function useServerClock() {
   const [offset, setOffset] = useState(0);
-  useEffect(() => onValue(r(".info/serverTimeOffset"), (s) => { const v = Number(s.val()) || 0; setOffset(v); setOffsetServer(v); }), []);
-  return offset;
+  const [siap, setSiap] = useState(false);
+  useEffect(() => {
+    const a = onValue(r(".info/serverTimeOffset"), (s) => { const v = Number(s.val()); const o = Number.isFinite(v) ? v : 0; setOffset(o); setOffsetServer(o); });
+    const b = onValue(r(".info/connected"), (s) => { if (s.val()) setSiap(true); });
+    const t = window.setTimeout(() => setSiap(true), 3000);
+    return () => { a(); b(); window.clearTimeout(t); };
+  }, []);
+  return { offset, siap };
 }
+export function useServerOffset() { return useServerClock().offset; }
 
 export function useConnected() {
   const [ok, setOk] = useState(true);
@@ -42,13 +55,18 @@ export function useConnected() {
   return ok;
 }
 
-export function useNow(intervalMs = 15000) {
-  const [now, setNow] = useState(() => new Date());
+/**
+ * "Sekarang" menurut jam SERVER: jam perangkat + selisih server (`offsetMs`, dari useServerClock). Perbarui tiap `intervalMs` dan
+ * seketika saat selisih berubah. Tanpa `offsetMs` (= 0) sama dengan jam perangkat (portal orang tua yang tidak membuka koneksi realtime).
+ */
+export function useNow(intervalMs = 15000, offsetMs = 0) {
+  const [tik, setTik] = useState(0);
   useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), intervalMs);
+    const t = window.setInterval(() => setTik((x) => x + 1), intervalMs);
     return () => window.clearInterval(t);
   }, [intervalMs]);
-  return now;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => new Date(waktuServerDari(Date.now(), offsetMs)), [tik, offsetMs]);
 }
 
 export const eventsQuery = (base: DatabaseReference) => query(base, orderByChild("ts"), limitToLast(30));
@@ -118,7 +136,8 @@ export async function tambahSiswa(s: { uid: string } & Student, pin: string, exi
   await update(r("/"), {
     [`config/students/${s.uid}`]: { nis: s.nis, nama: s.nama, kelas: s.kelas },
     // aktifSejak = tanggal siswa ditambahkan: hari efektif sebelum tanggal ini tidak dihitung untuk siswa baru
-    [`profiles/${s.nis}`]: { nama: s.nama, kelas: s.kelas, aktifSejak: todayWIB() },
+    [`profiles/${s.nis}`]: { nama: s.nama, kelas: s.kelas, aktifSejak: todayWIB(new Date(waktuServer())) }, // tanggal menurut SERVER, bukan jam perangkat
+    [`siswaKelas/${s.nis}`]: encodeKelas(s.kelas), // indeks untuk wewenang wali kelas
     [`parents/${s.nis}`]: akun,
     "config/version": Date.now(),
   });
@@ -132,6 +151,7 @@ export async function ubahSiswa(oldUid: string, old: Student, s: { uid: string }
     // per-field: JANGAN menimpa aktifSejak
     [`profiles/${s.nis}/nama`]: s.nama,
     [`profiles/${s.nis}/kelas`]: s.kelas,
+    [`siswaKelas/${s.nis}`]: encodeKelas(s.kelas),
     "config/version": Date.now(),
   };
   if (s.uid !== oldUid) paths[`config/students/${oldUid}`] = null; // ganti kartu (hilang/rusak)
@@ -143,6 +163,7 @@ export async function hapusSiswa(uid: string, nis: string) {
   await update(r("/"), {
     [`config/students/${uid}`]: null,
     [`profiles/${nis}`]: null,
+    [`siswaKelas/${nis}`]: null,
     [`parents/${nis}`]: null,
     "config/version": Date.now(),
   });
@@ -167,8 +188,10 @@ export async function aturIzin(nis: string, tanggal: string, ket: KetHarian | nu
 }
 
 // ------------------------------------------------------------------ akun pimpinan & staf (kepala, waka)
-export type PeranStaf = "kepala" | "waka" | "piket";
-export const PERAN_STAF: Record<PeranStaf, string> = { kepala: "Kepala Madrasah", waka: "Waka Kesiswaan", piket: "Guru Piket (akun bersama)" };
+export type PeranStaf = "kepala" | "waka" | "piket" | "wali";
+export const PERAN_STAF: Record<PeranStaf, string> = { kepala: "Kepala Madrasah", waka: "Waka Kesiswaan", piket: "Guru Piket (akun bersama)", wali: "Wali Kelas (akun per guru)" };
+/** Peran yang dibuat lewat dialog "Tambah akun" umum. Wali kelas punya panel sendiri (pemetaan kelas). */
+export const PERAN_STAF_UMUM: PeranStaf[] = ["kepala", "waka", "piket"];
 export type Staff = { email: string; nama: string; role: PeranStaf; dibuat: number };
 export const MAKS_STAF = 10;
 

@@ -7,7 +7,7 @@ import BannerTapRendah from "../kesiswaan/BannerTapRendah";
 import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { initials, toneOf } from "../lib/attendance";
 import { labelTa, levelDari, perluTindakLanjut, poinBertanda, ringkas, taKey } from "../lib/discipline";
-import { addDays, formatTanggal, salam, weekday } from "../lib/time";
+import { formatTanggal, hariKerjaSebelum, salam, weekday } from "../lib/time";
 import { useDiscipline } from "../kesiswaan/useDiscipline";
 import { useLive } from "../services/db";
 import { rentang, useSaran } from "../kesiswaan/useSaran";
@@ -21,7 +21,7 @@ export default function Dashboard() {
   const valLive = useLive<Record<string, unknown>>(`validasi/${today}`);
 
   const libur = weekday(today) === 0;
-  const saranHari = useSaran(useMemo(() => rentang(addDays(today, -1), today), [today]));
+  const saranHari = useSaran(useMemo(() => rentang(hariKerjaSebelum(today), today), [today])); // Senin: hari kerja terakhir = Sabtu
   // Minggu = libur: tidak ada daftar belum tap
   const belumTap = useMemo(() => (libur ? 0 : students.filter((s) => !byNis[s.nis]?.masuk && !byNis[s.nis]?.ket).length), [students, byNis, libur]);
   // belum divalidasi = belum tap, belum ada keterangan izin/sakit, belum dikonfirmasi Alfa (bukan hari libur)

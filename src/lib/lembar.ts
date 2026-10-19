@@ -1,6 +1,7 @@
-import type { EntriRiwayat, LevelItem, Ringkas } from "./discipline";
-import { labelTa, poinBertanda } from "./discipline";
-import { formatTanggal } from "./time";
+import type { EntriRiwayat, LevelItem, Ringkas } from "./discipline.ts";
+import { labelTa, poinBertanda } from "./discipline.ts";
+import type { Pembinaan } from "./pembinaan.ts";
+import { formatTanggal } from "./time.ts";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 
@@ -10,8 +11,9 @@ export type BarisJam = { tanggal: string; jam: number; kode: string; mapel?: str
 export function htmlLembar(a: {
   nama: string; nis: string; kelas: string; ta: string;
   ringkas: Ringkas; sekarang: LevelItem | null; berikut: LevelItem | null;
-  riwayat: EntriRiwayat[]; perJam: BarisJam[]; dicetak: string; dicetakOleh: string;
+  riwayat: EntriRiwayat[]; perJam: BarisJam[]; pembinaan?: Pembinaan[]; dicetak: string; dicetakOleh: string;
 }): string {
+  const pembinaan = (a.pembinaan ?? []).slice().sort((x, y) => x.tanggal.localeCompare(y.tanggal)).map((p) => `<tr><td>${esc(formatTanggal(p.tanggal, false))}</td><td>${esc(p.levelPoin)} poin<br><small>${esc(p.tindakan)}</small></td><td>${esc(p.metode)}</td><td>${p.status === "selesai" ? "Selesai" : "Dijadwalkan"}<br><small>${esc(p.olehNama)}</small></td><td>${esc(p.hasil)}${p.tindakLanjut ? `<br><small>Tindak lanjut: ${esc(p.tindakLanjut)}</small>` : ""}</td></tr>`).join("");
   const kodeLabel: Record<string, string> = { A: "Alfa", I: "Izin", S: "Sakit", D: "Dispensasi" };
   const baris = a.riwayat.map((e) => `<tr><td>${esc(formatTanggal(e.rec.tanggal, false))}</td><td>${esc(e.rec.nama)}${e.rec.takziran ? `<br><small>Takziran: ${esc(e.rec.takziran)}</small>` : ""}</td><td>${esc(e.rec.kategori ?? (e.rec.jenis === "remisi" ? "Remisi" : "Pelanggaran"))}</td><td class="r">${poinBertanda(e.rec) > 0 ? "+" : "−"}${esc(e.rec.poin)}</td></tr>`).join("");
   const jam = a.perJam.map((x) => `<tr><td>${esc(formatTanggal(x.tanggal, false))}</td><td>Jam ke-${esc(x.jam)}${x.mapel ? ` (${esc(x.mapel)})` : ""}</td><td>${esc(kodeLabel[x.kode] ?? x.kode)}</td></tr>`).join("");
@@ -33,6 +35,8 @@ ${a.berikut ? `<b>Ambang berikutnya</b><span>${esc(a.berikut[1].poin)} poin (${e
 ${a.ringkas.sangatBerat ? `<b>Catatan</b><span>Terdapat pelanggaran kategori Sangat Berat.</span>` : ""}</div>
 <h2>Riwayat pelanggaran &amp; remisi</h2>
 ${baris ? `<table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th>Poin</th></tr></thead><tbody>${baris}</tbody></table>` : "<p>Belum ada catatan.</p>"}
+<h2>Riwayat pembinaan</h2>
+${pembinaan ? `<table><thead><tr><th>Tanggal</th><th>Ambang</th><th>Metode</th><th>Status / pelaksana</th><th>Hasil</th></tr></thead><tbody>${pembinaan}</tbody></table>` : "<p>Belum ada pembinaan tercatat.</p>"}
 <h2>Ketidakhadiran per jam pelajaran</h2>
 ${jam ? `<table><thead><tr><th>Tanggal</th><th>Jam</th><th>Keterangan</th></tr></thead><tbody>${jam}</tbody></table>` : "<p>Tidak ada ketidakhadiran per jam tercatat.</p>"}
 <div class="ttd"><div>Wali Kelas<br><br><br><br>( ........................ )</div><div>Waka Kesiswaan<br><br><br><br>( ........................ )</div><div>Orang Tua / Wali<br><br><br><br>( ........................ )</div></div>

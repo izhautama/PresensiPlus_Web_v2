@@ -32,7 +32,7 @@ export default function Reports() {
 }
 
 function Bulanan() {
-  const { students, schedule, today, kelasList, aktifSejak } = useAdminData();
+  const { students, schedule, today, now, kelasList, aktifSejak } = useAdminData();
   const [bulan, setBulan] = useState(monthKey(today));
   const [kelas, setKelas] = useState("");
   const [att, setAtt] = useState<Record<string, Record<string, DayRecord>> | null>(null);
@@ -60,9 +60,9 @@ function Bulanan() {
     return students.filter((s) => !kelas || s.kelas === kelas).map((s) => {
       const manualSiswa: Record<string, ManualTap> = {};
       for (const [tgl, per] of Object.entries(manualBulan ?? {})) if (per[s.nis]) manualSiswa[tgl] = per[s.nis];
-      return { ...s, ...rekapSiswa({ hariEfektif: kal.peta, attendance: data[s.nis], manualTap: manualSiswa, schedule, kelas: s.kelas, aktifSejak: aktifSejak[s.nis], awal: `${bulan}-01`, akhir: lastDayOfMonth(bulan) }) };
+      return { ...s, ...rekapSiswa({ hariEfektif: kal.peta, attendance: data[s.nis], manualTap: manualSiswa, schedule, kelas: s.kelas, aktifSejak: aktifSejak[s.nis], awal: `${bulan}-01`, akhir: lastDayOfMonth(bulan), now }) };
     });
-  }, [data, manualBulan, students, kelas, bulan, schedule, kal.peta, aktifSejak]);
+  }, [data, manualBulan, students, kelas, bulan, schedule, kal.peta, aktifSejak, now]);
 
   const hariSekolah = rows.reduce((m, x) => Math.max(m, x.HariSekolah), 0);
   const denganData = rows.filter((x) => x.Persen != null);

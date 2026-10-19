@@ -27,6 +27,7 @@ button { cursor: pointer; }
 .nav-label-second { margin-top: 18px; }
 .nav-item { height: 46px; border: 0; border-radius: 11px; color: #69776f; background: transparent; display: flex; align-items: center; gap: 13px; padding: 0 14px; font-size: 15px; font-weight: 600; transition: .2s ease; }
 .nav-item:hover { color: #176b49; background: #f0f6f2; }
+.nav-badge { margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px; background: #d9722b; color: #fff; font-size: 12px; font-weight: 800; display: inline-grid; place-items: center; }
 .nav-item.active { color: #166c49; background: #eaf5ef; box-shadow: inset 3px 0 #29966a; }
 .sidebar-bottom { margin-top: auto; }
 .device-mini { padding: 13px 12px; border-radius: 12px; background: #f1f6f3; display: flex; align-items: center; gap: 9px; color: #337458; margin-bottom: 15px; }
@@ -378,7 +379,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .chip-group button { border: 0; background: transparent; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; color: #5f6c64; }
 .chip-group button.active { background: white; color: #176f4b; box-shadow: 0 2px 8px rgba(30,59,43,.08); }
 .chip-group.small button { padding: 6px 10px; font-size: 12px; }
-.chip-group.tabs { margin-bottom: 16px; }
+.chip-group.tabs { margin-bottom: 16px; max-width: 100%; overflow-x: auto; scrollbar-width: none; } /* tab yang lebih lebar dari layar HP bergulir di dalam grupnya, tidak melebarkan halaman */
+.chip-group.tabs::-webkit-scrollbar { display: none; }
+.chip-group.tabs button { flex: 0 0 auto; white-space: nowrap; }
 .caption-text { font-size: 12px; color: #6b766f; margin: 0 0 10px; }
 
 .table-head, .table-row { font-size: 13px; }

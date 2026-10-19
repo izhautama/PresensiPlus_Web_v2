@@ -87,3 +87,9 @@ export function relatif(ms: number, now = Date.now()): string {
 export function jamDariMs(ms: number): string {
   return new Date(ms).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
+
+/** Hari kerja (bukan Minggu) terakhir sebelum `tanggal`: Senin -> Sabtu (jendela "kemarin" untuk saran/tinjauan). */
+export function hariKerjaSebelum(tanggal: string): string {
+  const k = addDays(tanggal, -1);
+  return weekday(k) === 0 ? addDays(k, -1) : k;
+}

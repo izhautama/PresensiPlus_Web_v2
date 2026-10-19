@@ -6,10 +6,10 @@ import { idPerangkat, labelPerangkatSekarang, namaPerangkat } from "../lib/peran
 // Identitas "siapa" = nama petugas yang DIPILIH SENDIRI (deklarasi mandiri) + deviceId acak lokal + label perangkat.
 // Untuk piket, Security Rules MEWAJIBKAN setiap tulisan disertai entri log pada update yang sama (lihat build-rules.mjs).
 
-export type PeranLog = "admin" | "kepala" | "waka" | "piket";
+export type PeranLog = "admin" | "kepala" | "waka" | "piket" | "wali";
 export type AksiLog =
   | "login" | "logout" | "pilih-petugas" | "izin-harian" | "izin-jam" | "hapus-izin" | "pelanggaran" | "hapus-pelanggaran"
-  | "remisi" | "ubah-pelanggaran" | "pulihkan-pelanggaran" | "presensi-jam" | "presensi-manual" | "hapus-manual" | "atur-kalender" | "hapus-kalender" | "hitung-kalender" | "normal-kalender" | "ambang-kalender" | "migrasi-kalender" | "validasi-alfa" | "batal-alfa" | "saran-setuju" | "saran-abaikan"
+  | "remisi" | "ubah-pelanggaran" | "pulihkan-pelanggaran" | "presensi-jam" | "presensi-manual" | "hapus-manual" | "atur-wali" | "perbaiki-indeks" | "atur-penanggung-jawab" | "catat-pembinaan" | "usul-remisi" | "batal-usul" | "putuskan-usul" | "atur-kalender" | "hapus-kalender" | "hitung-kalender" | "normal-kalender" | "ambang-kalender" | "migrasi-kalender" | "validasi-alfa" | "batal-alfa" | "saran-setuju" | "saran-abaikan"
   | "kunci-akun" | "buka-kunci";
 type Konteks = { uid: string; peran: PeranLog; email: string };
 type Updates = Record<string, unknown>;

@@ -9,7 +9,7 @@ import { mulaiRealtimeStaf } from "../services/koneksi";
 
 export type Session =
   | { role: "admin"; uid: string; email: string }
-  | { role: "kepala" | "waka" | "piket"; uid: string; email: string; nama: string }
+  | { role: "kepala" | "waka" | "piket" | "wali"; uid: string; email: string; nama: string }
   | { role: "ortu"; uid: string; nis: string }
   | null;
 
@@ -21,7 +21,7 @@ const IDLE_MS = 30 * 60 * 1000; // ortu otomatis keluar setelah 30 menit tidak a
 const KEY_LOGIN = "aktivitas-login";
 
 /** Siapkan konteks log aktivitas staf; "login" dicatat sekali per sesi tab (bukan setiap muat ulang). */
-async function mulaiAktivitas(uid: string, peran: "admin" | "kepala" | "waka" | "piket", email: string) {
+async function mulaiAktivitas(uid: string, peran: "admin" | "kepala" | "waka" | "piket" | "wali", email: string) {
   setKonteksAktivitas({ uid, peran, email });
   await Promise.all([muatOffsetServer(), siapkanLabelPerangkat()]);
   let sudah = false;
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           mulaiRealtimeStaf(); // staf (termasuk muat ulang halaman dengan sesi tersimpan): realtime
           const role = (await get(r(`roles/${user.uid}`))).val();
           if (role === "admin") { await mulaiAktivitas(user.uid, role, user.email); setSession({ role, uid: user.uid, email: user.email }); }
-          else if (role === "kepala" || role === "waka" || role === "piket") {
+          else if (role === "kepala" || role === "waka" || role === "piket" || role === "wali") {
             // nama dipakai untuk jejak audit; staff/{uid} boleh dibaca pemiliknya sendiri
             const nama = String((await get(r(`staff/${user.uid}/nama`))).val() ?? "").trim() || user.email;
             await mulaiAktivitas(user.uid, role, user.email);
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Peran kepala/waka/piket bisa dicabut admin kapan saja: begitu dicabut atau berubah, sesi langsung ditutup
   useEffect(() => {
-    if (session?.role !== "kepala" && session?.role !== "waka" && session?.role !== "piket") return;
+    if (session?.role !== "kepala" && session?.role !== "waka" && session?.role !== "piket" && session?.role !== "wali") return;
     const peran = session.role;
     return onValue(r(`roles/${session.uid}`),
       (s) => { if (s.val() !== peran) signOut(fb().auth); },

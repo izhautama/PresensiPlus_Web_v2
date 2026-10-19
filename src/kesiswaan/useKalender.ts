@@ -44,7 +44,7 @@ let sudahOtomatis = "";
  *  - sekali per sesi/hari: kemarin dan hari-hari sebelumnya (maks. 31 hari) yang belum punya ringkasan;
  *  - hari ini: saat status efektif berubah, dan setelah jam pulang saat jumlah berubah (+ penanda tap rendah).
  */
-export function useKalenderOtomatis() {
+export function useKalenderOtomatis(aktifkan = true) {
   const { today, log, manualToday, now, schedule, ready, buktiSiap } = useAdminData();
   const tersimpan = useLive<RingkasanHari>(`kalenderEfektif/${today}`);
   const override = useLive<OverrideKalender>(`kalender/${today}`);
@@ -52,7 +52,7 @@ export function useKalenderOtomatis() {
   const sibuk = useRef(false);
 
   useEffect(() => {
-    if (sudahOtomatis === today) return;
+    if (!aktifkan || sudahOtomatis === today) return;
     sudahOtomatis = today;
     hitungOtomatis(today).catch(() => { sudahOtomatis = ""; });
   }, [today]);
@@ -60,7 +60,7 @@ export function useKalenderOtomatis() {
   const bukti = hitungBukti(log, manualToday);
   const lewatPulang = nowHM(now) >= batasJam(schedule, "Semua", namaHari(today)).Pulang[0];
   useEffect(() => {
-    if (ambang === null || !ready || !buktiSiap || tersimpan.loading || override.loading || sibuk.current) return;
+    if (!aktifkan || ambang === null || !ready || !buktiSiap || tersimpan.loading || override.loading || sibuk.current) return;
     sibuk.current = true;
     perbaruiHariIni({ tanggal: today, tap: bukti.tap, manual: bukti.manual, override: override.data, tersimpan: tersimpan.data, lewatPulang, ambang })
       .catch(() => { /* gagal sementara: dicoba lagi pada perubahan berikutnya */ })
