@@ -207,8 +207,8 @@ const mutasi = [
   { nama: "discipline/settings: piket boleh mengubah jendela mundur", ubah: (r) => { const n = r.discipline.settings.piketMundurHari; n[".write"] = `(${n[".write"]}) || (auth != null && ${PIKET})`; } },
   { nama: "piketRoster: piket boleh menulis", ubah: (r) => { const n = r.piketRoster.$id; n[".write"] = `(${n[".write"]}) || (auth != null && ${PIKET})`; } },
   { nama: "waka boleh menetapkan role 'piket' (eskalasi)", ubah: (r) => { const n = r.roles.$uid; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA} && $uid !== auth.uid)`; } },
-  { nama: "alat boleh menghapus attendance/.../masuk", ubah: (r) => { const n = r.attendance.$nis.$date.masuk; n[".write"] = ganti(n[".write"], " && newData.exists()", ""); } },
-  { nama: "alat boleh menghapus attendance/.../pulang", ubah: (r) => { const n = r.attendance.$nis.$date.pulang; n[".write"] = ganti(n[".write"], " && newData.exists()", ""); } },
+  { nama: "alat boleh menghapus attendance/.../masuk (newData.exists dan kunci tap pertama dibuang)", ubah: (r) => { const n = r.attendance.$nis.$date.masuk; n[".write"] = ganti(n[".write"], " && newData.exists() && (!data.exists() || data.val() === newData.val())", ""); } },
+  { nama: "alat boleh menghapus attendance/.../pulang (newData.exists dan kunci tap pertama dibuang)", ubah: (r) => { const n = r.attendance.$nis.$date.pulang; n[".write"] = ganti(n[".write"], " && newData.exists() && (!data.exists() || data.val() === newData.val())", ""); } },
   { nama: "alat boleh menimpa/menghapus node attendance/{nis}/{tgl} utuh", ubah: (r) => { const n = r.attendance.$nis.$date; n[".write"] = ganti(n[".write"], " && !data.exists()", ""); } },
   { nama: "alat boleh menulis attendance/.../ket (kedua lapisan: write + validate)", ubah: (r) => {
     const n = r.attendance.$nis.$date.ket;
@@ -372,7 +372,7 @@ const mutasi = [
     r.manualTap.$tgl.$nis.alasan[".validate"] = "newData.isString()";
     r.manualTapByStudent.$nis.$tgl.alasan[".validate"] = "newData.isString()";
   } },
-  { nama: "manual: format jam masuk tidak diperiksa (asli + salinan)", ubah: (r) => {
+  { nama: "manual: format jam masuk tidak diperiksa (asli + salinan; v2.4: pencocokan masukDetik per jam/menit/detik memaksa format HH:MM:SS, jadi hanya lapisan ini)", ekuivalen: true, ubah: (r) => {
     r.manualTap.$tgl.$nis.masuk[".validate"] = "newData.isString()";
     r.manualTapByStudent.$nis.$tgl.masuk[".validate"] = "newData.isString()";
   } },
@@ -720,9 +720,9 @@ const mutasi = [
   { nama: "alfa-jam: piket mengubah/menghapus salinan A piket kemarin (hariKe tersimpan tidak diperiksa)", ubah: (r) => { const k = r.lessonsByStudent.$nis.$tgl.$jam; k[".write"] = ganti(k[".write"], ` && ${HARI_INI_T(`${INFO_S_LAMA_T}.child('hariKe')`)} && (`, " && ("); } },
   // ---- v2.4: jam manual diketik piket (masukDetik / mundur) dan KUNCI TAP PERTAMA alat
   { nama: "manual: jam masukDetik tidak diwajibkan (seluruh pemeriksaan jam manual dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; const a = n[".validate"].indexOf(" && (!newData.child('masuk').exists() ? (!newData.child('masukDetik')"); const b = n[".validate"].indexOf(" && (!(" + PIKET + ") ||", a); if (a < 0 || b < 0) throw new Error("pola tidak ditemukan"); n[".validate"] = n[".validate"].slice(0, a) + n[".validate"].slice(b); } },
-  { nama: "manual: masukDetik tidak dicocokkan dengan JAM pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(0, 2\) !== '\d\d' \|\| \(newData\.child\('masukDetik'\)\.val\(\) >= \d+ && newData\.child\('masukDetik'\)\.val\(\) < \d+\)\) && /g); } },
-  { nama: "manual: masukDetik tidak dicocokkan dengan MENIT pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(3, 5\) !== '\d\d' \|\| \(newData\.child\('masukDetik'\)\.val\(\) % 3600 >= \d+ && newData\.child\('masukDetik'\)\.val\(\) % 3600 < \d+\)\) && /g); } },
-  { nama: "manual: masukDetik tidak dicocokkan dengan DETIK pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masuk'\)\.val\(\)\.substring\(6, 8\) !== '\d\d' \|\| newData\.child\('masukDetik'\)\.val\(\) % 60 === \d+\) && /g); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan JAM pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(!\(newData\.child\('masukDetik'\)\.val\(\) >= \d+ && newData\.child\('masukDetik'\)\.val\(\) < \d+\) \|\| newData\.child\('masuk'\)\.val\(\)\.matches\(\/\^\d\d:\.\*\/\)\) && /g); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan MENIT pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(!\(newData\.child\('masukDetik'\)\.val\(\) % 3600 >= \d+ && newData\.child\('masukDetik'\)\.val\(\) % 3600 < \d+\) \|\| newData\.child\('masuk'\)\.val\(\)\.matches\(\/\^\.\.:\d\d:\.\*\/\)\) && /g); } },
+  { nama: "manual: masukDetik tidak dicocokkan dengan DETIK pada masuk", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = hapusSemua(n[".validate"], /\(newData\.child\('masukDetik'\)\.val\(\) % 60 !== \d+ \|\| newData\.child\('masuk'\)\.val\(\)\.matches\(\/\^\.\.:\.\.:\d\d\$\/\)\) && /g); } },
   { nama: "manual: jam masuk boleh melewati waktu dicatat (batas masa depan dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "newData.child('masukDetik').val() <= (((now + 25200000) % 86400000) / 1000) + 60 && ", ""); } },
   { nama: "manual: mundur TIDAK wajib bila selisih > 15 menit", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "> 960 ? newData.child('mundur').val() === true :", "> 960 ? true :"); } },
   { nama: "manual: mundur boleh dipasang walau selisih < 14 menit", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "< 840 ? !newData.child('mundur').exists() : true", "< 840 ? true : true"); } },
@@ -730,13 +730,13 @@ const mutasi = [
   { nama: "manual: waka ikut dibatasi aturan jam (pengecualian koreksi waka dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "&& (" + WAKA + " || (newData.child('hariKe').isNumber()", "&& (false || (newData.child('hariKe').isNumber()"); } },
   { nama: "manual: mundur boleh bernilai false", ubah: (r) => { r.manualTap.$tgl.$nis.mundur[".validate"] = "newData.isBoolean()"; } },
   { nama: "manual: masukDetik/mundur boleh ada tanpa masuk (entri hanya-pulang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "(!newData.child('masukDetik').exists() && !newData.child('mundur').exists())", "true"); } },
-  { nama: "manual: masukDetik wajib berupa angka (isNumber dibuang)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "newData.child('masukDetik').isNumber() && ", ""); } },
-  { nama: "manual: masukDetik tanpa batas rentang 0..86399 (hanya lapisan ini; pencocokan jam/menit/detik menahan)", ekuivalen: true, ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() >= 0 && newData.child('masukDetik').val() < 86400", ""); } },
-  { nama: "manual: masukDetik boleh pecahan (hanya lapisan bilangan bulat; pencocokan detik menahan)", ekuivalen: true, ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() % 1 === 0", ""); } },
+  { nama: "manual: masukDetik wajib berupa angka (isNumber dibuang; teks gagal pada pemeriksaan % 1 dan perbandingan rentang)", ekuivalen: true, ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], "newData.child('masukDetik').isNumber() && ", ""); } },
+  { nama: "manual: masukDetik tanpa batas rentang 0..86399 (nilai di luar sehari lolos semua klausa jam)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() >= 0 && newData.child('masukDetik').val() < 86400", ""); } },
+  { nama: "manual: masukDetik boleh pecahan (bilangan bulat tidak diperiksa; klausa detik tidak menangkap pecahan)", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".validate"] = ganti(n[".validate"], " && newData.child('masukDetik').val() % 1 === 0", ""); } },
   { nama: "alat-kunci: attendance/masuk dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.masuk; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
   { nama: "alat-kunci: attendance/pulang dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.pulang; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
   { nama: "alat-kunci: attendance/status dapat ditimpa tap kedua", ubah: (r) => { const n = r.attendance.$nis.$date.status; n[".write"] = ganti(n[".write"], " && (!data.exists() || data.val() === newData.val())", ""); } },
-  { nama: "alat-kunci: log _M/_P dapat ditimpa tap kedua (seluruh pemeriksaan dibuang)", ubah: (r) => { const n = r.log.$date.$key; const a = n[".write"].indexOf(" && (!data.exists() || (data.child('jam')"); if (a < 0) throw new Error("pola tidak ditemukan"); n[".write"] = n[".write"].slice(0, a) + ")))"; } },
+  { nama: "alat-kunci: log _M/_P dapat ditimpa tap kedua (seluruh pemeriksaan dibuang)", ubah: (r) => { const n = r.log.$date.$key; const a = n[".write"].indexOf(" && (!data.exists() || (data.child('jam')"); if (a < 0) throw new Error("pola tidak ditemukan"); n[".write"] = n[".write"].slice(0, a) + "))"; } },
   { nama: "alat-kunci: log retry tidak mencocokkan JAM", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('jam').val() === newData.child('jam').val() && ", ""); } },
   { nama: "alat-kunci: log retry tidak mencocokkan NIS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('nis').val() === newData.child('nis').val() && ", ""); } },
   { nama: "alat-kunci: log retry tidak mencocokkan STATUS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], " && data.child('status').val() === newData.child('status').val()", ""); } },
@@ -801,13 +801,18 @@ async function matikanEmulator() {
 }
 async function mulaiEmulator(alasan) {
   if (!kelola) return;
-  await matikanEmulator();
-  emu = spawn("npx firebase-tools emulators:start --only auth,database --project demo-presensi", { shell: true, stdio: "ignore", windowsHide: true });
-  for (let k = 0; k < 90; k++) {
-    if (await hidup(`${DB_URL}/`) && await hidup(`${AUTH_URL}/`)) { restartKe++; console.log(`  ↻ emulator ${restartKe === 1 ? "dimulai" : "direstart"} (${alasan})`); return; }
-    await tidur(1000);
+  // percobaan ulang: emulator kadang lambat dilepas/dimulai pada mesin sibuk; satu kegagalan start tidak boleh menggugurkan run panjang
+  for (let percobaan = 1; percobaan <= 3; percobaan++) {
+    await matikanEmulator();
+    for (const port of [9000, 9099, 4400, 4500]) bunuhPort(port); // sisa proses dari percobaan sebelumnya
+    emu = spawn("npx firebase-tools emulators:start --only auth,database --project demo-presensi", { shell: true, stdio: "ignore", windowsHide: true });
+    for (let k = 0; k < 90; k++) {
+      if (await hidup(`${DB_URL}/`) && await hidup(`${AUTH_URL}/`)) { restartKe++; console.log(`  ↻ emulator ${restartKe === 1 ? "dimulai" : "direstart"} (${alasan}${percobaan > 1 ? `, percobaan ${percobaan}` : ""})`); return; }
+      await tidur(1000);
+    }
+    console.log(`  ! emulator belum siap dalam 90 detik (percobaan ${percobaan}/3)`);
   }
-  throw new Error("emulator tidak siap dalam 90 detik");
+  throw new Error("emulator tidak siap setelah 3 percobaan");
 }
 process.on("exit", () => { if (emu) bunuhPohon(emu.pid); });
 

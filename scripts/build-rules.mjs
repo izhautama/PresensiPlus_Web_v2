@@ -270,15 +270,16 @@ const SEL_SID_K = "(newData.child('k').val() === 'S' || newData.child('k').val()
 const HARI_INI = (x) => `${x}.isNumber() && ${x}.val() % 1 === 0 && ${x}.val() > ${hariIni} - 1 && ${x}.val() <= ${hariIni}`;
 /**
  * Presensi manual v2.4: `masuk` ("HH:MM:SS") dan `masukDetik` (detik sejak tengah malam) HARUS sama. Rules tidak dapat mengubah string menjadi angka,
- * jadi setiap bagian jam/menit/detik dicocokkan dengan daftar pasangan yang dibangkitkan di sini (24 + 60 + 60 klausa).
+ * jadi setiap bagian jam/menit/detik dicocokkan (matches) dengan daftar klausa yang dibangkitkan di sini (24 + 60 + 60 klausa).
  */
 const dd = (n) => String(n).padStart(2, "0");
-const MASUK_STR = (a, b) => `newData.child('masuk').val().substring(${a}, ${b})`;
+const MASUK_VAL = "newData.child('masuk').val()";
 const MASUK_DETIK = "newData.child('masukDetik').val()";
+// Rules tidak punya substring(): pencocokan memakai matches() pada bagian jam/menit/detik yang ditentukan oleh nilai masukDetik.
 const MASUK_KONSISTEN = [
-  ...Array.from({ length: 24 }, (_, h) => `(${MASUK_STR(0, 2)} !== '${dd(h)}' || (${MASUK_DETIK} >= ${h * 3600} && ${MASUK_DETIK} < ${h * 3600 + 3600}))`),
-  ...Array.from({ length: 60 }, (_, m) => `(${MASUK_STR(3, 5)} !== '${dd(m)}' || (${MASUK_DETIK} % 3600 >= ${m * 60} && ${MASUK_DETIK} % 3600 < ${m * 60 + 60}))`),
-  ...Array.from({ length: 60 }, (_, s) => `(${MASUK_STR(6, 8)} !== '${dd(s)}' || ${MASUK_DETIK} % 60 === ${s})`),
+  ...Array.from({ length: 24 }, (_, h) => `(!(${MASUK_DETIK} >= ${h * 3600} && ${MASUK_DETIK} < ${h * 3600 + 3600}) || ${MASUK_VAL}.matches(/^${dd(h)}:.*/))`),
+  ...Array.from({ length: 60 }, (_, m) => `(!(${MASUK_DETIK} % 3600 >= ${m * 60} && ${MASUK_DETIK} % 3600 < ${m * 60 + 60}) || ${MASUK_VAL}.matches(/^..:${dd(m)}:.*/))`),
+  ...Array.from({ length: 60 }, (_, s) => `(${MASUK_DETIK} % 60 !== ${s} || ${MASUK_VAL}.matches(/^..:..:${dd(s)}$/))`),
 ].join(" && ");
 /** Detik sejak tengah malam WIB pada saat server menerima tulisan. */
 const SEKARANG_DETIK = "(((now + 25200000) % 86400000) / 1000)";

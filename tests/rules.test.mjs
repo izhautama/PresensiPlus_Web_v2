@@ -595,9 +595,9 @@ await tolak("kunci: HANYA log _P status berbeda DITOLAK", dev, "PATCH", "", { [`
 await cek("kunci: tap pertama utuh setelah semua upaya menimpa", waka, `attendance/346/${KT}`, (j) => j?.masuk === "06:55:00" && j.status === "Hadir" && j.pulang === "15:05:00");
 await cek("kunci: log _M tap pertama utuh", waka, `log/${KT}/EEEE5555_M`, (j) => j?.jam === "06:55:00" && j.status === "Hadir");
 // tidak mengganggu antrian lain
-await izin("kunci: siswa LAIN pada hari yang sama tidak terpengaruh", dev, "PATCH", "", tapMasuk("347", "GGGG7777", "07:20:00", "Terlambat"));
+await izin("kunci: siswa LAIN pada hari yang sama tidak terpengaruh", dev, "PATCH", "", tapMasuk("347", "AAAA7777", "07:20:00", "Terlambat"));
 await izin("kunci: siswa yang sama pada hari BERIKUTNYA tidak terpengaruh", dev, "PATCH", "", tapMasuk("346", "EEEE5555", "07:05:00", "Hadir", KT2));
-await izin("kunci: kartu LAIN (entri log baru) untuk siswa yang sama pada hari yang sama DITERIMA", dev, "PUT", `log/${KT}/HHHH8888_M`, { jam: "07:50:00", nis: "346", status: "Terlambat" });
+await izin("kunci: kartu LAIN (entri log baru) untuk siswa yang sama pada hari yang sama DITERIMA", dev, "PUT", `log/${KT}/CCCC8888_M`, { jam: "07:50:00", nis: "346", status: "Terlambat" });
 await izin("kunci: admin tetap dapat mengoreksi attendance/masuk", admin, "PUT", `attendance/346/${KT}/masuk`, "06:56:00");
 await tolak("kunci: waka TIDAK dapat menulis attendance/masuk (tetap hanya alat/admin)", waka, "PUT", `attendance/347/${KT}/masuk`, "06:00:00");
 await izin("fw: PUT unknown/{tgl}/{uid}", dev, "PUT", `unknown/${FW}/ZZZZ0001`, { jam: "07:10:00" });
@@ -1143,7 +1143,9 @@ await tolak("piket TIDAK bisa menulis sistem/backupTerakhir", piket, "PUT", "sis
 
 seksi("PRESENSI MANUAL — manualTap + manualTapByStudent (waka & piket; alat tidak tersentuh)");
 // hari kerja (bukan Minggu) dalam jendela piket: hari ini, atau Sabtu bila hari ini Minggu
-const HKM = (HK + 4) % 7 === 0 ? HK - 1 : HK;
+// v2.4: tanggal dasar seksi ini = hari kerja LAMPAU (dalam jendela piket N=2): uji tidak bergantung pada jam hari. Uji jam manual 'hari ini' memakai TD di bawah.
+const HKM = (HK - 1 + 4) % 7 === 0 ? HK - 2 : HK - 1;
+const TD = new Date(HK * 86400000).toISOString().slice(0, 10);
 const TM = new Date(HKM * 86400000).toISOString().slice(0, 10);
 const MINGGU_HK = HK - ((HK + 4) % 7); // Minggu terakhir <= hari ini (epoch-day; (hk+4)%7 === 0 -> Minggu)
 const MT = (t, n) => `manualTap/${t}/${n}`;
@@ -1159,10 +1161,12 @@ const manualBody = (u, t, n, o = {}) => {
   // v2.4: jam masuk diketik -> `masukDetik` (konsisten dengan `masuk`) dan `mundur` otomatis; uji khusus menimpa/menghapusnya lewat o.tap
   if (typeof tap.masuk === "string") {
     const dn = detikNow();
+    // jam tetap (mis. 07:10, 08:20) yang melewati waktu sekarang (uji dijalankan dini hari) diganti ke 1 jam lalu agar tidak melanggar "tidak boleh melewati waktu dicatat";
+    // uji jam manual memakai jam relatif terhadap sekarang dan menonaktifkannya dengan o.klem === false
+    const klem = o.klem !== false && tap.hariKe === HK && detikJ(tap.masuk) > dn - 30 && dn > 120;
+    if (klem) tap.masuk = jamDariDetik(dn - 3600 > 0 ? dn - 3600 : 1);
     if (!("masukDetik" in (o.tap ?? {}))) tap.masukDetik = detikJ(tap.masuk);
-    // tanpa penyetelan eksplisit, jam default yang melewati waktu sekarang (uji dijalankan dini hari) diganti agar tidak melanggar "tidak boleh melewati waktu dicatat"
-    if (!("masuk" in (o.tap ?? {})) && tap.hariKe === HK && tap.masukDetik > dn - 30 && dn > 120) { tap.masuk = jamDariDetik(Math.max(1, dn - 3600 > 0 ? dn - 3600 : 1)); tap.masukDetik = detikJ(tap.masuk); }
-    if (!("mundur" in (o.tap ?? {})) && (tap.hariKe < HK || (tap.hariKe === HK && dn - tap.masukDetik > 960))) tap.mundur = true;
+    if (!("mundur" in (o.tap ?? {})) && (tap.hariKe < HK || (tap.hariKe === HK && dn - detikJ(tap.masuk) > 960))) tap.mundur = true;
   }
   const body = { ...A.body };
   if (!o.tanpaAsli) body[MT(t, n)] = tap;
@@ -1236,33 +1240,36 @@ await manual("manual: waka hariKe Senin setelah Minggu DITERIMA (kontrol Minggu)
 {
   const dn = detikNow();
   const HKP = (HK - 1 + 4) % 7 === 0 ? HK - 2 : HK - 1; // hari kerja lampau dalam jendela piket (N=2)
-  if (HKM === HK && dn > 2400 && dn < 86400 - 600) {
+  if ((HK + 4) % 7 !== 0 && dn > 2400 && dn < 86400 - 600) {
     const j5 = jamDariDetik(dn - 300), j30 = jamDariDetik(dn - 1800), jDepan = jamDariDetik(dn + 600), jPas = jamDariDetik(dn + 20);
-    await manual("manual-jam: piket masuk 5 menit lalu TANPA mundur DITERIMA", piket, TM, "4101", "izin", { tap: { masuk: j5 } });
-    await manual("manual-jam: piket masuk 5 menit lalu dengan mundur:true DITOLAK (selisih < 14 menit)", piket, TM, "4102", "tolak", { tap: { masuk: j5, mundur: true } });
-    await manual("manual-jam: piket masuk 30 menit lalu TANPA mundur DITOLAK", piket, TM, "4103", "tolak", { tap: { masuk: j30, mundur: undefined } });
-    await manual("manual-jam: piket masuk 30 menit lalu dengan mundur:true DITERIMA", piket, TM, "4104", "izin", { tap: { masuk: j30 } });
-    await cek("manual-jam: entri mundur tersimpan dengan masukDetik dan ts (dicatat)", waka, MT(TM, "4104"), (j) => j?.mundur === true && j.masukDetik === detikJ(j30) && j.masuk === j30 && typeof j.ts === "number");
-    await manual("manual-jam: piket masuk 10 menit di masa depan DITOLAK (melewati waktu dicatat)", piket, TM, "4105", "tolak", { tap: { masuk: jDepan } });
-    await manual("manual-jam: piket masuk 10 menit di masa depan + mundur:true tetap DITOLAK", piket, TM, "4105", "tolak", { tap: { masuk: jDepan, mundur: true } });
-    await manual("manual-jam: piket masuk +20 detik (dalam toleransi jam klien) DITERIMA", piket, TM, "4106", "izin", { tap: { masuk: jPas } });
-    await manual("manual-jam: WAKA masuk 10 menit di masa depan DITERIMA (koreksi tanpa batas)", waka, TM, "4107", "izin", { tap: { masuk: jDepan } });
-    await manual("manual-jam: WAKA masuk 30 menit lalu TANPA mundur DITERIMA", waka, TM, "4108", "izin", { tap: { masuk: j30, mundur: undefined } });
-    await manual("manual-jam: WAKA masuk 5 menit lalu dengan mundur:true DITERIMA (hanya boleh bernilai true)", waka, TM, "4109", "izin", { tap: { masuk: j5, mundur: true } });
+    const K = { klem: false };
+    await manual("manual-jam: piket masuk 5 menit lalu TANPA mundur DITERIMA", piket, TD, "4101", "izin", { ...K, tap: { hariKe: HK, masuk: j5 } });
+    await manual("manual-jam: piket masuk 5 menit lalu dengan mundur:true DITOLAK (selisih < 14 menit)", piket, TD, "4102", "tolak", { ...K, tap: { hariKe: HK, masuk: j5, mundur: true } });
+    await manual("manual-jam: piket masuk 30 menit lalu TANPA mundur DITOLAK", piket, TD, "4103", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, mundur: undefined } });
+    await manual("manual-jam: piket masuk 30 menit lalu dengan mundur:true DITERIMA", piket, TD, "4104", "izin", { ...K, tap: { hariKe: HK, masuk: j30 } });
+    await cek("manual-jam: entri mundur tersimpan dengan masukDetik dan ts (dicatat)", waka, MT(TD, "4104"), (j) => j?.mundur === true && j.masukDetik === detikJ(j30) && j.masuk === j30 && typeof j.ts === "number");
+    await manual("manual-jam: piket masuk 10 menit di masa depan DITOLAK (melewati waktu dicatat)", piket, TD, "4105", "tolak", { ...K, tap: { hariKe: HK, masuk: jDepan } });
+    await manual("manual-jam: piket masuk 10 menit di masa depan + mundur:true tetap DITOLAK", piket, TD, "4105", "tolak", { ...K, tap: { hariKe: HK, masuk: jDepan, mundur: true } });
+    await manual("manual-jam: piket masuk +20 detik (dalam toleransi jam klien) DITERIMA", piket, TD, "4106", "izin", { ...K, tap: { hariKe: HK, masuk: jPas } });
+    await manual("manual-jam: WAKA masuk 10 menit di masa depan DITERIMA (koreksi tanpa batas)", waka, TD, "4107", "izin", { ...K, tap: { hariKe: HK, masuk: jDepan } });
+    await manual("manual-jam: WAKA masuk 30 menit lalu TANPA mundur DITERIMA", waka, TD, "4108", "izin", { ...K, tap: { hariKe: HK, masuk: j30, mundur: undefined } });
+    await manual("manual-jam: WAKA masuk 5 menit lalu dengan mundur:true DITERIMA (hanya boleh bernilai true)", waka, TD, "4109", "izin", { ...K, tap: { hariKe: HK, masuk: j5, mundur: true } });
     // konsistensi masuk <-> masukDetik (jam, menit, detik diuji TERPISAH)
-    await manual("manual-jam: masukDetik beda JAM dari masuk DITOLAK", waka, TM, "4110", "tolak", { tap: { masuk: j30, masukDetik: detikJ(j30) + 3600 } });
-    await manual("manual-jam: masukDetik beda MENIT dari masuk DITOLAK", waka, TM, "4110", "tolak", { tap: { masuk: j30, masukDetik: detikJ(j30) + 60 * 7 } });
-    await manual("manual-jam: masukDetik beda DETIK dari masuk DITOLAK", waka, TM, "4110", "tolak", { tap: { masuk: j30, masukDetik: detikJ(j30) + 1 } });
-    await manual("manual-jam: piket mengaburkan jam dengan masukDetik palsu (terbaru) DITOLAK", piket, TM, "4111", "tolak", { tap: { masuk: j30, masukDetik: detikJ(j5), mundur: undefined } });
+    await manual("manual-jam: masukDetik beda JAM dari masuk DITOLAK", waka, TD, "4110", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j30) + 3600 } });
+    await manual("manual-jam: masukDetik beda MENIT dari masuk DITOLAK", waka, TD, "4110", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j30) + 60 * 7 } });
+    await manual("manual-jam: masukDetik beda DETIK dari masuk DITOLAK", waka, TD, "4110", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j30) + 1 } });
+    await manual("manual-jam: piket mengaburkan jam dengan masukDetik palsu (terbaru) DITOLAK", piket, TD, "4111", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j5), mundur: undefined } });
+    // validasi isi masukDetik / mundur (kontrol: entri sehat dengan jam relatif yang sama DITERIMA)
+    await manual("manual-jam: kontrol - entri waka sah dengan jam relatif DITERIMA", waka, TD, "4112", "izin", { ...K, tap: { hariKe: HK, masuk: j30 } });
+    await manual("manual-jam: masuk TANPA masukDetik DITOLAK (piket)", piket, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: undefined } });
+    await manual("manual-jam: masuk TANPA masukDetik DITOLAK (waka)", waka, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: undefined } });
+    await manual("manual-jam: masukDetik pecahan DITOLAK", waka, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j30) + 0.5 } });
+    await manual("manual-jam: masukDetik berupa teks DITOLAK", waka, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: String(detikJ(j30)) } });
+    await manual("manual-jam: mundur bernilai false DITOLAK", waka, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, mundur: false } });
+    await manual("manual-jam: masukDetik di luar rentang (hari berikutnya) DITOLAK", waka, TD, "4113", "tolak", { ...K, tap: { hariKe: HK, masuk: j30, masukDetik: detikJ(j30) + 86400 } });
   }
-  await manual("manual-jam: masuk TANPA masukDetik DITOLAK (piket)", piket, TM, "4112", "tolak", { tap: { masukDetik: undefined } });
-  await manual("manual-jam: masuk TANPA masukDetik DITOLAK (waka)", waka, TM, "4112", "tolak", { tap: { masukDetik: undefined } });
-  await manual("manual-jam: masukDetik pecahan DITOLAK", waka, TM, "4113", "tolak", { tap: { masukDetik: detikJ("07:10:00") + 0.5 } });
-  await manual("manual-jam: masukDetik berupa teks DITOLAK", waka, TM, "4113", "tolak", { tap: { masukDetik: String(detikJ("07:10:00")) } });
   await manual("manual-jam: masukDetik TANPA masuk (hanya pulang) DITOLAK", piket, TM, "4114", "tolak", { tap: { masuk: undefined, pulang: "15:02:00", masukDetik: 100 }, salinan: { status: "Hadir", pulang: "15:02:00", alasan: "Lupa KTM" } });
   await manual("manual-jam: mundur TANPA masuk (hanya pulang) DITOLAK", piket, TM, "4114", "tolak", { tap: { masuk: undefined, pulang: "15:02:00", mundur: true }, salinan: { status: "Hadir", pulang: "15:02:00", alasan: "Lupa KTM" } });
-  await manual("manual-jam: mundur bernilai false DITOLAK", waka, TM, "4115", "tolak", { tap: { mundur: false } });
-  await manual("manual-jam: masukDetik di luar rentang (86400) DITOLAK", waka, TM, "4115", "tolak", { tap: { masukDetik: 86400 } });
   // tanggal lampau: mundur WAJIB bagi piket
   await manual("manual-jam: piket tanggal lampau TANPA mundur DITOLAK", piket, TM, "4116", "tolak", { tap: { hariKe: HKP, mundur: undefined } });
   await manual("manual-jam: piket tanggal lampau dengan mundur:true DITERIMA", piket, TM, "4117", "izin", { tap: { hariKe: HKP } });

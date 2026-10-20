@@ -2217,32 +2217,34 @@ test("per jam: Alfa seharian & keterangan harian DITURUNKAN (terkunci, tidak dit
 
 
 // ===================================================================== v2.4-a: BUKTI HADIR PALING AWAL + JAM MANUAL
-test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam dimundurkan ditandai; info gabung; saran; kartu waka", async ({ page, browser }) => {
+// Skenario memakai tanggal KEMARIN (hari kerja lampau): aturan jam manual tidak bergantung pada jam hari mesin uji
+// (Security Rules memakai jam NYATA emulator, sedangkan aplikasi memakai jam server palsu 16:00). Kartu Dashboard memakai entri hari ini hasil seed.
+test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam dimundurkan ditandai; info gabung; saran; laporan; kartu waka", async ({ page, browser }) => {
   const SISWA = { uid: "MNL00861", nis: "861", nama: "TARI LUPAKARTU", kelas: "XII IPS" };
   await dbPut(`config/students/${SISWA.uid}`, { nis: SISWA.nis, nama: SISWA.nama, kelas: SISWA.kelas });
-  await dbPut(`profiles/${SISWA.nis}`, { nama: SISWA.nama, kelas: SISWA.kelas });
+  await dbPut(`profiles/${SISWA.nis}`, { nama: SISWA.nama, kelas: SISWA.kelas, aktifSejak: "2020-01-01" });
   const lap = await siapkan(page);
   await masukPiket(page);
 
-  // piket: lupa KTM, jam 07:05 (Tepat). Dialog memperingatkan bahwa jam ini dimundurkan; jam melewati waktu sekarang ditolak.
-  await menu(page, "Presensi manual");
+  // piket: lupa KTM, jam 07:05 (Tepat) pada hari kerja kemarin. Jam sebelum awal jendela - 60 menit ditolak di dialog.
+  await page.goto(`/piket/presensi-manual?tanggal=${T.kemarin}`);
   const baris = page.locator(`.piket-grid[data-nis='${SISWA.nis}']`);
+  await expect(baris).toBeVisible();
   await baris.getByRole("button", { name: "Hadir manual" }).click();
-  let dlg = page.getByRole("dialog", { name: "Hadir manual" });
-  await dlg.getByLabel("Jam masuk").fill("17:30");
-  await expect(dlg.getByTestId("galat-jam-manual")).toContainText("tidak boleh melewati waktu pencatatan");
-  await dlg.getByRole("button", { name: "Simpan" }).click();
-  await expect(dlg.getByRole("alert")).toContainText("tidak boleh melewati waktu pencatatan");
+  const dlg = page.getByRole("dialog", { name: "Hadir manual" });
   await dlg.getByLabel("Jam masuk").fill("05:30");
   await expect(dlg.getByTestId("galat-jam-manual")).toContainText("tidak boleh lebih awal dari 06:00");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(dlg.getByRole("alert")).toContainText("tidak boleh lebih awal dari 06:00");
   await dlg.getByLabel("Jam masuk").fill("07:05");
   await expect(dlg.getByText("Status dihitung dari jadwal kelas: Hadir")).toBeVisible();
+  await expect(dlg.getByTestId("peringatan-mundur")).toContainText("Tanggal lampau");
   await dlg.getByRole("button", { name: "Simpan" }).click();
   await expect(toast(page)).toContainText("TARI LUPAKARTU: hadir manual (Hadir) tercatat");
 
   // siswa kembali mengambil kartu dan tap alat pukul 07:40 (alat mencatat Terlambat)
-  await dbPut(`attendance/${SISWA.nis}/${T.hariIni}`, { masuk: "07:40:00", status: "Terlambat" });
-  await dbPut(`log/${T.hariIni}/ALAT0861_M`, { jam: "07:40:00", nis: SISWA.nis, status: "Terlambat", nama: SISWA.nama, kelas: SISWA.kelas });
+  await dbPut(`attendance/${SISWA.nis}/${T.kemarin}`, { masuk: "07:40:00", status: "Terlambat" });
+  await dbPut(`log/${T.kemarin}/ALAT0861_M`, { jam: "07:40:00", nis: SISWA.nis, status: "Terlambat", nama: SISWA.nama, kelas: SISWA.kelas });
   const kartu = page.getByTestId("manual-tercatat").locator(`[data-nis='${SISWA.nis}']`);
   await expect(kartu).toContainText("masuk 07:05 (Hadir)");
   await expect(kartu.getByTestId("info-gabung")).toContainText("Tap alat 07:40 setelah presensi manual 07:05");
@@ -2250,24 +2252,31 @@ test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam d
   await expect(kartu.getByTestId("jam-dicatat")).toContainText("dicatat");
   bersih(kecualikan(lap, 2), "piket (v2.4 lupa KTM)");
 
-  // waka: kartu jam dimundurkan, tautan ke daftar, tanpa saran Terlambat (lupaKtm tetap), laporan log menampilkan kedua jam
+  // waka: tanpa saran Terlambat (lupaKtm tetap), bukan kandidat Alfa, laporan log menampilkan kedua jam, kartu jam dimundurkan
   const kW = await browser.newContext(opsiKonteks());
   const pw = await kW.newPage();
   const lapW = await siapkan(pw);
   await loginStaf(pw, "waka");
-  await expect(pw.getByTestId("jumlah-manual-mundur")).not.toHaveText("0");
-  await pw.getByTestId("kartu-manual-mundur").getByRole("link").click();
-  await expect(pw.getByTestId("manual-tercatat")).toContainText(SISWA.nama);
-  await expect(pw.getByTestId("manual-tercatat")).toContainText("hanya yang jam masuknya dimundurkan");
   await menu(pw, "Perlu ditinjau");
   await expect(pw.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: SISWA.nama })).toHaveCount(1);
   await expect(pw.locator('.saran-row[data-tipe="terlambat"]', { hasText: SISWA.nama })).toHaveCount(0);
   await menu(pw, "Validasi harian");
   await expect(pw.locator(".table-row", { hasText: SISWA.nama })).toHaveCount(0);
-  await pw.goto("/admin/laporan");
-  await expect(pw.getByRole("button", { name: "Log harian" })).toBeVisible();
+  // Laporan > Log harian pada tanggal kemarin: baris manual memuat jam diketik + dicatat + JAM DIMUNDURKAN; baris alat diberi catatan
+  await menu(pw, "Laporan");
+  await pw.getByRole("tab", { name: "Log harian" }).click();
+  await pw.locator("input[type=date]").first().fill(T.kemarin);
+  const barisManual = pw.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "Manual" });
+  await expect(barisManual).toContainText("diketik 07:05");
+  await expect(barisManual).toContainText("JAM DIMUNDURKAN");
+  await expect(pw.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "Setelah presensi manual 07:05" })).toHaveCount(1);
+  // kartu Dashboard: entri hari ini bertanda mundur (seed langsung) dihitung dan tautannya memakai filter
+  await dbPut(`manualTap/${T.hariIni}/862`, { masuk: "07:00:00", masukDetik: 25200, mundur: true, status: "Hadir", alasan: "Lupa KTM", oleh: "x", ts: Date.now(), hariKe: 1 });
+  await pw.goto("/waka");
+  await expect(pw.getByTestId("jumlah-manual-mundur")).toHaveText("1");
+  await expect(pw.getByTestId("kartu-manual-mundur").getByRole("link")).toHaveAttribute("href", new RegExp(`presensi-manual\?tanggal=${T.hariIni}&mundur=1`));
   bersih(kecualikan(lapW, 2), "waka (v2.4 lupa KTM)");
   await kW.close();
 
-  for (const path of [`config/students/${SISWA.uid}`, `profiles/${SISWA.nis}`, `attendance/${SISWA.nis}/${T.hariIni}`, `log/${T.hariIni}/ALAT0861_M`, `manualTap/${T.hariIni}/${SISWA.nis}`, `manualTapByStudent/${SISWA.nis}/${T.hariIni}`]) await dbPut(path, null);
+  for (const path of [`config/students/${SISWA.uid}`, `profiles/${SISWA.nis}`, `attendance/${SISWA.nis}/${T.kemarin}`, `log/${T.kemarin}/ALAT0861_M`, `manualTap/${T.kemarin}/${SISWA.nis}`, `manualTapByStudent/${SISWA.nis}/${T.kemarin}`, `manualTap/${T.hariIni}/862`]) await dbPut(path, null);
 });
