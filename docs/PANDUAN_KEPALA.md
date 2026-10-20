@@ -30,8 +30,9 @@ Untuk: Kepala Madrasah
 
 ## Pembinaan dan usulan remisi
 
-1. Menu Pembinaan: rekap pembinaan wali kelas dan pejabat; saring lalu Unduh CSV.
-2. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
+1. Menu Pembinaan: rekap pembinaan wali kelas, BK, dan pejabat; saring lalu Unduh CSV.
+2. Menu Konseling: Anda dapat membaca catatan konseling rahasia dari BK beserta riwayat koreksinya (hanya baca).
+3. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
 
 ## Yang tidak dapat dilakukan
 

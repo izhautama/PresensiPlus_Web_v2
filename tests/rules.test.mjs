@@ -47,6 +47,7 @@ async function uji(nama, who, op, path, body, harap /* "izin" | "tolak" */) {
   const r = await http(op, path, { token, body });
   const diizinkan = r.status === 200;
   const ok = harap === "izin" ? diizinkan : !diizinkan;
+  if (process.env.DBG_NAMA && nama.includes(process.env.DBG_NAMA)) console.log(`DBG [${nama}] status ${r.status} ${JSON.stringify(r.json)?.slice(0, 200)}`); // pemeriksaan mutan: lihat respons uji tertentu
   if (ok) hasil.lolos++;
   else hasil.gagal.push(`${nama}  [harap ${harap}, status ${r.status} ${JSON.stringify(r.json)}]`);
   console.log(`${ok ? "  ✓" : "  ✗"} ${nama}`);
@@ -2031,6 +2032,251 @@ await uji("usul: record usul-wali usA6 TIDAK dapat dibuat ulang (usulan sudah di
   [P("701", "usA6")]: REC_U("usA6"), [`${M("701", "usA6")}/dihapus`]: null, [`${M("701", "usA6")}/alasanHapus`]: null, [`${M("701", "usA6")}/snapshot`]: null,
   [`${M("701", "usA6")}/diubahOleh`]: waka.uid, [`${M("701", "usA6")}/diubahTs`]: SV,
 }, "tolak");
+// ================================================================ v2.4-b: BK (GURU BIMBINGAN KONSELING)
+seksi("BK — Guru Bimbingan Konseling: lintas kelas, konseling rahasia (baca BK+Kepala, tulis BK)");
+const bkA = await buatUser("bka@uji.test");
+const bkB = await buatUser("bkb@uji.test");
+const bkBaru1 = await buatUser("bkbaru1@uji.test");
+const bkBaru2 = await buatUser("bkbaru2@uji.test");
+const bkBaru3 = await buatUser("bkbaru3@uji.test"); // uid segar: belum punya role maupun staff
+for (const u of [bkA, bkB, bkBaru1, bkBaru2]) PERAN.set(u.uid, "bk");
+const stfBk = (nama) => ({ email: `${nama}@uji.test`, nama, role: "bk", dibuat: 1 });
+await http("PATCH", "", { owner: true, body: {
+  [`roles/${bkA.uid}`]: "bk", [`roles/${bkB.uid}`]: "bk",
+  [`staff/${bkA.uid}`]: stfBk("bka"), [`staff/${bkB.uid}`]: stfBk("bkb"),
+  // siswa uji khusus BK (kelas berbeda-beda) + siswa TANPA indeks
+  "siswaKelas/901": "X", "siswaKelas/902": "XI", "siswaKelas/903": "XII",
+  ...Object.fromEntries(["901", "902", "903"].flatMap((n) => [[`profiles/${n}`, { nama: `SISWA BK ${n}`, kelas: "?" }], [`attendance/${n}/${TGL}`, { masuk: "06:50:00", status: "Hadir" }], [`lessonsByStudent/${n}/${TGL}/2`, { k: "S" }]])),
+} });
+
+// ---- BACA lintas kelas (tanpa UID kartu/PIN/log tap)
+for (const p of ["siswaKelas", "profiles", "profiles/902", "attendance/903", `attendance/901/${TGL}`, "lessonsByStudent/902", "manualTapByStudent/901", "validasiByStudent/903", "discipline/records", "discipline/records/701", "discipline/records/703", "discipline/recordMeta", "discipline/recordMeta/704", "pembinaan", "pembinaan/701", "pembinaanStatus", "discipline/levels", "discipline/rules", "discipline/remisi", "discipline/settings", "kalenderEfektif"]) {
+  await izin(`bk: BK membaca ${p}`, bkA, "GET", p);
+}
+for (const p of ["config/students", "log", `log/${TGL}`, "attendance", "parents", "parents/701", "roles", `roles/${waka.uid}`, "staff", `staff/${waka.uid}`, "waliAkun", "bkAkun", "discipline/audit", "discipline/notes", "discipline/notes/701", "discipline/suggest", "lessons", "manualTap", "izin", "izinMeta", "validasi", "device", "device/status", "unknown", "activity", "piketHarian", "piketRoster", "sistem", "usulRemisi"]) {
+  await tolak(`bk: BK TIDAK membaca ${p}`, bkA, "GET", p);
+}
+await izin("bk: BK membaca usulan sendiri lewat query oleh=uid (kosong tidak apa-apa)", bkA, "GET", `usulRemisi?orderBy=${encodeURIComponent('"oleh"')}&equalTo=${encodeURIComponent(JSON.stringify(bkA.uid))}`);
+await tolak("bk: BK TIDAK query usulan orang lain", bkA, "GET", `usulRemisi?orderBy=${encodeURIComponent('"oleh"')}&equalTo=${encodeURIComponent(JSON.stringify(waliA.uid))}`);
+await tolak("bk: BK membaca roles milik orang lain ditolak", bkA, "GET", `roles/${bkB.uid}`);
+await izin("bk: BK membaca role sendiri", bkA, "GET", `roles/${bkA.uid}`);
+await izin("bk: BK membaca staff sendiri", bkA, "GET", `staff/${bkA.uid}`);
+
+// ---- TULIS yang DITOLAK: izin, per jam, Alfa, manual, master, kalender, akun
+await uji("bk: izin harian (ket) DITOLAK", bkA, "PATCH", "", { ...act(bkA, "izin-harian").body, [`attendance/901/${TGL}/ket`]: "Sakit", [`izin/${TGL}/901`]: "Sakit" }, "tolak");
+await uji("bk: izin per jam (S) DITOLAK", bkA, "PATCH", "", { ...act(bkA, "izin-jam").body, [`lessons/${HT}/X/absen/901/3`]: "S", [`lessonsByStudent/901/${HT}/3`]: { k: "S" } }, "tolak");
+await uji("bk: Alfa per jam (A) DITOLAK", bkA, "PATCH", "", aSet(bkA, "5102", 6), "tolak");
+await tolak("bk: sel per jam (PUT langsung, kode I) DITOLAK — hanya aturan tulis sel yang menahan", bkA, "PUT", `lessons/${HT}/${AJ}/absen/5102/6`, "I");
+await tolak("bk: sel per jam (PUT langsung, kode A) DITOLAK", bkA, "PUT", `lessons/${HT}/${AJ}/absen/5102/6`, "A");
+await tolak("bk: Alfa seharian (validasi) DITOLAK", bkA, "PUT", `validasi/${TGL}/901`, { status: "Alfa", oleh: bkA.uid, ts: SV });
+await uji("bk: presensi manual DITOLAK", bkA, "PATCH", "", manualBody(bkA, TM, "901"), "tolak");
+await uji("bk: presensi manual TANPA salinan (hanya entri asli) DITOLAK — hanya aturan tulis manualTap yang menahan", bkA, "PATCH", "", manualBody(bkA, TM, "901", { tanpaSalinan: true }), "tolak");
+await tolak("bk: kalender DITOLAK (tanggal yang sudah ada; waka dapat menandai tanggal yang sama)", bkA, "PUT", "kalenderEfektif/2026-11-16/normal", true);
+await tolak("bk: master aturan DITOLAK (isian sah; waka dapat menulis yang sama)", bkA, "PUT", "discipline/rules/rBK", { kategori: "Ringan", nama: "Uji BK", poin: 5, aktif: true, diubahOleh: bkA.uid, diubahTs: SV });
+await izin("bk: kontrol — waka dapat menulis aturan dengan isian yang sama", waka, "PUT", "discipline/rules/rBKkontrol", { kategori: "Ringan", nama: "Uji BK", poin: 5, aktif: true, diubahOleh: waka.uid, diubahTs: SV });
+await tolak("bk: master ambang (levels) DITOLAK", bkA, "PUT", "discipline/levels/lvBK", { poin: 300, tindakan: "Teguran uji", penanggungJawab: "bk" });
+await tolak("bk: master remisi DITOLAK (isian sah)", bkA, "PUT", "discipline/remisi/mBK", { kelompok: "Prestasi", nama: "Uji BK", poin: 5, aktif: true, diubahOleh: bkA.uid, diubahTs: SV });
+await tolak("bk: pemetaan saran DITOLAK", bkA, "PUT", "discipline/autoMap/terlambat", "r1");
+await tolak("bk: roles (memberi diri role admin) DITOLAK", bkA, "PUT", `roles/${bkA.uid}`, "admin");
+await tolak("bk: roles (memberi akun lain role bk) DITOLAK", bkA, "PUT", `roles/${bkBaru1.uid}`, "bk");
+await tolak("bk: staff orang lain DITOLAK", bkA, "PUT", `staff/${bkB.uid}/nama`, "ubah");
+await tolak("bk: siswaKelas (indeks) DITOLAK", bkA, "PUT", "siswaKelas/990", "X");
+await tolak("bk: profil siswa DITOLAK", bkA, "PUT", "profiles/901/nama", "UBAH");
+await tolak("bk: catatan internal (notes) DITOLAK", bkA, "PUT", "discipline/notes/901/x", "catatan");
+await tolak("bk: sistem/backup DITOLAK", bkA, "PUT", "sistem/backupTerakhir", SV);
+
+// ---- PEMBINAAN: hanya ambang berpenanggung jawab BK (lvB), siswa MANA PUN yang terindeks
+await pbw("bk: BK mencatat pembinaan ambang BK siswa kelas X (901)", bkA, "901", "izin", { levelId: "lvB" });
+await pbw("bk: BK mencatat pembinaan ambang BK siswa kelas XI (902) — lintas kelas", bkA, "902", "izin", { levelId: "lvB" });
+await pbw("bk: BK mencatat pembinaan ambang BK siswa kelas XII (903)", bkB, "903", "izin", { levelId: "lvB" });
+await cek("bk: pembinaan tersimpan dengan pelaksana BK", waka, `pembinaan/901/${pbId("lvB")}`, (j) => j?.oleh === bkA.uid && j.levelId === "lvB" && j.status === "selesai");
+await pbw("bk: ambang WALI (lvW) DITOLAK untuk BK", bkA, "901", "tolak", { levelId: "lvW" });
+await pbw("bk: ambang tanpa penanggung jawab (l1) DITOLAK untuk BK", bkA, "901", "tolak", { levelId: "l1", data: { levelPoin: 100 }, st: { levelPoin: 100 } });
+await pbw("bk: ambang tidak ada DITOLAK", bkA, "901", "tolak", { levelId: "lvTidakAda" });
+await pbw("bk: siswa tanpa indeks (111) DITOLAK", bkA, "111", "tolak", { levelId: "lvB" });
+await pbw("bk: TANPA log aktivitas DITOLAK", bkA, "901", "tolak", { levelId: "lvB", ...tanpaLog });
+await pbw("bk: log aksi salah ('pelanggaran') DITOLAK", bkA, "901", "tolak", { levelId: "lvB", aksi: "pelanggaran" });
+await pbw("bk: TANPA salinan status DITOLAK", bkA, "901", "tolak", { levelId: "lvB", tanpaStatus: true });
+await pbw("bk: salinan status berbeda status DITOLAK", bkA, "901", "tolak", { levelId: "lvB", st: { status: "dijadwalkan" } });
+await pbw("bk: oleh palsu DITOLAK", bkA, "901", "tolak", { levelId: "lvB", data: { oleh: waka.uid } });
+await pbw("wali: ambang BK (lvB) tetap DITOLAK untuk wali (regresi)", waliA, "701", "tolak", { levelId: "lvB" });
+await uji("bk: BK TIDAK mengoreksi pembinaan yang sudah selesai", bkA, "PATCH", "", { ...act(bkA, "catat-pembinaan").body, [`pembinaan/901/${pbId("lvB")}/hasil`]: "Diubah setelah selesai tanpa wewenang", [`pembinaan/901/${pbId("lvB")}/diubahOleh`]: bkA.uid, [`pembinaan/901/${pbId("lvB")}/diubahTs`]: SV }, "tolak");
+await tolak("bk: BK TIDAK menghapus pembinaan", bkA, "DELETE", `pembinaan/901/${pbId("lvB")}`);
+{
+  const taX = taFresh();
+  await tolak("bk: BK TIDAK menulis pembinaanStatus sendirian (tanpa pembinaan berpasangan)", bkA, "PUT", `pembinaanStatus/902/${taX}/lvB`, { id: `${taX}_lvB`, status: "selesai", tanggal: TGL, levelPoin: 200 });
+}
+
+// ---- PELANGGARAN Ringan / bertakziran (sumber 'bk') seperti wali/piket
+const bkPel = (u, n, id, ro = {}, mo = {}, o = {}) => ({
+  ...(o.act?.tanpa ? {} : act(u, o.aksi ?? "pelanggaran", o.act ?? {}).body),
+  [P(n, id)]: rec({ sumber: "bk", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5, ...ro }),
+  [M(n, id)]: meta(u, { dibuatNama: "Bu BK", hariKe: HK, ...mo }),
+});
+const bpl = (nama, who, n, id, ro, mo, harap, o) => uji(nama, who, "PATCH", "", bkPel(who, n, id, ro, mo, o), harap);
+await bpl("bk: pelanggaran Ringan siswa kelas X (901)", bkA, "901", "bkp1", {}, {}, "izin");
+await bpl("bk: pelanggaran bertakziran siswa kelas XII (903)", bkA, "903", "bkp2", { refId: "rT", kategori: "Sedang", nama: "Sedang bertakziran", poin: 50, takziran: "Bersihkan lorong" }, {}, "izin");
+await cek("bk: catatan terbaca waka dengan sumber 'bk' dan meta pencatat", waka, M("901", "bkp1"), (j) => j?.dibuatOleh === bkA.uid && j.hariKe === HK);
+await bpl("bk: siswa tanpa indeks (111) DITOLAK", bkA, "111", "bkpx1", {}, {}, "tolak");
+await bpl("bk: pelanggaran SEDANG tanpa takziran DITOLAK", bkA, "901", "bkpx2", { refId: "rS", kategori: "Sedang", nama: "Sedang tanpa takziran", poin: 30 }, {}, "tolak");
+await bpl("bk: pelanggaran BERAT DITOLAK", bkA, "901", "bkpx3", { refId: "rB", kategori: "Berat", nama: "Berat tanpa takziran", poin: 75 }, {}, "tolak");
+await bpl("bk: aturan NONAKTIF DITOLAK", bkA, "901", "bkpx4", { refId: "rOff", nama: "Ringan nonaktif" }, {}, "tolak");
+await bpl("bk: poin diubah (bukan dari master) DITOLAK", bkA, "901", "bkpx5", { poin: 4 }, {}, "tolak");
+await bpl("bk: REMISI langsung DITOLAK", bkA, "901", "bkpx6", { jenis: "remisi", refId: "m1", nama: "Contoh", poin: 10, kategori: undefined }, {}, "tolak");
+await bpl("bk: sumber 'manual' (jalur staf) DITOLAK", bkA, "901", "bkpx7", { sumber: "manual" }, {}, "tolak");
+await bpl("bk: sumber 'wali' DITOLAK", bkA, "901", "bkpx8", { sumber: "wali" }, {}, "tolak");
+await bpl("bk: TANPA log aktivitas DITOLAK", bkA, "901", "bkpx9", {}, {}, "tolak", { act: { tanpa: true } });
+await bpl("bk: hariKe BESOK DITOLAK (tanpa masa depan)", bkA, "901", "bkpx10", {}, { hariKe: HK + 1 }, "tolak");
+await bpl("bk: hariKe di luar jendela (40 hari lalu) DITOLAK", bkA, "901", "bkpx11", {}, { hariKe: HK - 40 }, "tolak");
+await uji("wali: sumber 'bk' DITOLAK untuk wali (regresi)", waliA, "PATCH", "", bkPel(waliA, "701", "bkpx12"), "tolak");
+await uji("piket: sumber 'bk' DITOLAK untuk piket (regresi)", piket, "PATCH", "", bkPel(piket, "701", "bkpx13"), "tolak");
+// hapus lunak: hanya catatan BK sendiri
+const bkHapus = (u, n, id, o = {}) => ({
+  ...act(u, o.aksi ?? "hapus-pelanggaran").body,
+  [P(n, id)]: null, [`${M(n, id)}/dihapus`]: true, [`${M(n, id)}/alasanHapus`]: "salah siswa", [`${M(n, id)}/snapshot`]: rec({ sumber: "bk", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5 }),
+  [`${M(n, id)}/diubahOleh`]: u.uid, [`${M(n, id)}/diubahTs`]: SV,
+});
+await uji("bk: BK B TIDAK menghapus catatan BK A", bkB, "PATCH", "", bkHapus(bkB, "901", "bkp1"), "tolak");
+await uji("bk: BK TIDAK menghapus catatan sumber 'manual' milik waka (recMan)", bkA, "PATCH", "", bkHapus(bkA, "701", "recMan"), "tolak");
+await uji("bk: BK menghapus (soft delete) catatan BK sendiri DITERIMA", bkA, "PATCH", "", bkHapus(bkA, "901", "bkp1"), "izin");
+
+// ---- USUL REMISI oleh BK (lintas kelas); diputuskan waka/kepala
+await us("bk: BK mengusulkan remisi siswa kelas X (901)", bkA, "bkU1", "izin", { data: { nis: "901" } });
+await us("bk: BK mengusulkan remisi siswa kelas XII (903) — lintas kelas", bkA, "bkU2", "izin", { data: { nis: "903" } });
+await us("bk: siswa tanpa indeks (111) DITOLAK", bkA, "bkUx1", "tolak", { data: { nis: "111" } });
+await us("bk: TANPA log aktivitas DITOLAK", bkA, "bkUx2", "tolak", { data: { nis: "901" }, act: { tanpa: true } });
+await us("bk: status langsung 'disetujui' DITOLAK", bkA, "bkUx3", "tolak", { data: { nis: "901", status: "disetujui" } });
+await us("bk: remisi nonaktif DITOLAK", bkA, "bkUx4", "tolak", { data: { nis: "901", remId: "mOff", nama: "Remisi nonaktif", poin: 20 } });
+await izin("bk: BK membaca usulan sendiri", bkA, "GET", "usulRemisi/bkU1");
+await tolak("bk: BK B TIDAK membaca usulan BK A", bkB, "GET", "usulRemisi/bkU1");
+await tolak("bk: BK TIDAK membaca seluruh node usulRemisi", bkA, "GET", "usulRemisi");
+await uji("bk: BK B TIDAK membatalkan usulan BK A", bkB, "PATCH", "", { ...act(bkB, "batal-usul").body, "usulRemisi/bkU1": null }, "tolak");
+await uji("bk: BK A membatalkan usulan SENDIRI (menunggu) DITERIMA", bkA, "PATCH", "", { ...act(bkA, "batal-usul").body, "usulRemisi/bkU2": null }, "izin");
+await uji("bk: BK TIDAK memutuskan usulan sendiri (setuju)", bkA, "PATCH", "", { ...act(bkA, "putuskan-usul").body, ...putus(bkA, "bkU1", { nis: "901" }) }, "tolak");
+await uji("bk: waka menyetujui usulan BK (usulan + record usul-wali + meta) DITERIMA", waka, "PATCH", "", putus(waka, "bkU1", { nis: "901" }), "izin");
+await uji("bk: BK TIDAK membatalkan usulan yang SUDAH diputuskan", bkA, "PATCH", "", { ...act(bkA, "batal-usul").body, "usulRemisi/bkU1": null }, "tolak");
+await cek("bk: record remisi 'usul-wali' tercipta untuk usulan BK", waka, "discipline/records/901/bkU1", (j) => j?.sumber === "usul-wali" && j.jenis === "remisi");
+
+// ---- CATATAN KONSELING RAHASIA
+const KS = (u, o = {}) => ({ tanggal: TGL, topik: "Pribadi", isi: "Siswa bercerita tentang masalah keluarga yang memengaruhi belajarnya.", rahasia: true, oleh: u.uid, olehNama: "Bu BK", dibuatTs: SV, ...o });
+const ksBody = (u, nis, id, o = {}) => ({ ...(o.act?.tanpa ? {} : act(u, o.aksi ?? "catat-konseling", o.act ?? {}).body), [`konseling/${nis}/${id}`]: KS(u, o.data ?? {}), ...(o.tambah ?? {}) });
+const ks = (nama, who, nis, id, harap, o) => uji(nama, who, "PATCH", "", ksBody(who, nis, id, o), harap);
+await ks("konseling: BK mencatat siswa kelas X (901)", bkA, "901", "k1", "izin");
+await ks("konseling: BK mencatat siswa kelas XI (902) — lintas kelas", bkA, "902", "k2", "izin", { data: { topik: "Akademik" } });
+await ks("konseling: BK B mencatat siswa kelas XII (903) dengan tindak lanjut", bkB, "903", "k3", "izin", { data: { topik: "Karier", tindakLanjut: "Pertemuan lanjutan pekan depan" } });
+for (const t of ["Akademik", "Pribadi", "Sosial", "Karier", "Keluarga", "Lainnya"]) await ks(`konseling: topik '${t}' DITERIMA`, bkA, "901", `kt${t}`, "izin", { data: { topik: t } });
+await ks("konseling: topik di luar daftar DITOLAK", bkA, "901", "kx1", "tolak", { data: { topik: "Hiburan" } });
+await ks("konseling: isi < 10 karakter DITOLAK", bkA, "901", "kx2", "tolak", { data: { isi: "pendek" } });
+await ks("konseling: isi tepat 2000 karakter DITERIMA", bkA, "901", "kx3", "izin", { data: { isi: "x".repeat(2000) } });
+await ks("konseling: isi 2001 karakter DITOLAK", bkA, "901", "kx4", "tolak", { data: { isi: "x".repeat(2001) } });
+await ks("konseling: tindak lanjut 501 karakter DITOLAK", bkA, "901", "kx5", "tolak", { data: { tindakLanjut: "x".repeat(501) } });
+await ks("konseling: rahasia bukan true DITOLAK", bkA, "901", "kx6", "tolak", { data: { rahasia: false } });
+await ks("konseling: TANPA field rahasia DITOLAK", bkA, "901", "kx7", "tolak", { data: { rahasia: undefined } });
+await ks("konseling: oleh palsu DITOLAK", bkA, "901", "kx8", "tolak", { data: { oleh: bkB.uid } });
+await ks("konseling: dibuatTs bukan waktu server DITOLAK", bkA, "901", "kx9", "tolak", { data: { dibuatTs: 12345 } });
+await ks("konseling: format tanggal salah DITOLAK", bkA, "901", "kx10", "tolak", { data: { tanggal: "20-10-2026" } });
+await ks("konseling: field asing DITOLAK", bkA, "901", "kx11", "tolak", { data: { rahasia2: 1 } });
+await ks("konseling: membawa diubahTs pada pembuatan DITOLAK", bkA, "901", "kx12", "tolak", { data: { diubahTs: SV } });
+await ks("konseling: TANPA log aktivitas DITOLAK", bkA, "901", "kx13", "tolak", { act: { tanpa: true } });
+await ks("konseling: log aksi salah ('pelanggaran') DITOLAK", bkA, "901", "kx14", "tolak", { aksi: "pelanggaran" });
+await ks("konseling: penanda log tanpa ENTRI DITOLAK", bkA, "901", "kx15", "tolak", { act: { tanpaEntri: true } });
+await ks("konseling: siswa tanpa indeks (111) DITOLAK", bkA, "111", "kx16", "tolak");
+await ks("konseling: id tidak sah DITOLAK", bkA, "901", "k.bad", "tolak");
+await uji("konseling: BK menimpa catatan yang ada lewat jalur BUAT (log catat) DITOLAK", bkA, "PATCH", "", ksBody(bkA, "901", "k1", { data: { isi: "Menimpa catatan lama tanpa audit sama sekali." } }), "tolak");
+
+// ---- siapa boleh MEMBACA
+for (const [n, who] of [["BK A", bkA], ["BK B", bkB], ["kepala", kepala]]) {
+  await izin(`konseling: ${n} membaca satu catatan`, who, "GET", "konseling/901/k1");
+  await izin(`konseling: ${n} membaca konseling per siswa`, who, "GET", "konseling/902");
+  await izin(`konseling: ${n} membaca seluruh node konseling`, who, "GET", "konseling");
+}
+for (const [n, who] of [["waka", waka], ["admin", admin], ["wali A", waliA], ["piket", piket], ["ortu", ortu1], ["alat", dev], ["anonim", null]]) {
+  await tolak(`konseling: ${n} TIDAK membaca satu catatan`, who, "GET", "konseling/901/k1");
+  await tolak(`konseling: ${n} TIDAK membaca konseling per siswa`, who, "GET", "konseling/901");
+  await tolak(`konseling: ${n} TIDAK membaca seluruh node`, who, "GET", "konseling");
+}
+await tolak("konseling: waka TIDAK query konseling", waka, "GET", `konseling?orderBy=${encodeURIComponent('"$key"')}&limitToFirst=1`);
+await tolak("konseling: ortu TIDAK membaca konseling anak sendiri (111)", ortu1, "GET", "konseling/111");
+// ---- siapa boleh MENULIS (selain BK ditolak, termasuk lewat Console = klien REST)
+for (const [n, who] of [["kepala", kepala], ["waka", waka], ["admin", admin], ["wali A", waliA], ["piket", piket], ["ortu", ortu1], ["alat", dev]]) {
+  await uji(`konseling: ${n} TIDAK menulis catatan (log valid)`, who, "PATCH", "", ksBody(who, "901", `kw-${n.replace(/\s/g, "")}`), "tolak");
+  await tolak(`konseling: ${n} TIDAK menulis catatan (PUT langsung)`, who, "PUT", `konseling/901/kp-${n.replace(/\s/g, "")}`, KS(who));
+}
+await tolak("konseling: anonim TIDAK menulis", null, "PUT", "konseling/901/kanon", KS(bkA));
+
+// ---- koreksi: ubah + audit konseling SAMA update; hapus fisik ditolak
+const ksUbah = (u, nis, id, lama, o = {}) => ({
+  ...act(u, o.aksi ?? "ubah-konseling", o.act ?? {}).body,
+  [`konseling/${nis}/${id}/isi`]: o.isi ?? "Isi yang sudah dikoreksi oleh konselor pembuat catatan ini.",
+  [`konseling/${nis}/${id}/diubahTs`]: SV, [`konseling/${nis}/${id}/diubahOleh`]: u.uid,
+  ...(o.tanpaAudit ? {} : { [`konselingAudit/${nis}/${o.auditKey ?? "__LOG__"}`]: { konselingId: id, oleh: o.auditOleh ?? u.uid, olehNama: "Bu BK", ts: SV, sebelum: { tanggal: TGL, topik: "Pribadi", isi: lama, ...(o.sebelum ?? {}) } } }),
+  ...(o.tambah ?? {}),
+});
+const LAMA_K1 = "Siswa bercerita tentang masalah keluarga yang memengaruhi belajarnya.";
+await ks("konseling: siapkan catatan kn (topik Pribadi) untuk uji koreksi negatif", bkA, "902", "kn", "izin", { data: { isi: LAMA_K1 } });
+/** Audit dikunci dengan id entri log aktivitas; helper act() membuat id acak, jadi id diambil dari body log lalu dipasang ke kunci audit. */
+const ubahKs = (u, nis, id, lama, o = {}) => {
+  const b = ksUbah(u, nis, id, lama, o);
+  const idLog = b[`activityLast/${u.uid}`]?.id;
+  const k = `konselingAudit/${nis}/__LOG__`;
+  if (b[k]) { b[`konselingAudit/${nis}/${idLog}`] = b[k]; delete b[k]; }
+  return b;
+};
+await uji("konseling: BK pembuat mengubah isi + audit + log 'ubah-konseling' DITERIMA", bkA, "PATCH", "", ubahKs(bkA, "901", "k1", LAMA_K1), "izin");
+await cek("konseling: isi baru tersimpan dengan diubahTs/diubahOleh; dibuatTs & oleh tetap", bkA, "konseling/901/k1", (j) => j?.isi.startsWith("Isi yang sudah dikoreksi") && j.diubahOleh === bkA.uid && j.oleh === bkA.uid && typeof j.diubahTs === "number" && typeof j.dibuatTs === "number");
+await cek("konseling: audit menyimpan isi LAMA, terbaca BK", bkA, "konselingAudit/901", (j) => Object.values(j ?? {}).some((x) => x.konselingId === "k1" && x.sebelum?.isi === LAMA_K1));
+await cek("konseling: audit terbaca kepala", kepala, "konselingAudit/901", (j) => Object.keys(j ?? {}).length === 1);
+await uji("konseling: ubah TANPA audit DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { tanpaAudit: true }), "tolak");
+await uji("konseling: ubah dengan audit isi lama TIDAK cocok DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", "isi lama yang dipalsukan sama sekali berbeda", {}), "tolak");
+await uji("konseling: ubah dengan audit tanggal lama tidak cocok DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { sebelum: { tanggal: "2026-01-02" } }), "tolak");
+await uji("konseling: audit memuat oleh orang lain (BK B) saat BK A mengoreksi DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { auditOleh: bkB.uid }), "tolak");
+await uji("konseling: ubah dengan audit topik lama tidak cocok DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", "Siswa bercerita tentang masalah keluarga yang memengaruhi belajarnya.", { sebelum: { topik: "Sosial" } }), "tolak");
+await uji("konseling: ubah dengan log aksi 'catat-konseling' DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { aksi: "catat-konseling" }), "tolak");
+await uji("konseling: ubah TANPA log aktivitas DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { act: { tanpa: true } }), "tolak");
+await uji("konseling: BK B (bukan pembuat) mengubah catatan BK A DITOLAK", bkB, "PATCH", "", ubahKs(bkB, "902", "kn", LAMA_K1), "tolak");
+await uji("konseling: ubah tanpa diubahTs DITOLAK", bkA, "PATCH", "", (() => { const b = ubahKs(bkA, "902", "kn", LAMA_K1); delete b["konseling/902/kn/diubahTs"]; return b; })(), "tolak");
+await uji("konseling: ubah dengan oleh dialihkan ke BK lain DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { tambah: { "konseling/902/kn/oleh": bkB.uid } }), "tolak");
+await uji("konseling: ubah dengan dibuatTs diganti DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { tambah: { "konseling/902/kn/dibuatTs": 5 } }), "tolak");
+await uji("konseling: ubah dengan rahasia=false DITOLAK", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1, { tambah: { "konseling/902/kn/rahasia": false } }), "tolak");
+await uji("konseling: BK B menulis audit LEPAS untuk catatan BK A (tanpa perubahan konseling) DITOLAK", bkB, "PUT", "konselingAudit/902/auditLepasB", { konselingId: "kn", oleh: bkB.uid, olehNama: "x", ts: SV, sebelum: { tanggal: TGL, topik: "Pribadi", isi: LAMA_K1 } }, "tolak");
+await uji("konseling: kontrol — koreksi SAH atas kn (semua syarat terpenuhi) DITERIMA", bkA, "PATCH", "", ubahKs(bkA, "902", "kn", LAMA_K1), "izin");
+for (const [n, who] of [["BK A", bkA], ["BK B", bkB], ["kepala", kepala], ["admin", admin], ["waka", waka]]) {
+  await tolak(`konseling: ${n} TIDAK menghapus fisik catatan (DELETE)`, who, "DELETE", "konseling/902/k2");
+  await uji(`konseling: ${n} TIDAK menghapus fisik lewat PATCH null`, who, "PATCH", "", { ...act(who, "ubah-konseling").body, "konseling/902/k2": null }, "tolak");
+}
+await tolak("konseling: BK TIDAK menghapus node konseling siswa", bkA, "DELETE", "konseling/902");
+await cek("konseling: catatan k2 tetap utuh setelah semua upaya", bkA, "konseling/902/k2", (j) => j?.topik === "Akademik" && j.isi.startsWith("Siswa bercerita"));
+// audit khusus
+for (const [n, who] of [["waka", waka], ["admin", admin], ["wali A", waliA], ["piket", piket], ["ortu", ortu1], ["anonim", null]]) {
+  await tolak(`konselingAudit: ${n} TIDAK membaca`, who, "GET", "konselingAudit/901");
+}
+await tolak("konselingAudit: BK TIDAK menimpa entri audit yang ada", bkA, "PATCH", "", { ...act(bkA, "ubah-konseling").body, [`konselingAudit/901/${Object.keys((await http("GET", "konselingAudit/901", { owner: true })).json ?? {})[0]}`]: { konselingId: "k1", oleh: bkA.uid, olehNama: "x", ts: SV, sebelum: { tanggal: TGL, topik: "Pribadi", isi: LAMA_K1 } } });
+await tolak("konselingAudit: BK TIDAK menghapus audit", bkA, "DELETE", `konselingAudit/901/${Object.keys((await http("GET", "konselingAudit/901", { owner: true })).json ?? {})[0]}`);
+await tolak("konselingAudit: BK TIDAK menulis audit sendirian (tanpa perubahan konseling)", bkA, "PUT", "konselingAudit/901/auditLepas", { konselingId: "k1", oleh: bkA.uid, olehNama: "x", ts: SV, sebelum: { tanggal: TGL, topik: "Pribadi", isi: "Isi yang sudah dikoreksi oleh konselor pembuat catatan ini." } });
+await tolak("konselingAudit: kepala TIDAK menulis", kepala, "PUT", "konselingAudit/901/auditK", { konselingId: "k1", oleh: kepala.uid, olehNama: "x", ts: SV, sebelum: { tanggal: TGL, topik: "Pribadi", isi: "x".repeat(12) } });
+// isi konseling TIDAK pernah ada di audit umum / aktivitas yang dibaca waka dan admin
+const umum = JSON.stringify((await http("GET", "discipline/audit", { owner: true })).json ?? {}) + JSON.stringify((await http("GET", "activity", { owner: true })).json ?? {});
+await cek("konseling: isi catatan tidak bocor ke audit umum / log aktivitas (klien menulis detail tanpa isi)", waka, `activity/${TGLN}`, () => !umum.includes("masalah keluarga yang memengaruhi belajarnya"));
+
+// ---- AKUN BK: dibuat admin (bebas) dan waka (per-field, hanya role 'bk' bersama staff.role 'bk')
+const staffBkBaru = (uid, nama) => ({ [`staff/${uid}/email`]: `${nama}@uji.test`, [`staff/${uid}/nama`]: nama, [`staff/${uid}/role`]: "bk", [`staff/${uid}/dibuat`]: SV_ANGKA });
+await uji("akun BK: admin membuat (role + staff)", admin, "PATCH", "", { [`roles/${bkBaru1.uid}`]: "bk", [`staff/${bkBaru1.uid}`]: stfBk("bkbaru1"), [`bkAkun/${bkBaru1.uid}`]: { email: "bkbaru1@uji.test", nama: "bkbaru1", aktif: true } }, "izin");
+await uji("akun BK: waka membuat (role + staff per-field + cermin bkAkun)", waka, "PATCH", "", { [`roles/${bkBaru2.uid}`]: "bk", ...staffBkBaru(bkBaru2.uid, "bkbaru2"), [`bkAkun/${bkBaru2.uid}/email`]: "bkbaru2@uji.test", [`bkAkun/${bkBaru2.uid}/nama`]: "bkbaru2", [`bkAkun/${bkBaru2.uid}/aktif`]: true }, "izin");
+await uji("akun BK: waka memasang role 'bk' pada uid segar TANPA staff.role 'bk' DITOLAK", waka, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk" }, "tolak");
+await uji("akun BK: waka memasang role 'bk' dengan staff.role 'wali' DITOLAK", waka, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk", [`staff/${bkBaru3.uid}/email`]: "x@uji.test", [`staff/${bkBaru3.uid}/nama`]: "x", [`staff/${bkBaru3.uid}/role`]: "wali", [`staff/${bkBaru3.uid}/dibuat`]: SV_ANGKA }, "tolak");
+await tolak("akun BK: waka TIDAK memberi role 'admin'", waka, "PUT", `roles/${bkBaru2.uid}`, "admin");
+await tolak("akun BK: waka TIDAK memberi role 'kepala'", waka, "PUT", `roles/${bkBaru2.uid}`, "kepala");
+await tolak("akun BK: waka TIDAK menulis node staff utuh", waka, "PUT", `staff/${bkBaru2.uid}`, stfBk("bkbaru2"));
+await tolak("akun BK: kepala TIDAK membuat akun", kepala, "PUT", `roles/${bkBaru1.uid}`, "bk");
+await tolak("akun BK: piket TIDAK membuat akun", piket, "PUT", `roles/${bkBaru1.uid}`, "bk");
+await izin("akun BK: waka mencabut (hapus role bk)", waka, "DELETE", `roles/${bkBaru2.uid}`);
+await izin("akun BK: waka menonaktifkan di cermin (aktif=false)", waka, "PUT", `bkAkun/${bkBaru2.uid}/aktif`, false);
+await izin("akun BK: waka membaca cermin bkAkun", waka, "GET", "bkAkun");
+await izin("akun BK: kepala membaca cermin bkAkun", kepala, "GET", "bkAkun");
+await tolak("akun BK: waka TIDAK mengubah email cermin yang sudah ada", waka, "PUT", `bkAkun/${bkBaru2.uid}/email`, "ganti@uji.test");
+await tolak("akun BK: BK TIDAK membaca bkAkun", bkA, "GET", "bkAkun");
+await izin("akun BK: admin memasang kembali role bk", admin, "PUT", `roles/${bkBaru2.uid}`, "bk");
+
 seksi("PERANGKAT PIKET — piketPerangkat (create-only)");
 {
   const dev1 = `perangkat-${Date.now().toString(36)}-01`;

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PANDUAN, URUTAN_PANDUAN, hitungKata, keMarkdown } from "../src/lib/panduan.ts";
 
-assert.deepEqual(URUTAN_PANDUAN, ["admin", "kepala", "waka", "piket", "wali", "ortu", "sop"]);
-const BERKAS = { admin: "PANDUAN_ADMIN.md", kepala: "PANDUAN_KEPALA.md", waka: "PANDUAN_WAKA.md", piket: "PANDUAN_PIKET.md", wali: "PANDUAN_WALI.md", ortu: "PANDUAN_ORANG_TUA.md", sop: "SOP_HARIAN.md" };
+assert.deepEqual(URUTAN_PANDUAN, ["admin", "kepala", "waka", "piket", "wali", "bk", "ortu", "sop"]);
+const BERKAS = { admin: "PANDUAN_ADMIN.md", kepala: "PANDUAN_KEPALA.md", waka: "PANDUAN_WAKA.md", piket: "PANDUAN_PIKET.md", wali: "PANDUAN_WALI.md", bk: "PANDUAN_BK.md", ortu: "PANDUAN_ORANG_TUA.md", sop: "SOP_HARIAN.md" };
 for (const k of URUTAN_PANDUAN) {
   const p = PANDUAN[k];
   assert.equal(p.berkas, BERKAS[k]);
@@ -37,3 +37,7 @@ assert.match(teks("admin"), /Wali kelas/); assert.match(teks("admin"), /Indeks s
 // tidak ada rahasia/URL nyata di panduan
 for (const k of URUTAN_PANDUAN) assert.doesNotMatch(teks(k), /AIza|firebaseio|password-uji|@gmail/i);
 console.log("panduan.test: OK");
+
+// v2.4-b: panduan BK memuat konseling rahasia; admin/kepala/waka menyebut Guru BK / Konseling
+assert.match(teks("bk"), /Konseling/); assert.match(teks("bk"), /rahasia/i); assert.match(teks("bk"), /Perlu dibina/); assert.match(teks("bk"), /tidak dapat dihapus/i);
+assert.match(teks("admin"), /Guru BK/); assert.match(teks("waka"), /Guru BK/); assert.match(teks("kepala"), /Konseling/);

@@ -11,7 +11,7 @@ export const NAMA_AKSI: Record<string, string> = {
   "hapus-izin": "Hapus izin", pelanggaran: "Pelanggaran", "hapus-pelanggaran": "Hapus pelanggaran", remisi: "Remisi",
   "ubah-pelanggaran": "Ubah pelanggaran", "pulihkan-pelanggaran": "Pulihkan pelanggaran", "presensi-jam": "Presensi per jam", "presensi-manual": "Presensi manual", "atur-wali": "Atur wali kelas", "alfa-jam": "Alfa per jam", "perbaiki-indeks": "Perbaiki indeks kelas", "atur-penanggung-jawab": "Atur penanggung jawab level", "catat-pembinaan": "Catat pembinaan", "usul-remisi": "Usul remisi", "batal-usul": "Batalkan usulan remisi", "putuskan-usul": "Putuskan usulan remisi", "atur-kalender": "Atur kalender (override)", "hapus-kalender": "Hapus override kalender", "hitung-kalender": "Hitung hari efektif", "normal-kalender": "Konfirmasi hari normal", "ambang-kalender": "Ubah ambang hari efektif", "migrasi-kalender": "Migrasi kalender", "hapus-manual": "Hapus presensi manual",
   "validasi-alfa": "Validasi Alfa", "batal-alfa": "Batal Alfa", "saran-setuju": "Setujui saran", "saran-abaikan": "Abaikan saran",
-  "kunci-akun": "Kunci akun", "buka-kunci": "Buka kunci akun",
+  "kunci-akun": "Kunci akun", "buka-kunci": "Buka kunci akun", "catat-konseling": "Catat konseling", "ubah-konseling": "Ubah konseling", "atur-bk": "Atur akun BK",
 };
 
 export function saring(daftar: EntriLog[], f: Filter, namaSiswa: (nis: string) => string): EntriLog[] {

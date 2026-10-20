@@ -31,10 +31,11 @@ const Panduan = lazy(() => import("../pages/Panduan"));
 const PembinaanRekap = lazy(() => import("../kesiswaan/PembinaanRekap"));
 const UsulanRemisi = lazy(() => import("../kesiswaan/UsulanRemisi"));
 const WaliKelas = lazy(() => import("../kesiswaan/WaliKelas"));
+const GuruBk = lazy(() => import("../kesiswaan/GuruBk"));
 const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 
-export type PanelMode = "admin" | "kepala" | "waka" | "piket" | "wali";
+export type PanelMode = "admin" | "kepala" | "waka" | "piket" | "wali" | "bk";
 type NavItem = { to: string; label: string; icon: IconName; title: string; section?: string };
 
 /** Menu Kesiswaan dipakai bersama tiga peran; hak ubah ditegakkan Security Rules (admin hanya baca). */
@@ -57,6 +58,8 @@ const kesiswaan = (base: string, denganHarian: boolean): NavItem[] => {
   baru.splice(baru.findIndex((x) => x.to.endsWith("/audit")), 0, laporanKes(base, "Laporan kesiswaan"));
   if (base === "/admin") baru.push({ to: `${base}/petugas-piket`, label: "Petugas piket", icon: "users", title: "Petugas piket" });
   if (base === "/admin") baru.push({ to: `${base}/wali-kelas`, label: "Wali kelas", icon: "users", title: "Wali kelas" });
+  if (base === "/admin") baru.push({ to: `${base}/guru-bk`, label: "Guru BK", icon: "users", title: "Guru BK" });
+  if (base === "/kepala") baru.push({ to: `${base}/konseling`, label: "Konseling", icon: "eye", title: "Konseling (baca saja)" });
   if (base === "/admin") baru.push({ to: `${base}/log-aktivitas`, label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" });
   const daftar = denganHarian ? [...harian(base), ...baru] : baru;
   return daftar.map((x, i) => (i === 0 ? { ...x, section: "KESISWAAN" } : x));
@@ -108,6 +111,18 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/wali/panduan", label: "Panduan", icon: "file", title: "Panduan wali kelas" },
     ],
   },
+  bk: {
+    base: "/bk", role: "Guru BK", short: "BK", menuLabel: "Menu guru BK",
+    nav: [
+      { to: "/bk", label: "Dashboard", icon: "grid", title: "Dashboard BK" },
+      { to: "/bk/siswa", label: "Siswa", icon: "users", title: "Siswa (semua kelas)" },
+      { to: "/bk/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
+      { to: "/bk/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
+      { to: "/bk/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
+      { to: "/bk/konseling", label: "Konseling", icon: "eye", title: "Catatan konseling (rahasia)" },
+      { to: "/bk/panduan", label: "Panduan", icon: "file", title: "Panduan BK" },
+    ],
+  },
   waka: {
     base: "/waka", role: "Waka Kesiswaan", short: "WK", menuLabel: "Menu waka kesiswaan",
     nav: [
@@ -116,6 +131,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       laporanKes("/waka", "Laporan"),
       { to: "/waka/petugas-piket", label: "Petugas piket", icon: "users", title: "Petugas piket" },
       { to: "/waka/wali-kelas", label: "Wali kelas", icon: "users", title: "Wali kelas" },
+      { to: "/waka/guru-bk", label: "Guru BK", icon: "users", title: "Guru BK" },
       ...kesiswaan("/waka", false).filter((x) => x.to !== "/waka/laporan-kesiswaan"),
       { to: "/waka/log-aktivitas", label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" },
       { to: "/waka/panduan", label: "Panduan", icon: "file", title: "Panduan" },
@@ -157,6 +173,7 @@ export default function AdminLayout() {
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
           <Route path="wali-kelas" element={<WaliKelas />} />
+          <Route path="guru-bk" element={<GuruBk />} />
           <Route path="kalender" element={<Kalender />} />
           <Route path="panduan" element={<Panduan peran="admin" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />
@@ -185,6 +202,7 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
   const lencana: Record<string, number> = {
     [`${P.base}/usulan-remisi`]: antreanUsul(usul.data).length,
     "/wali/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
+    "/bk/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
   };
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {

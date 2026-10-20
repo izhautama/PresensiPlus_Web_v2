@@ -4,7 +4,7 @@ import Icon from "../components/Icon";
 import { Empty, Field, Spinner } from "../components/ui";
 import StudentPicker from "../components/StudentPicker";
 import { useToast } from "../admin/AdminLayout";
-import { useAuth } from "../auth/AuthContext";
+import { usePembina } from "./pembina";
 import { ringkas, type Remisi } from "../lib/discipline";
 import { validasiUsul, type UsulRemisi } from "../lib/pembinaan";
 import { formatTanggal } from "../lib/time";
@@ -17,9 +17,8 @@ const BADGE = { menunggu: "badge-lemah", disetujui: "badge-aman", ditolak: "badg
 
 /** Usulan remisi oleh wali: wali hanya mengusulkan dan membatalkan usulan sendiri yang menunggu; keputusan ada pada waka/kepala. */
 export default function UsulanRemisi() {
-  const { session } = useAuth();
-  const uid = session?.role === "wali" ? session.uid : "";
-  const nama = session?.role === "wali" ? session.nama : "";
+  const pembina = usePembina();
+  const { uid, nama } = pembina;
   const notify = useToast();
   const d = useDisiplinKelas();
   const master = useLive<Record<string, Remisi>>("discipline/remisi");
@@ -39,7 +38,7 @@ export default function UsulanRemisi() {
     e.preventDefault();
     const s = nis[0] ? siswa.get(nis[0]) : undefined;
     const v: Record<string, string> = {};
-    if (!s) v.siswa = "Pilih siswa kelas binaan";
+    if (!s) v.siswa = pembina.peran === "bk" ? "Pilih siswa" : "Pilih siswa kelas binaan";
     const remisi = master.data?.[remId];
     const punyaPel = s ? ringkas(d.recs[s.nis], d.ta).pel > 0 : false;
     Object.assign(v, validasiUsul({ remisi, alasan, punyaPelanggaranTa: punyaPel, usulLain: Object.values(usul.data ?? {}), nis: s?.nis ?? "", remId }));
@@ -51,7 +50,7 @@ export default function UsulanRemisi() {
       notify("Usulan dikirim ke Waka/Kepala");
       setNis([]); setRemId(""); setAlasan("");
     } catch (ex) {
-      setErr({ umum: /permission/i.test((ex as Error).message) ? "Usulan ditolak. Pastikan siswa ada di kelas binaan Anda dan remisi masih aktif." : (ex as Error).message });
+      setErr({ umum: /permission/i.test((ex as Error).message) ? pembina.peran === "bk" ? "Usulan ditolak. Pastikan siswa terdaftar di indeks kelas dan remisi masih aktif." : "Usulan ditolak. Pastikan siswa ada di kelas binaan Anda dan remisi masih aktif." : (ex as Error).message });
     } finally { setBusy(false); }
   };
 

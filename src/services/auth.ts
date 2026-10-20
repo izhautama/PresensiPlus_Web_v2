@@ -24,7 +24,7 @@ export async function loginAdmin(email: string, password: string, remember: bool
     await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
     const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
     const role = (await get(r(`roles/${cred.user.uid}`))).val();
-    if (role !== "admin" && role !== "kepala" && role !== "waka" && role !== "piket" && role !== "wali") {
+    if (role !== "admin" && role !== "kepala" && role !== "waka" && role !== "piket" && role !== "wali" && role !== "bk") {
       await signOut(auth);
       return { success: false, message: "Email atau password salah" }; // generik: jangan bocorkan akun ada
     }

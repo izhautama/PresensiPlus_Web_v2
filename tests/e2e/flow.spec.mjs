@@ -2280,3 +2280,200 @@ test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam d
 
   for (const path of [`config/students/${SISWA.uid}`, `profiles/${SISWA.nis}`, `attendance/${SISWA.nis}/${T.kemarin}`, `log/${T.kemarin}/ALAT0861_M`, `manualTap/${T.kemarin}/${SISWA.nis}`, `manualTapByStudent/${SISWA.nis}/${T.kemarin}`, `manualTap/${T.hariIni}/862`]) await dbPut(path, null);
 });
+
+// ===================================================================== v2.4-b: PERAN BK (Guru Bimbingan Konseling)
+test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat siswa semua kelas", async ({ page, browser }) => {
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  await menu(page, "Guru BK");
+  await expect(judul(page)).toHaveText("Guru BK");
+  await page.getByRole("button", { name: "Tambah guru BK" }).click();
+  const dlg = page.getByRole("dialog", { name: "Tambah guru BK" });
+  await dlg.getByLabel("Nama guru BK").fill("Bu Konselor Satu");
+  await dlg.getByLabel("Email guru BK").fill(`bk1.${proyek()}@e2e.test`);
+  await dlg.getByLabel("Password sementara").fill("sementara-123");
+  await dlg.getByLabel("Ulangi password").fill("sementara-123");
+  await dlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Akun BK Bu Konselor Satu dibuat");
+  await expect(page.locator("[data-testid=daftar-bk] [data-uid]", { hasText: "Bu Konselor Satu" })).toContainText("Aktif");
+  // akun BK tidak bercampur dengan daftar akun staf lain (kepala/waka/piket) di Pengaturan
+  await page.goto("/admin/pengaturan");
+  await expect(page.getByText("Bu Konselor Satu")).toHaveCount(0);
+  bersih(lap, "admin (guru BK)");
+
+  // waka: juga boleh membuat akun BK (per-field), tetapi tidak melihat catatan konseling
+  const kW = await browser.newContext(opsiKonteks());
+  const pw = await kW.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await menu(pw, "Guru BK");
+  await expect(pw.getByTestId("daftar-bk")).toContainText("Bu Konselor Satu");
+  await pw.getByRole("button", { name: "Tambah guru BK" }).click();
+  const d2 = pw.getByRole("dialog", { name: "Tambah guru BK" });
+  await d2.getByLabel("Nama guru BK").fill("Pak Konselor Dua");
+  await d2.getByLabel("Email guru BK").fill(`bk2.${proyek()}@e2e.test`);
+  await d2.getByLabel("Password sementara").fill("sementara-123");
+  await d2.getByLabel("Ulangi password").fill("sementara-123");
+  await d2.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(pw)).toContainText("Akun BK Pak Konselor Dua dibuat");
+  await expect(pw.locator("aside.sidebar").getByRole("link", { name: /^Konseling/ })).toHaveCount(0);
+  bersih(lapW, "waka (guru BK)");
+  await kW.close();
+
+  // BK masuk: panel /bk, siswa dari SEMUA kelas, menu tanpa izin/Alfa/manual
+  const kB = await browser.newContext(opsiKonteks());
+  const pb = await kB.newPage();
+  const lapB = await siapkan(pb);
+  await loginDengan(pb, `bk1.${proyek()}@e2e.test`, "sementara-123");
+  await expect(pb).toHaveURL(/\/bk$/);
+  await expect(pb.getByTestId("bk-jumlah-siswa")).not.toHaveText("0");
+  const sb = pb.locator("aside.sidebar");
+  for (const m of ["Dashboard", "Siswa", "Pelanggaran", "Pembinaan", "Usulan remisi", "Konseling", "Panduan"]) await expect(sb.getByRole("link", { name: new RegExp(`^${m}`) })).toHaveCount(1);
+  for (const m of ["Izin", "Presensi manual", "Presensi per jam", "Kalender", "Validasi", "Tata tertib"]) await expect(sb.getByRole("link", { name: new RegExp(m) })).toHaveCount(0);
+  await menu(pb, "Siswa");
+  await expect(pb.locator(".students-grid[data-nis='111']")).toHaveCount(1); // kelas XI IPS
+  await expect(pb.locator(".students-grid[data-nis='333']")).toHaveCount(1); // kelas X IPA
+  await pb.getByLabel("Filter kelas").selectOption("X IPA");
+  await expect(pb.locator(".students-grid[data-nis='111']")).toHaveCount(0);
+  // portal siswa yang sama dengan orang tua, tanpa PIN / UID kartu
+  await pb.getByLabel("Filter kelas").selectOption("");
+  await pb.getByRole("link", { name: "Detail ANDI TEST" }).click();
+  await expect(pb.getByTestId("ekstra-bk")).toBeVisible();
+  const isi = await pb.locator("main").innerText();
+  expect(isi).not.toMatch(/PIN|AAAA1111/);
+  bersih(lapB, "bk (masuk)");
+  await kB.close();
+});
+
+test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, dan konseling rahasia (tulis, koreksi, riwayat)", async ({ page }) => {
+  const tgl = T.hariIni, ta = taDari(tgl);
+  // ambang berpenanggung jawab BK; dua siswa dari KELAS BERBEDA melewatinya
+  await dbRest("PUT", "discipline/levels/e2eLvBk", { poin: 150, tindakan: "Teguran 2 — pembinaan BK", penanggungJawab: "bk" });
+  for (const nis of ["333", "444"]) {
+    await dbRest("PUT", `discipline/records/${nis}/e2eBk${nis}`, { jenis: "pelanggaran", nama: "Uji BK", poin: 160, tanggal: tgl, ta, sumber: "manual" });
+    await dbRest("PUT", `discipline/recordMeta/${nis}/e2eBk${nis}`, { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: Date.now() });
+  }
+  await dbRest("PUT", "discipline/records/111/e2eBk111", { jenis: "pelanggaran", nama: "Uji BK", poin: 160, tanggal: tgl, ta, sumber: "manual" });
+  await dbRest("PUT", "discipline/recordMeta/111/e2eBk111", { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: Date.now() });
+
+  const lap = await siapkan(page);
+  await loginDengan(page, `bk1.${proyek()}@e2e.test`, "sementara-123");
+  await expect(page).toHaveURL(/\/bk$/);
+  await expect(page.getByTestId("lencana-pembinaan"), "lencana menu Pembinaan").toHaveText(/^[1-9]/);
+  await expect(page.getByTestId("bk-perlu-dibina")).not.toHaveText("0");
+
+  // pembinaan: siswa dari X IPA (333) DAN XI IPS (111) sama-sama muncul
+  await menu(page, "Pembinaan");
+  const daftar = page.getByTestId("daftar-perlu-dibina");
+  await expect(daftar.locator("[data-nis='333']")).toHaveCount(1);
+  await expect(daftar.locator("[data-nis='111']")).toHaveCount(1);
+  await expect(daftar.locator("[data-nis='333']")).toContainText("Ambang 150 poin");
+  await daftar.locator("[data-nis='333']").getByRole("button", { name: "Catat pembinaan" }).click();
+  const pbDlg = page.getByRole("dialog", { name: "Catat pembinaan" });
+  await pbDlg.getByLabel("Hasil pembinaan").fill("Siswa dipanggil BK, diberi arahan, dan menyetujui rencana perbaikan");
+  await pbDlg.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Pembinaan dicatat selesai");
+  await expect(daftar.locator("[data-nis='333']")).toHaveCount(0);
+  await expect(page.getByTestId("riwayat-pembinaan").locator("[data-nis='333']")).toContainText("Selesai");
+
+  // pelanggaran ringan untuk siswa kelas lain; catatan muncul di "Catatan saya"
+  await menu(page, "Pelanggaran");
+  await page.getByPlaceholder("Ketik NIS atau nama siswa...").fill("555");
+  await page.locator(".picker-list li[role=option]", { hasText: "EKO TEST" }).click();
+  await page.locator("[role=listbox] button[role=option]").first().click();
+  await page.getByRole("button", { name: /^Catat/ }).click();
+  await expect(toast(page)).toContainText("Pelanggaran dicatat untuk 1 siswa");
+  await expect(page.getByTestId("catatan-piket")).toContainText("EKO TEST");
+
+  // usulan remisi
+  await menu(page, "Usulan remisi");
+  await page.getByTestId("form-usulan").getByPlaceholder("Ketik NIS atau nama siswa...").fill("555");
+  await page.locator(".picker-list li[role=option]", { hasText: "EKO TEST" }).click();
+  const opsiRemisi = page.getByLabel("Remisi", { exact: true }).locator("option").nth(1);
+  await page.getByLabel("Remisi", { exact: true }).selectOption({ index: 1 });
+  expect(await opsiRemisi.count()).toBe(1);
+  await page.getByLabel("Alasan usulan").fill("Aktif membantu kegiatan sekolah dan menunjukkan perubahan sikap");
+  await page.getByRole("button", { name: "Kirim usulan" }).click();
+  await expect(toast(page)).toContainText("Usulan dikirim ke Waka/Kepala");
+
+  // konseling rahasia: catat, lihat, koreksi (isi lama masuk riwayat koreksi)
+  await menu(page, "Konseling");
+  await page.getByRole("button", { name: "Catatan baru" }).click();
+  const kd = page.getByRole("dialog", { name: "Catatan konseling baru" });
+  await kd.getByRole("button", { name: "Simpan" }).click();
+  await expect(kd).toContainText("Pilih siswa");
+  await kd.getByPlaceholder("Ketik NIS atau nama siswa...").fill("444");
+  await page.locator(".picker-list li[role=option]", { hasText: "DINA TEST" }).click();
+  await kd.getByLabel("Topik konseling").selectOption("Keluarga");
+  await kd.getByLabel("Isi konseling").fill("pendek");
+  await kd.getByRole("button", { name: "Simpan" }).click();
+  await expect(kd).toContainText("minimal 10 karakter");
+  const ISI_LAMA = "Siswa menceritakan perselisihan di rumah yang mengganggu belajarnya.";
+  await kd.getByLabel("Isi konseling").fill(ISI_LAMA);
+  await kd.getByLabel("Tindak lanjut konseling").fill("Pertemuan lanjutan pekan depan");
+  await kd.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Catatan konseling disimpan");
+  const baris = page.getByTestId("daftar-konseling").locator("[data-nis='444']");
+  await expect(baris).toContainText("Keluarga");
+  await expect(baris).toContainText("perselisihan di rumah");
+  await baris.getByRole("button", { name: /^Koreksi catatan/ }).click();
+  const kd2 = page.getByRole("dialog", { name: "Koreksi catatan konseling" });
+  const ISI_BARU = "Siswa dan orang tua sudah bertemu BK; perselisihan mulai reda dan siswa fokus belajar.";
+  await kd2.getByLabel("Isi konseling").fill(ISI_BARU);
+  await kd2.getByRole("button", { name: "Simpan" }).click();
+  await expect(toast(page)).toContainText("Catatan konseling dikoreksi");
+  await baris.getByRole("button", { name: /^Buka catatan/ }).click();
+  await expect(baris).toContainText("mulai reda");
+  await expect(baris.getByTestId("riwayat-koreksi")).toContainText("perselisihan di rumah"); // isi lama tersimpan di riwayat koreksi
+  await expect(baris).toContainText("dikoreksi");
+  // tidak ada tombol hapus fisik
+  await expect(baris.getByRole("button", { name: /Hapus/i })).toHaveCount(0);
+  // detail siswa: bagian konseling rahasia + catatan BK
+  await menu(page, "Siswa");
+  await page.getByRole("link", { name: "Detail DINA TEST" }).click();
+  await expect(page.getByTestId("konseling-siswa")).toContainText("rahasia");
+  await expect(page.getByTestId("konseling-siswa")).toContainText("mulai reda");
+  bersih(kecualikan(lap, 2), "bk (pembinaan, pelanggaran, usulan, konseling)");
+});
+
+test("bk: kepala hanya MEMBACA konseling; waka, admin, wali, dan orang tua tidak melihatnya; usulan BK diputuskan waka", async ({ page, browser }) => {
+  // kepala: baca saja
+  const lap = await siapkan(page);
+  await loginStaf(page, "kepala");
+  await menu(page, "Konseling");
+  await expect(page.getByTestId("halaman-konseling")).toContainText("Anda hanya membaca");
+  const baris = page.getByTestId("daftar-konseling").locator("[data-nis='444']");
+  await expect(baris).toContainText("Keluarga");
+  await baris.getByRole("button", { name: /^Buka catatan/ }).click();
+  await expect(baris.getByTestId("riwayat-koreksi")).toContainText("perselisihan di rumah");
+  await expect(page.getByRole("button", { name: "Catatan baru" })).toHaveCount(0);
+  await expect(baris.getByRole("button", { name: /Koreksi/ })).toHaveCount(0);
+  bersih(lap, "kepala (konseling)");
+
+  // waka & admin: tidak ada menu Konseling; membuka /…/konseling langsung dialihkan; usulan BK masuk antrean keputusan waka
+  for (const peran of ["waka", "admin"]) {
+    const k = await browser.newContext(opsiKonteks());
+    const p = await k.newPage();
+    const l = await siapkan(p);
+    await loginStaf(p, peran);
+    await expect(p.locator("aside.sidebar").getByRole("link", { name: /^Konseling/ })).toHaveCount(0);
+    await p.goto(`/${peran}/konseling`);
+    await expect(p).toHaveURL(new RegExp(`/${peran}$`));
+    if (peran === "waka") {
+      await menu(p, "Usulan remisi");
+      await expect(p.locator("body")).toContainText("EKO TEST"); // usulan BK terlihat sebagai usulan biasa
+      await expect(p.locator("body")).not.toContainText("perselisihan di rumah"); // isi konseling tidak pernah bocor
+    }
+    bersih(l, `${peran} (tanpa konseling)`);
+    await k.close();
+  }
+
+  // orang tua: portal tidak memuat konseling
+  const kO = await browser.newContext(opsiKonteks());
+  const po = await kO.newPage();
+  const lapO = await siapkan(po);
+  await loginOrtu(po, "222", "739104");
+  await expect(po.locator("body")).not.toContainText(/konseling/i);
+  bersih(lapO, "ortu (tanpa konseling)");
+  await kO.close();
+});

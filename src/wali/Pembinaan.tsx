@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import { Empty, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
-import { useAuth } from "../auth/AuthContext";
+import { usePembina } from "./pembina";
 import FormPembinaan from "../kesiswaan/FormPembinaan";
 import { labelTa } from "../lib/discipline";
 import { formatTanggal } from "../lib/time";
@@ -11,13 +11,13 @@ import { useDisiplinKelas } from "./DisiplinKelas";
 
 /** Pembinaan oleh wali kelas: daftar "Perlu dibina" (ambang bertanggung jawab wali) dan riwayat pembinaan kelas binaan pada TA berjalan. */
 export default function Pembinaan() {
-  const { session } = useAuth();
+  const pembina = usePembina();
   const { today } = useAdminData();
   const d = useDisiplinKelas();
   const [buka, setBuka] = useState<{ item: ItemDibina } | null>(null);
   const [ubah, setUbah] = useState<{ nis: string; levelId: string; pb: PembinaanData } | null>(null);
   const siswa = useMemo(() => new Map(d.siswa.map((s) => [s.nis, s])), [d.siswa]);
-  const ctx = { uid: session?.role === "wali" ? session.uid : "", nama: session?.role === "wali" ? session.nama : "" };
+  const ctx = { uid: pembina.uid, nama: pembina.nama };
 
   const riwayat = useMemo(() => {
     const out: { nis: string; id: string; pb: PembinaanData }[] = [];
@@ -28,14 +28,14 @@ export default function Pembinaan() {
   return (
     <section className="data-page" data-testid="halaman-pembinaan">
       <div className="section-heading">
-        <div><p>Pembinaan</p><span>{labelTa(d.ta)} · siswa kelas binaan yang saldonya mencapai ambang pembinaan wali kelas</span></div>
+        <div><p>Pembinaan</p><span>{labelTa(d.ta)} · {pembina.peran === "bk" ? "siswa dari semua kelas" : "siswa kelas binaan"} yang saldonya mencapai ambang pembinaan {pembina.label}</span></div>
       </div>
       {d.galat.length > 0 && <div className="notice warn" role="alert"><Icon name="warning" size={17} /><span>Sebagian data tidak dapat dimuat ({d.galat[0]}).</span></div>}
 
       <article className="panel master-group">
         <div className="panel-header"><div><p className="panel-title">Perlu dibina <span className="badge badge-lemah" data-testid="jumlah-perlu-dibina">{d.items.length}</span></p><span>Hilang dari daftar setelah pembinaan dicatat <b>selesai</b>. Saldo yang sudah turun tetap tampil sampai dibina.</span></div></div>
         {d.memuat ? <div className="page-loader"><Spinner dark /></div> : d.items.length === 0 ? (
-          <Empty icon="check" title="Tidak ada siswa yang perlu dibina" text="Siswa muncul di sini saat saldo poinnya mencapai ambang yang menjadi tanggung jawab wali kelas." />
+          <Empty icon="check" title="Tidak ada siswa yang perlu dibina" text={`Siswa muncul di sini saat saldo poinnya mencapai ambang yang menjadi tanggung jawab ${pembina.label}.`} />
         ) : (
           <div className="simple-list" data-testid="daftar-perlu-dibina">
             {d.items.map((it) => {
@@ -57,7 +57,7 @@ export default function Pembinaan() {
       </article>
 
       <article className="panel master-group">
-        <div className="panel-header"><div><p className="panel-title">Riwayat pembinaan</p><span>Pembinaan kelas binaan pada {labelTa(d.ta)}</span></div></div>
+        <div className="panel-header"><div><p className="panel-title">Riwayat pembinaan</p><span>Pembinaan {pembina.peran === "bk" ? "oleh BK" : "kelas binaan"} pada {labelTa(d.ta)}</span></div></div>
         {riwayat.length === 0 ? <p className="modal-note">Belum ada pembinaan tercatat.</p> : (
           <div className="simple-list" data-testid="riwayat-pembinaan">
             {riwayat.map(({ nis, id, pb }) => (

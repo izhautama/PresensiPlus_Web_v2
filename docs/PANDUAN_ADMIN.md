@@ -43,6 +43,11 @@ Untuk: Administrator / TU sekolah
 4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).
 5. Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal "aktif sejak" siswa lama.
 
+## Guru BK
+
+1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.
+2. Cabut dan Pasang kembali seperti wali. Catatan konseling hanya terbaca BK dan Kepala.
+
 ## Wali kelas
 
 1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.

@@ -20,7 +20,8 @@ export type DisiplinKelasValue = {
   memuat: boolean;
   galat: string[];
 };
-const Ctx = createContext<DisiplinKelasValue | null>(null);
+export const DisiplinCtx = createContext<DisiplinKelasValue | null>(null);
+const Ctx = DisiplinCtx;
 /** Null di luar panel wali (mis. dipakai Shell untuk lencana menu). */
 export const useDisiplinKelasOpsional = () => useContext(Ctx);
 export function useDisiplinKelas(): DisiplinKelasValue {

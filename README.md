@@ -135,6 +135,21 @@ Sebuah tanggal adalah **hari efektif** hanya bila ada bukti sekolah berlangsung 
 - **Batasan yang diketahui:** rules tidak dapat menghitung `hariKe` dari kunci tanggal; `mundur` dibandingkan dengan jam hari (WIB) saat penulisan, sehingga entri berklaim `hariKe` hari ini untuk tanggal lain tidak terdeteksi lewat Console (sama seperti klaim `hariKe` di tempat lain). E2E memakai jam server palsu (16:00): jam manual yang diketik harus konsisten dengan jam nyata mesin uji (jalankan setelah ~07:30 WIB).
 - **Urutan deploy:** rules dulu, lalu hosting **segera** (klien lama tanpa `masukDetik` ditolak rules baru untuk presensi manual dengan jam masuk).
 
+## Peran BK / Guru Bimbingan Konseling (v2.4-b)
+Akun PER GURU (role `bk`), dibuat admin atau waka di menu **Guru BK**; login lewat tab Admin ke `/bk`. Wewenang LINTAS SEMUA KELAS (siswa harus terindeks di `siswaKelas`), setiap tulisan berlog aktivitas.
+| Aksi | BK |
+|---|---|
+| Lihat semua siswa: kehadiran, per jam, poin, saldo & level, riwayat pembinaan (tanpa PIN/UID kartu/log tap) | ya |
+| Catat pembinaan untuk ambang `penanggungJawab: "bk"` (node `pembinaan` + `pembinaanStatus`) | ya |
+| Catat pelanggaran Ringan/bertakziran dari master (`sumber: "bk"`) | ya |
+| Usul remisi (diputuskan waka/kepala, node `usulRemisi`) | ya |
+| Catatan konseling rahasia (`konseling/{nis}/{id}`) | tulis + baca |
+| Izin, per jam, Alfa, presensi manual, master, kalender, akun | tidak |
+- **Konseling:** baca = BK + Kepala; tulis = BK pembuat catatan. Waka, admin, wali, piket, orang tua, dan alat DITOLAK (juga lewat Console). Tidak ada hapus fisik; koreksi = ubah + entri `konselingAudit/{nis}/{idLog}` (isi LAMA) pada update yang sama (baca BK + Kepala; terpisah dari audit umum). Log aktivitas hanya mencatat bahwa catatan dibuat/dikoreksi: tanpa isi, topik, nama, atau NIS siswa. Kepala membaca lewat menu **Konseling** (hanya baca).
+- **Keputusan desain (konfirmasi bila ingin diubah):** BK lain dapat MEMBACA semua catatan konseling, tetapi hanya pembuat yang dapat mengoreksi. Portal orang tua tidak pernah memuat konseling.
+- Uji: `npm run test:mutation:bk`, `tests/konseling.test.mjs`, blok "BK" di `tests/rules.test.mjs`, E2E "bk: ...".
+- Daftar "Perlu dibina (BK)" + lencana menu memakai data kedisiplinan seluruh siswa (satu langganan per node, bukan per siswa).
+
 ### Status uji v2.3.1 (tag `v2.3.1-deployed`)
 Dijalankan sebelum tag: unit semua berkas, rules 1618 lolos, mutasi **hanya kelompok yang disentuh** (perjam 30/30, piket 53/53 + 3 ekuivalen, dasar 28/28 + 2 ekuivalen), E2E desktop+HP 78/78, mobile 5x berturut-turut 39/39. Mutasi kelompok **wali, pembinaan, manual, saran, kalender** tidak dijalankan ulang untuk v2.3.1 (tidak disentuh; terakhir bersih pada v2.3) dan ikut tercakup oleh regresi v2.4. Hash rules ter-deploy: `40215ca1dd2647225e199be961f6b5acbfd2a6f63957f3aac55c9bf0bb8cb372`.
 

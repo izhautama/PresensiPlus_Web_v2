@@ -36,13 +36,17 @@ Untuk: Waka Kesiswaan
 2. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.
 3. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.
 
+## Guru BK
+
+1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali.
+2. Catatan konseling BK tidak dapat Anda baca.
+
 ## Wali kelas
 
 1. Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).
 2. Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.
-3. Kelas yang sudah punya wali tidak dapat diberi wali kedua oleh Waka; hubungi admin.
 
-> Catatan: Wali hanya melihat siswa kelasnya, mencatat Izin/Sakit seharian dan pelanggaran Ringan atau bertakziran; tidak dapat memberi Dispensasi, mengubah presensi per jam, atau memvalidasi Alfa. Semua tindakannya tercatat di log aktivitas.
+> Catatan: Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log aktivitas.
 
 ## Pembinaan dan usulan remisi
 

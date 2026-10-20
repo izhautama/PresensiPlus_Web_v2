@@ -2,7 +2,7 @@
 // (docs dibuat oleh `node scripts/buat-panduan.mjs`; uji `tests/panduan.test.mjs` memastikan keduanya selalu sama).
 // Bahasa sederhana, langkah bernomor, maksimal sekitar 2 halaman per peran.
 
-export type KodePanduan = "admin" | "kepala" | "waka" | "piket" | "wali" | "ortu" | "sop";
+export type KodePanduan = "admin" | "kepala" | "waka" | "piket" | "wali" | "bk" | "ortu" | "sop";
 export type Bagian = { judul: string; langkah: string[]; catatan?: string };
 export type Panduan = { kode: KodePanduan; judul: string; untuk: string; berkas: string; bagian: Bagian[] };
 
@@ -44,6 +44,10 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Override Efektif pada tanggal tanpa bukti membuat semua siswa tanpa data tercatat Alpha: isi dulu presensi manual (mode alat bermasalah), lalu centang pernyataan.",
         "Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).",
         "Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal \"aktif sejak\" siswa lama.",
+      ] },
+      { judul: "Guru BK", langkah: [
+        "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.",
+        "Cabut dan Pasang kembali seperti wali. Catatan konseling hanya terbaca BK dan Kepala.",
       ] },
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.",
@@ -87,7 +91,8 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.",
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: rekap pembinaan wali kelas dan pejabat; saring lalu Unduh CSV.",
+        "Menu Pembinaan: rekap pembinaan wali kelas, BK, dan pejabat; saring lalu Unduh CSV.",
+        "Menu Konseling: Anda dapat membaca catatan konseling rahasia dari BK beserta riwayat koreksinya (hanya baca).",
         "Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.",
       ] },
       { judul: "Yang tidak dapat dilakukan", langkah: [
@@ -129,11 +134,14 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.",
         "Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.",
       ] },
+      { judul: "Guru BK", langkah: [
+        "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali.",
+        "Catatan konseling BK tidak dapat Anda baca.",
+      ] },
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).",
         "Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.",
-        "Kelas yang sudah punya wali tidak dapat diberi wali kedua oleh Waka; hubungi admin.",
-      ], catatan: "Wali hanya melihat siswa kelasnya, mencatat Izin/Sakit seharian dan pelanggaran Ringan atau bertakziran; tidak dapat memberi Dispensasi, mengubah presensi per jam, atau memvalidasi Alfa. Semua tindakannya tercatat di log aktivitas." },
+      ], catatan: "Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log aktivitas." },
       { judul: "Pembinaan dan usulan remisi", langkah: [
         "Menu Pembinaan: rekap pembinaan wali kelas dan pejabat. Saring menurut tahun ajaran, status, atau kelas; Unduh CSV untuk arsip. Anda dapat mencatat atau mengoreksi pembinaan, termasuk yang Selesai.",
         "Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.",
@@ -223,6 +231,31 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
     ],
   },
 
+  bk: {
+    kode: "bk", judul: "Panduan Guru BK", untuk: "Guru Bimbingan Konseling (akun per guru)", berkas: "PANDUAN_BK.md",
+    bagian: [
+      { judul: "Masuk dan menu", langkah: [
+        "Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).",
+        "Menu: Dashboard, Siswa, Pelanggaran, Pembinaan, Usulan remisi, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.",
+        "Anda tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.",
+      ] },
+      { judul: "Siswa dan pelanggaran ringan", langkah: [
+        "Menu Siswa: cari nama atau NIS, saring menurut kelas, lihat saldo poin dan level. Ketuk nama untuk rekap kehadiran, per jam, riwayat poin dan pencatat, serta pembinaan. PIN orang tua dan UID kartu tidak ditampilkan.",
+        "Menu Pelanggaran: catat pelanggaran Ringan atau yang bertakziran dari daftar tata tertib untuk siswa mana pun. Poin dan takziran tetap dari daftar resmi. Catatan Anda dapat dihapus dengan alasan.",
+      ] },
+      { judul: "Pembinaan dan usulan remisi", langkah: [
+        "Menu Pembinaan: daftar Perlu dibina berisi siswa yang saldonya mencapai ambang yang penanggung jawabnya BK (mis. Teguran 2). Lencana angka di menu menunjukkan jumlahnya.",
+        "Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksi.",
+        "Menu Usulan remisi: pilih siswa dan remisi dari daftar resmi, tulis alasan, lalu Kirim usulan. Keputusan setuju atau tolak ada pada Waka atau Kepala.",
+      ] },
+      { judul: "Catatan konseling rahasia", langkah: [
+        "Menu Konseling atau detail siswa: tekan Catatan baru, pilih topik (Akademik, Pribadi, Sosial, Karier, Keluarga, Lainnya), isi konseling (10 sampai 2000 karakter) dan tindak lanjut (opsional).",
+        "Hanya BK dan Kepala Madrasah yang dapat MEMBACA catatan; Waka, admin, wali kelas, piket, dan orang tua tidak dapat melihatnya. Catatan tidak pernah muncul di portal orang tua, laporan, atau log aktivitas.",
+        "Catatan tidak dapat dihapus. Koreksi hanya oleh pembuat catatan: isi lama otomatis disimpan di riwayat koreksi yang hanya terbaca BK dan Kepala.",
+      ], catatan: "Jaga kerahasiaan: keluar dari aplikasi setelah selesai, terutama di komputer bersama." },
+    ],
+  },
+
   ortu: {
     kode: "ortu", judul: "Panduan Orang Tua / Wali", untuk: "Orang tua atau wali siswa", berkas: "PANDUAN_ORANG_TUA.md",
     bagian: [
@@ -294,7 +327,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
   },
 };
 
-export const URUTAN_PANDUAN: KodePanduan[] = ["admin", "kepala", "waka", "piket", "wali", "ortu", "sop"];
+export const URUTAN_PANDUAN: KodePanduan[] = ["admin", "kepala", "waka", "piket", "wali", "bk", "ortu", "sop"];
 
 /** Ubah satu panduan menjadi Markdown (dipakai skrip pembuat docs/ dan uji kesamaan). */
 export function keMarkdown(p: Panduan): string {

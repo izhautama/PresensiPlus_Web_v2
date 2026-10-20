@@ -19,7 +19,7 @@ export default function StaffAccounts() {
   const [cabut, setCabut] = useState<{ uid: string; s: Staff } | null>(null);
   const [reset, setReset] = useState("");
   // wali kelas punya panel sendiri (Wali kelas) karena butuh pemetaan kelas; tidak dihitung dalam batas akun pimpinan/staf
-  const daftar = Object.entries(staff.data ?? {}).filter(([, s]) => s.role !== "wali").sort((a, b) => a[1].dibuat - b[1].dibuat);
+  const daftar = Object.entries(staff.data ?? {}).filter(([, s]) => s.role !== "wali" && s.role !== "bk").sort((a, b) => a[1].dibuat - b[1].dibuat);
   const penuh = daftar.length >= MAKS_STAF;
 
   const [kunciBusy, setKunciBusy] = useState("");

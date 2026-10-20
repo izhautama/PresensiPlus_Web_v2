@@ -135,14 +135,14 @@ export type KonteksWali = { uid: string; nama: string };
  * Catat pelanggaran Ringan/bertakziran dari MASTER (poin/nama/kategori/takziran identik master) dengan sumber "wali".
  * records + recordMeta (nama wali + hariKe untuk jendela waktu) + log aktivitas dalam SATU update. Tanpa piketHarian.
  */
-export async function pelanggaranWali(a: { siswa: SiswaWali[]; ruleId: string; rule: Rule; tanggal: string }, ctx: KonteksWali) {
+export async function pelanggaranWali(a: { siswa: SiswaWali[]; ruleId: string; rule: Rule; tanggal: string }, ctx: KonteksWali, sumber: "wali" | "bk" = "wali") {
   const u: Updates = {};
   sisipkanAktivitas(u, { aksi: "pelanggaran", nis: a.siswa.length === 1 ? a.siswa[0].nis : undefined, detail: `${a.rule.nama} (${a.rule.poin} poin) ${a.tanggal}: ${a.siswa.map((s) => s.nama).join(", ")}` });
   for (const s of a.siswa) {
     const id = newKey(`discipline/records/${s.nis}`);
     u[`discipline/records/${s.nis}/${id}`] = {
       jenis: "pelanggaran", refId: a.ruleId, nama: a.rule.nama, kategori: a.rule.kategori, poin: a.rule.poin,
-      tanggal: a.tanggal, ta: taKey(a.tanggal), sumber: "wali", ...(a.rule.takziran ? { takziran: a.rule.takziran } : {}),
+      tanggal: a.tanggal, ta: taKey(a.tanggal), sumber, ...(a.rule.takziran ? { takziran: a.rule.takziran } : {}),
     };
     u[`discipline/recordMeta/${s.nis}/${id}`] = { dibuatOleh: ctx.uid, dibuatNama: ctx.nama.slice(0, 60), dibuatTs: serverTimestamp(), hariKe: hariKeDariTanggal(a.tanggal) };
   }
@@ -155,7 +155,7 @@ export type CatatanWali = {
 };
 
 /** Soft delete catatan wali sendiri: hilang dari node publik; alasan + snapshot di recordMeta. */
-export async function hapusPelanggaranWali(a: { id: string; item: CatatanWali; alasan: string }, ctx: KonteksWali) {
+export async function hapusPelanggaranWali(a: { id: string; item: CatatanWali; alasan: string }, ctx: KonteksWali, sumber: "wali" | "bk" = "wali") {
   const { item } = a;
   const m = `discipline/recordMeta/${item.nis}/${a.id}`;
   const u: Updates = {};
@@ -165,7 +165,7 @@ export async function hapusPelanggaranWali(a: { id: string; item: CatatanWali; a
   u[`${m}/alasanHapus`] = a.alasan.trim().slice(0, 200);
   u[`${m}/snapshot`] = {
     jenis: "pelanggaran", refId: item.refId, nama: item.pelanggaran, ...(item.kategori ? { kategori: item.kategori } : {}), poin: item.poin,
-    tanggal: item.tanggal, ta: taKey(item.tanggal), sumber: "wali", ...(item.takziran ? { takziran: item.takziran } : {}),
+    tanggal: item.tanggal, ta: taKey(item.tanggal), sumber, ...(item.takziran ? { takziran: item.takziran } : {}),
   };
   u[`${m}/diubahOleh`] = ctx.uid;
   u[`${m}/diubahTs`] = serverTimestamp();

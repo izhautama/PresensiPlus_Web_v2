@@ -188,8 +188,8 @@ export async function aturIzin(nis: string, tanggal: string, ket: KetHarian | nu
 }
 
 // ------------------------------------------------------------------ akun pimpinan & staf (kepala, waka)
-export type PeranStaf = "kepala" | "waka" | "piket" | "wali";
-export const PERAN_STAF: Record<PeranStaf, string> = { kepala: "Kepala Madrasah", waka: "Waka Kesiswaan", piket: "Guru Piket (akun bersama)", wali: "Wali Kelas (akun per guru)" };
+export type PeranStaf = "kepala" | "waka" | "piket" | "wali" | "bk";
+export const PERAN_STAF: Record<PeranStaf, string> = { kepala: "Kepala Madrasah", waka: "Waka Kesiswaan", piket: "Guru Piket (akun bersama)", wali: "Wali Kelas (akun per guru)", bk: "Guru BK (akun per guru)" };
 /** Peran yang dibuat lewat dialog "Tambah akun" umum. Wali kelas punya panel sendiri (pemetaan kelas). */
 export const PERAN_STAF_UMUM: PeranStaf[] = ["kepala", "waka", "piket"];
 export type Staff = { email: string; nama: string; role: PeranStaf; dibuat: number };

@@ -12,6 +12,7 @@ const PIKET = "root.child('roles').child(auth.uid).val() === 'piket'";
 const WAKA = "root.child('roles').child(auth.uid).val() === 'waka'";
 const DEVICE = "root.child('roles').child(auth.uid).val() === 'device'";
 const KEPALA = "root.child('roles').child(auth.uid).val() === 'kepala'";
+const BK = "root.child('roles').child(auth.uid).val() === 'bk'";
 // Salinan helper generator (harus identik dengan scripts/build-rules.mjs) untuk menyusun teks yang akan dibuang oleh mutasi
 const nav = (n) => "newData" + ".parent()".repeat(n);
 const ACT = (n) => `${nav(n)}.child('activityLast').child(auth.uid)`;
@@ -26,6 +27,8 @@ const WALI = "root.child('roles').child(auth.uid).val() === 'wali'";
 const STFT = "root.child('staff').child(auth.uid)";
 const SKT = (nis) => `root.child('siswaKelas').child(${nis})`;
 const waliDariT = (nis) => `(${WALI} && ${SKT(nis)}.exists() && (${STFT}.child('kelasUtama').val() === ${SKT(nis)}.val() || ${STFT}.child('kelasTambahan').child(${SKT(nis)}.val()).val() === true))`;
+const bkDariT = (nis) => `(${BK} && ${SKT(nis)}.exists())`;
+const binaanDariT = (nis) => `(${waliDariT(nis)} || ${bkDariT(nis)})`;
 const waliIzinT = (n, tgl, cekKet) => `(${WALI} && ${waliDariT("$nis")} && !root.child('validasi').child(${tgl}).child($nis).exists() && (newData.exists() ? (${cekKet ? "newData.val() !== 'Dispensasi' && " : ""}${actOk(n, ["izin-harian"])} && ${metaBaruPiket(n, tgl, "$nis", "'H'")}) : ${actOk(n, ["hapus-izin"])}))`;
 // ---- pembantu mutasi PEMBINAAN / USUL REMISI (salinan helper rules; harus identik dengan scripts/build-rules.mjs)
 const LEVEL_WALI_T = (lvl) => `root.child('discipline').child('levels').child(${lvl}).child('penanggungJawab').val() === 'wali'`;
@@ -92,8 +95,8 @@ const mutasi = [
   { nama: "ortu boleh baca discipline/recordMeta (nama staf)", ubah: (r) => { r.discipline.recordMeta.$nis[".read"] = MILIK_ANAK; } },
   { nama: "admin boleh membuat role 'admin' (eskalasi)", ubah: (r) => {
     const n = r.roles.$uid;
-    n[".write"] = ganti(n[".write"], "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali')", "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'admin')");
-    n[".validate"] = "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'admin'";
+    n[".write"] = ganti(n[".write"], "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk')", "(!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk' || newData.val() === 'admin')");
+    n[".validate"] = "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk' || newData.val() === 'admin'";
   } },
   { nama: "recordMeta: dibuatOleh/dibuatTs boleh diubah", ubah: (r) => {
     const n = r.discipline.recordMeta.$nis.$recId;
@@ -580,7 +583,7 @@ const mutasi = [
   { nama: "wali: waka boleh menghapus kelasUtama", ubah: (r) => { const n = r.staff.$uid.kelasUtama; n[".write"] = ganti(n[".write"], " && newData.exists()", ""); } },
   { nama: "wali: format kelasUtama bebas", ubah: (r) => { r.staff.$uid.kelasUtama[".validate"] = "newData.isString()"; } },
   { nama: "wali: nilai kelasTambahan bebas (bukan true)", ubah: (r) => { const n = r.staff.$uid.kelasTambahan.$kelas; n[".validate"] = ganti(n[".validate"], "newData.val() === true && ", ""); } },
-  { nama: "wali: waka boleh membuat entri staff untuk role selain wali (hanya lapisan field role; email/nama/dibuat tetap mensyaratkan role wali)", ekuivalen: true, ubah: (r) => { const n = r.staff.$uid.role; n[".write"] = ganti(n[".write"], " && newData.val() === 'wali'", ""); } },
+  { nama: "wali: waka boleh membuat entri staff untuk role selain wali (hanya lapisan field role; email/nama/dibuat tetap mensyaratkan role wali)", ekuivalen: true, ubah: (r) => { const n = r.staff.$uid.role; n[".write"] = ganti(n[".write"], " && (newData.val() === 'wali' || newData.val() === 'bk')", ""); } },
   { nama: "wali: waka boleh memberi role tanpa entri staff wali", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], " && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'", ""); } },
   { nama: "wali: waka boleh memberi role selain wali (staff wali ada)", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], "(!data.exists() && newData.val() === 'wali' && newData.parent()", "(!data.exists() && newData.parent()"); } },
   { nama: "wali: waka boleh mencabut role apa pun", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], "(data.val() === 'wali' && !newData.exists())", "(!newData.exists())"); } },
@@ -622,7 +625,7 @@ const mutasi = [
   { nama: "pembinaan: status bebas (hanya lapisan pembinaan; pembinaanStatus menahan karena salinan status wajib sama)", ekuivalen: true, ubah: (r) => { r.pembinaan.$nis.$id.status[".validate"] = "newData.isString()"; } },
   { nama: "pembinaan: status bebas (kedua lapisan: pembinaan dan salinan pembinaanStatus)", ubah: (r) => { r.pembinaan.$nis.$id.status[".validate"] = "newData.isString()"; r.pembinaanStatus.$nis.$ta.$levelId.status[".validate"] = "newData.isString()"; } },
   { nama: "pembinaan: field tak dikenal diterima", ubah: (r) => { r.pembinaan.$nis.$id.$other[".validate"] = true; } },
-  { nama: "pembinaan: baca: wali kelas binaan tidak diizinkan membaca", ubah: (r) => { const n = r.pembinaan.$nis; n[".read"] = ganti(n[".read"], ` || ${waliDariT("$nis")}`, ""); } },
+  { nama: "pembinaan: baca: wali kelas binaan tidak diizinkan membaca", ubah: (r) => { const n = r.pembinaan.$nis; n[".read"] = ganti(n[".read"], ` || ${binaanDariT("$nis")}`, ` || ${bkDariT("$nis")}`); } },
   { nama: "pembinaan: baca: siapa pun yang login membaca isi pembinaan", ubah: (r) => { r.pembinaan.$nis[".read"] = "auth != null"; } },
   { nama: "pembinaan: baca: piket membaca seluruh node", ubah: (r) => { r.pembinaan[".read"] = `(${r.pembinaan[".read"]}) || (auth != null && ${PIKET})`; } },
   { nama: "pembinaanStatus: wali boleh menulis status ambang non-wali", ubah: (r) => { const n = r.pembinaanStatus.$nis.$ta.$levelId; n[".write"] = ganti(n[".write"], ` && ${LEVEL_WALI_T("$levelId")}`, ""); } },
@@ -740,8 +743,110 @@ const mutasi = [
   { nama: "alat-kunci: log retry tidak mencocokkan JAM", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('jam').val() === newData.child('jam').val() && ", ""); } },
   { nama: "alat-kunci: log retry tidak mencocokkan NIS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], "data.child('nis').val() === newData.child('nis').val() && ", ""); } },
   { nama: "alat-kunci: log retry tidak mencocokkan STATUS", ubah: (r) => { const n = r.log.$date.$key; n[".write"] = ganti(n[".write"], " && data.child('status').val() === newData.child('status').val()", ""); } },
+  // ---- v2.4-b: BK (Guru Bimbingan Konseling) + catatan konseling rahasia
+  { nama: "bk: konseling dapat dibaca waka", ubah: (r) => { r.konseling[".read"] = r.konseling[".read"].replace(/\)$/, ` || ${WAKA})`); } },
+  { nama: "bk: konseling dapat dibaca admin", ubah: (r) => { r.konseling[".read"] = r.konseling[".read"].replace(/\)$/, ` || ${ADMIN})`); } },
+  { nama: "bk: konseling dapat dibaca wali", ubah: (r) => { r.konseling[".read"] = r.konseling[".read"].replace(/\)$/, ` || ${WALI})`); } },
+  { nama: "bk: konseling dapat dibaca piket", ubah: (r) => { r.konseling[".read"] = r.konseling[".read"].replace(/\)$/, ` || ${PIKET})`); } },
+  { nama: "bk: konseling per siswa dapat dibaca siapa pun yang login", ubah: (r) => { r.konseling.$nis[".read"] = "auth != null"; } },
+  { nama: "bk: konseling anak sendiri dapat dibaca orang tua", ubah: (r) => { r.konseling.$nis[".read"] = "auth != null && root.child('parents').child($nis).child('uid').val() === auth.uid"; } },
+  { nama: "bk: kepala dapat menulis konseling", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], `auth != null && ${BK} && newData.exists()`, `auth != null && (${BK} || ${KEPALA}) && newData.exists()`); } },
+  { nama: "bk: waka dapat menulis konseling", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], `auth != null && ${BK} && newData.exists()`, `auth != null && (${BK} || ${WAKA}) && newData.exists()`); } },
+  { nama: "bk: konseling dapat dihapus fisik (newData.exists dan audit dibuang)", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], `auth != null && ${BK} && newData.exists() && `, `auth != null && ${BK} && `); k[".write"] = ganti(k[".write"], ` && ${AUDIT_K_T}.child('konselingId').val() === $id`, ""); } },
+  { nama: "bk: konseling milik BK lain dapat diubah (konseling.write + pemilik pada audit)", ubah: (r) => {
+    const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], "(data.exists() && data.child('oleh').val() === auth.uid && ", "(data.exists() && ");
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('oleh').val() === auth.uid`, ""); } },
+  { nama: "bk: konseling dapat diubah tanpa audit", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], ` && ${AUDIT_K_T}.child('konselingId').val() === $id`, ""); } },
+  { nama: "bk: konseling diubah tanpa log aksi 'ubah-konseling'", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], ` && ${actOk(3, ["ubah-konseling"])}`, ""); } },
+  { nama: "bk: konseling dibuat tanpa log aksi 'catat-konseling'", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], `(!data.exists() && ${actOk(3, ["catat-konseling"])})`, "(!data.exists())"); } },
+  { nama: "bk: konseling untuk siswa tanpa indeks diterima", ubah: (r) => { const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], " && root.child('siswaKelas').child($nis).exists()", ""); } },
+  { nama: "bk: konseling rahasia boleh bernilai apa saja", ubah: (r) => { r.konseling.$nis.$id.rahasia[".validate"] = "true"; } },
+  { nama: "bk: konseling topik bebas", ubah: (r) => { r.konseling.$nis.$id.topik[".validate"] = "newData.isString()"; } },
+  { nama: "bk: konseling isi tanpa batas minimal", ubah: (r) => { const n = r.konseling.$nis.$id.isi; n[".validate"] = ganti(n[".validate"], "newData.val().length >= 10 && ", ""); } },
+  { nama: "bk: konseling isi tanpa batas maksimal", ubah: (r) => { const n = r.konseling.$nis.$id.isi; n[".validate"] = ganti(n[".validate"], "<= 2000", "<= 2000000"); } },
+  { nama: "bk: konseling tindak lanjut tanpa batas maksimal", ubah: (r) => { const n = r.konseling.$nis.$id.tindakLanjut; n[".validate"] = ganti(n[".validate"], "<= 500", "<= 500000"); } },
+  { nama: "bk: konseling dibuat dengan oleh palsu", ubah: (r) => { const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], ": (newData.child('oleh').val() === auth.uid && ", ": ("); } },
+  { nama: "bk: konseling dibuat dengan dibuatTs palsu", ubah: (r) => { const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], "newData.child('dibuatTs').val() === now && !newData.child('diubahTs').exists()", "!newData.child('diubahTs').exists()"); } },
+  { nama: "bk: konseling baru boleh membawa diubahTs/diubahOleh", ubah: (r) => { const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], " && !newData.child('diubahTs').exists() && !newData.child('diubahOleh').exists()", ""); } },
+  { nama: "bk: ubah konseling tanpa diubahTs/diubahOleh (validate + pasangan audit)", ubah: (r) => {
+    const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], " && newData.child('diubahTs').val() === now && newData.child('diubahOleh').val() === auth.uid)", ")");
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('diubahTs').val() === now`, ""); } },
+  { nama: "bk: ubah konseling boleh mengganti pembuat (validate + pemilik pada audit)", ubah: (r) => {
+    const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], "(newData.child('oleh').val() === data.child('oleh').val() && ", "(");
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('oleh').val() === auth.uid`, ""); } },
+  { nama: "bk: ubah konseling boleh mengganti dibuatTs", ubah: (r) => { const k = r.konseling.$nis.$id; k[".validate"] = ganti(k[".validate"], "newData.child('dibuatTs').val() === data.child('dibuatTs').val() && ", ""); } },
+  { nama: "bk: konselingAudit dapat dibaca waka", ubah: (r) => { r.konselingAudit[".read"] = r.konselingAudit[".read"].replace(/\)$/, ` || ${WAKA})`); } },
+  { nama: "bk: konselingAudit dapat dibaca admin", ubah: (r) => { r.konselingAudit[".read"] = r.konselingAudit[".read"].replace(/\)$/, ` || ${ADMIN})`); } },
+  { nama: "bk: konselingAudit dapat ditulis kepala (peran + pasangan perubahan)", ubah: (r) => {
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], `auth != null && ${BK} && !data.exists()`, `auth != null && (${BK} || ${KEPALA}) && !data.exists()`);
+    a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('diubahTs').val() === now`, ""); a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('oleh').val() === auth.uid`, ""); } },
+  { nama: "bk: konselingAudit ditulis tanpa perubahan konseling berpasangan", ubah: (r) => { const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('diubahTs').val() === now`, ""); } },
+  { nama: "bk: konselingAudit untuk konseling milik BK lain (pemilik + pasangan perubahan)", ubah: (r) => {
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('diubahTs').val() === now`, ""); a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('oleh').val() === auth.uid`, ""); } },
+  { nama: "bk: konselingAudit dapat ditimpa (cek !data.exists + pasangan perubahan)", ubah: (r) => {
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], `${BK} && !data.exists() && `, `${BK} && `); a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('diubahTs').val() === now`, ""); } },
+  { nama: "bk: konselingAudit tidak mencocokkan isi lama", ubah: (r) => { const a = r.konselingAudit.$nis.$aid; a[".validate"] = hapusSemua(a[".validate"], / && newData\.child\('sebelum'\)\.child\('isi'\)\.val\(\) === root\.child\('konseling'\)\.child\(\$nis\)\.child\(newData\.child\('konselingId'\)\.val\(\)\)\.child\('isi'\)\.val\(\)/g); } },
+  { nama: "bk: konselingAudit tidak mencocokkan topik lama", ubah: (r) => { const a = r.konselingAudit.$nis.$aid; a[".validate"] = hapusSemua(a[".validate"], / && newData\.child\('sebelum'\)\.child\('topik'\)\.val\(\) === root\.child\('konseling'\)\.child\(\$nis\)\.child\(newData\.child\('konselingId'\)\.val\(\)\)\.child\('topik'\)\.val\(\)/g); } },
+  { nama: "bk: konselingAudit tidak mencocokkan tanggal lama", ubah: (r) => { const a = r.konselingAudit.$nis.$aid; a[".validate"] = hapusSemua(a[".validate"], / && newData\.child\('sebelum'\)\.child\('tanggal'\)\.val\(\) === root\.child\('konseling'\)\.child\(\$nis\)\.child\(newData\.child\('konselingId'\)\.val\(\)\)\.child\('tanggal'\)\.val\(\)/g); } },
+  { nama: "bk: konselingAudit oleh palsu", ubah: (r) => { r.konselingAudit.$nis.$aid.oleh[".validate"] = "newData.isString()"; } },
+  // ---- wewenang BK
+  { nama: "bk: pembinaan BK untuk ambang apa pun (kedua lapisan: pembinaan + pembinaanStatus)", ubah: (r) => {
+    const a = r.pembinaan.$nis.$id; a[".write"] = ganti(a[".write"], `root.child('discipline').child('levels').child(newData.child('levelId').val()).child('penanggungJawab').val() === 'bk'`, "true");
+    const b = r.pembinaanStatus.$nis.$ta.$levelId; b[".write"] = ganti(b[".write"], `root.child('discipline').child('levels').child($levelId).child('penanggungJawab').val() === 'bk'`, "true"); } },
+  { nama: "bk: pembinaan BK untuk siswa tanpa indeks (kedua lapisan)", ubah: (r) => {
+    const a = r.pembinaan.$nis.$id; a[".write"] = tailBk(a[".write"], `(${BK} && root.child('siswaKelas').child($nis).exists())`, BK);
+    const b = r.pembinaanStatus.$nis.$ta.$levelId; b[".write"] = tailBk(b[".write"], `(${BK} && root.child('siswaKelas').child($nis).exists())`, BK); } },
+  { nama: "bk: pembinaan BK tanpa log aktivitas", ubah: (r) => { const a = r.pembinaan.$nis.$id; a[".write"] = tailBk(a[".write"], ` && ${actOk(3, ["catat-pembinaan"])}`, "", `(${BK} && root.child('siswaKelas').child($nis).exists())`); } },
+  { nama: "bk: pembinaan dapat dibaca BK untuk siswa tanpa indeks via per-siswa", ekuivalen: true, ubah: (r) => { const a = r.pembinaan.$nis; a[".read"] = ganti(a[".read"], `(${BK} && root.child('siswaKelas').child($nis).exists())`, BK); } },
+  { nama: "bk: pelanggaran BK (sumber 'bk') tanpa siswa terindeks (kedua lapisan record + meta)", ubah: (r) => {
+    const a = r.discipline.records.$nis.$recId; a[".write"] = tailBk(a[".write"], `(${BK} && root.child('siswaKelas').child($nis).exists())`, BK, `(${BK} && (newData.exists() ?`);
+    const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = tailBk(m[".write"], `(${BK} && root.child('siswaKelas').child($nis).exists())`, BK); } },
+  { nama: "bk: pelanggaran BK boleh kategori Sedang/Berat tanpa takziran", ubah: (r) => { const a = r.discipline.records.$nis.$recId; a[".write"] = tailBkRe(a[".write"], /\(root\.child\('discipline'\)\.child\('rules'\)\.child\(newData\.child\('refId'\)\.val\(\)\)\.child\('kategori'\)\.val\(\) === 'Ringan' \|\| root\.child\('discipline'\)\.child\('rules'\)\.child\(newData\.child\('refId'\)\.val\(\)\)\.child\('takziran'\)\.val\(\)\.length > 0\)/, "true", `(${BK} && (newData.exists() ?`); } },
+  { nama: "bk: pelanggaran BK dengan poin bebas (bukan dari master)", ubah: (r) => { const a = r.discipline.records.$nis.$recId; a[".write"] = tailBkRe(a[".write"], / && newData\.child\('poin'\)\.val\(\) === root\.child\('discipline'\)\.child\('rules'\)\.child\(newData\.child\('refId'\)\.val\(\)\)\.child\('poin'\)\.val\(\)/, "", `(${BK} && (newData.exists() ?`); } },
+  { nama: "bk: pelanggaran BK dengan sumber apa pun (cek sumber 'bk' dibuang pada record DAN meta)", ubah: (r) => {
+    const a = r.discipline.records.$nis.$recId; a[".write"] = tailBk(a[".write"], " && newData.child('sumber').val() === 'bk'", "", `(${BK} && (newData.exists() ?`);
+    const m = r.discipline.recordMeta.$nis.$recId; const T = `(${recordBaruT("$nis", "$recId")}.child('sumber').val() === 'bk' || root.child('discipline').child('records').child($nis).child($recId).child('sumber').val() === 'bk')`;
+    m[".write"] = tailBk(m[".write"], T, "true"); } },
+  { nama: "bk: pelanggaran BK tanpa log aktivitas (kedua lapisan record + meta)", ubah: (r) => {
+    const a = r.discipline.records.$nis.$recId; a[".write"] = tailBk(a[".write"], ` && ${actOk(4, ["pelanggaran"])}`, "", `(${BK} && (newData.exists() ?`);
+    const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = tailBk(m[".write"], `(${actOk(4, ["pelanggaran"])} || ${actOk(4, ["hapus-pelanggaran"])})`, "true"); } },
+  { nama: "bk: usul remisi BK tanpa log aktivitas", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = tailBk(n[".write"], ` && ${actOk(2, ["usul-remisi"])}`, "", `(${BK} && !data.exists() && newData.exists()`); } },
+  { nama: "bk: usul remisi BK untuk siswa tanpa indeks", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = tailBk(n[".write"], ` && root.child('siswaKelas').child(newData.child('nis').val()).exists()`, "", `(${BK} && !data.exists() && newData.exists()`); } },
+  { nama: "bk: BK dapat membatalkan usulan orang lain", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = tailBk(n[".write"], ` && data.child('oleh').val() === auth.uid`, "", `(${BK} && data.exists() && !newData.exists()`); } },
+  { nama: "bk: BK dapat membatalkan usulan yang sudah diputuskan", ubah: (r) => { const n = r.usulRemisi.$id; n[".write"] = tailBk(n[".write"], ` && data.child('status').val() === 'menunggu'`, "", `(${BK} && data.exists() && !newData.exists()`); } },
+  { nama: "bk: BK dapat membaca usulan orang lain per id", ubah: (r) => { const n = r.usulRemisi.$id; n[".read"] = ganti(n[".read"], " && data.child('oleh').val() === auth.uid", ""); } },
+  { nama: "bk: BK dapat meng-query usulan orang lain", ubah: (r) => { r.usulRemisi[".read"] = ganti(r.usulRemisi[".read"], " && query.equalTo === auth.uid", ""); } },
+  { nama: "bk: waka memberi role 'bk' tanpa staff.role 'bk'", ubah: (r) => { const n = r.roles.$uid; n[".write"] = ganti(n[".write"], ` && newData.parent().parent().child('staff').child($uid).child('role').val() === 'bk'`, ""); } },
+  { nama: "bk: waka dapat menimpa email cermin bkAkun", ubah: (r) => { const n = r.bkAkun.$uid.email; n[".write"] = ganti(n[".write"], "!data.exists() && ", ""); } },
+  { nama: "bk: BK dapat membaca log tap", ubah: (r) => { r.log[".read"] = r.log[".read"].replace(/\)$/, ` || ${BK})`); } },
+  { nama: "bk: BK dapat membaca seluruh attendance", ubah: (r) => { r.attendance[".read"] = r.attendance[".read"].replace(/\)$/, ` || ${BK})`); } },
+  { nama: "bk: BK dapat menulis Alfa per jam (sel lessons)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = `(${c[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis kalender efektif", ubah: (r) => { const n = r.kalenderEfektif.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis master aturan", ubah: (r) => { const n = r.discipline.rules.$ruleId; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis master ambang", ubah: (r) => { const n = r.discipline.levels.$lvlId; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis roles", ubah: (r) => { const n = r.roles.$uid; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat mengisi presensi manual", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis validasi Alfa", ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
 ];
+
+/** Ganti teks hanya pada BAGIAN BK sebuah aturan: bagian dimulai pada penanda `awal` (bawaan: kemunculan terakhir dari "(BK && root.child('siswaKelas')"). */
+function tailBk(teks, dari, ke, awal) {
+  const i = teks.indexOf(awal ?? `(${BK} && root.child('siswaKelas')`);
+  if (i < 0) throw new Error(`penanda bagian BK tidak ditemukan: ${awal ?? "(BK && siswaKelas"}`);
+  const hasil = teks.slice(0, i) + ganti(teks.slice(i), dari, ke);
+  return hasil;
+}
+function tailBkRe(teks, re, ke, awal) {
+  const i = teks.indexOf(awal);
+  if (i < 0) throw new Error(`penanda bagian BK tidak ditemukan: ${awal}`);
+  const ekor = teks.slice(i);
+  const baru = ekor.replace(re, ke);
+  if (baru === ekor) throw new Error(`pola tidak ditemukan pada bagian BK: ${re}`);
+  return teks.slice(0, i) + baru;
+}
+const recordBaruT = (nis, id) => `newData.parent().parent().parent().child('records').child(${nis}).child(${id})`;
+const AUDIT_K_T = `${nav(3)}.child('konselingAudit').child($nis).child(${ACT(3)}.child('id').val())`;
 
 /** Hapus semua kemunculan pola dari teks; melempar bila tidak ada yang cocok. */
 function hapusSemua(teks, re) {
@@ -761,9 +866,9 @@ const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
 // Kelompok: manual | piket | saran | kalender | wali | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^alfa-jam/.test(nama) ? "perjam" : /^alat-kunci/.test(nama) ? "alat" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+const GRUP = (nama) => /^bk:/.test(nama) ? "bk" : /^alfa-jam/.test(nama) ? "perjam" : /^alat-kunci/.test(nama) ? "alat" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "alat", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "alat", "bk", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 // ---- Pengelola emulator: mutasi memakai emulator SENDIRI (bukan firebase emulators:exec) supaya dapat direstart ----
 // Penyebab macet sebelumnya: satu emulator Java melayani ratusan run suite; memorinya menumpuk (+-3 GB) hingga tiap suite timeout.

@@ -8,6 +8,7 @@ const WakaLayout = lazy(() => import("../waka/WakaLayout"));
 const PiketLayout = lazy(() => import("../piket/PiketLayout"));
 const KepalaLayout = lazy(() => import("../kepala/KepalaLayout"));
 const WaliLayout = lazy(() => import("../wali/WaliLayout"));
+const BkLayout = lazy(() => import("../bk/BkLayout"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const StudentPage = lazy(() => import("../pages/StudentPage"));
 const PanduanOrtu = lazy(() => import("../pages/Panduan").then((m) => ({ default: () => { const { session } = useAuth(); return session?.role === "ortu" ? <m.PanduanOrtu nis={session.nis} /> : <Navigate to="/login" replace />; } })));
@@ -34,7 +35,7 @@ function SetupNeeded() {
   );
 }
 
-const HOME = { admin: "/admin", kepala: "/kepala", waka: "/waka", piket: "/piket", wali: "/wali" } as const;
+const HOME = { admin: "/admin", kepala: "/kepala", waka: "/waka", piket: "/piket", wali: "/wali", bk: "/bk" } as const;
 
 function HomeRedirect() {
   const { session } = useAuth();
@@ -44,7 +45,7 @@ function HomeRedirect() {
 }
 
 /** Hanya peran `role` yang boleh masuk; peran staf lain dialihkan ke panelnya sendiri. */
-function PanelGuard({ role, children }: { role: "admin" | "kepala" | "waka" | "piket" | "wali"; children: ReactNode }) {
+function PanelGuard({ role, children }: { role: "admin" | "kepala" | "waka" | "piket" | "wali" | "bk"; children: ReactNode }) {
   const { session } = useAuth();
   if (session?.role === role) return <>{children}</>;
   if (session && session.role !== "ortu") return <Navigate to={HOME[session.role]} replace />;
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
   { path: "/kepala/*", element: <Page><PanelGuard role="kepala"><KepalaLayout /></PanelGuard></Page> },
   { path: "/waka/*", element: <Page><PanelGuard role="waka"><WakaLayout /></PanelGuard></Page> },
   { path: "/wali/*", element: <Page><PanelGuard role="wali"><WaliLayout /></PanelGuard></Page> },
+  { path: "/bk/*", element: <Page><PanelGuard role="bk"><BkLayout /></PanelGuard></Page> },
   { path: "/piket/*", element: <Page><PanelGuard role="piket"><PiketLayout /></PanelGuard></Page> },
   { path: "/siswa/:nis", element: <Page><StudentGuard /></Page> },
   { path: "/panduan", element: <Page><PanduanOrtu /></Page> },

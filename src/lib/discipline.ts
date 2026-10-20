@@ -24,7 +24,7 @@ export type DiscRecord = {
   tanggal: string;
   ta: string;
   takziran?: string;
-  sumber: "manual" | "saran" | "piket" | "wali" | "usul-wali";
+  sumber: "manual" | "saran" | "piket" | "wali" | "bk" | "usul-wali";
 };
 
 /** discipline/recordMeta/{nis}/{recId} — KHUSUS STAF. `snapshot` = salinan isi catatan saat dihapus. */
@@ -37,6 +37,8 @@ export type RecordMeta = {
   dihapus?: true;
   alasanHapus?: string;
   snapshot?: DiscRecord;
+  /** epoch-day klaim pencatat (wali/BK/piket); jendela waktu ditegakkan Security Rules */
+  hariKe?: number;
 };
 
 export type AuditEntry = {
