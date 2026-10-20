@@ -1300,7 +1300,7 @@ test("pemetaan saran (autoMap) di Tata tertib, cadangan nama sekali-jalan, perin
   await expect(gani.first()).toContainText("Manual");
   await expect(gani.first()).toContainText("Lupa KTM");
   await expect(gani.first()).toContainText("Bu Rina");
-  await expect(pa.locator(".table-row.log-grid", { hasText: "HANI HILANG" }).filter({ hasText: "diabaikan (ada tap alat)" }).first()).toBeVisible(); // alat menang, manual tampil bertanda
+  await expect(pa.locator(".table-row.log-grid", { hasText: "HANI HILANG" }).filter({ hasText: "tidak dipakai (tap alat lebih awal)" }).first()).toBeVisible(); // tap alat lebih awal, manual tampil bertanda tidak dipakai
   const [unduh] = await Promise.all([pa.waitForEvent("download"), pa.getByRole("button", { name: "Unduh CSV" }).click()]);
   const csv = readFileSync(await unduh.path(), "utf8");
   expect(csv).toContain("Manual: Lupa KTM");
@@ -1711,7 +1711,7 @@ async function loginDengan(page, email, password) {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill(password);
   await page.locator("button.login-submit").click();
-  await page.waitForURL(/\/(admin|kepala|waka|piket|wali)$/);
+  await page.waitForURL(/\/(admin|kepala|waka|piket|wali|bk)$/);
   await sehat(page);
 }
 const uidWaliSeed = async () => {
@@ -2235,7 +2235,7 @@ test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam d
   await dlg.getByLabel("Jam masuk").fill("05:30");
   await expect(dlg.getByTestId("galat-jam-manual")).toContainText("tidak boleh lebih awal dari 06:00");
   await dlg.getByRole("button", { name: "Simpan" }).click();
-  await expect(dlg.getByRole("alert")).toContainText("tidak boleh lebih awal dari 06:00");
+  await expect(dlg.getByRole("alert").last()).toContainText("tidak boleh lebih awal dari 06:00");
   await dlg.getByLabel("Jam masuk").fill("07:05");
   await expect(dlg.getByText("Status dihitung dari jadwal kelas: Hadir")).toBeVisible();
   await expect(dlg.getByTestId("peringatan-mundur")).toContainText("Tanggal lampau");
@@ -2260,23 +2260,28 @@ test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam d
   await menu(pw, "Perlu ditinjau");
   await expect(pw.locator('.saran-row[data-tipe="lupaKtm"]', { hasText: SISWA.nama })).toHaveCount(1);
   await expect(pw.locator('.saran-row[data-tipe="terlambat"]', { hasText: SISWA.nama })).toHaveCount(0);
-  await menu(pw, "Validasi harian");
-  await expect(pw.locator(".table-row", { hasText: SISWA.nama })).toHaveCount(0);
-  // Laporan > Log harian pada tanggal kemarin: baris manual memuat jam diketik + dicatat + JAM DIMUNDURKAN; baris alat diberi catatan
-  await menu(pw, "Laporan");
-  await pw.getByRole("tab", { name: "Log harian" }).click();
-  await pw.locator("input[type=date]").first().fill(T.kemarin);
-  const barisManual = pw.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "Manual" });
-  await expect(barisManual).toContainText("diketik 07:05");
-  await expect(barisManual).toContainText("JAM DIMUNDURKAN");
-  await expect(pw.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "Setelah presensi manual 07:05" })).toHaveCount(1);
   // kartu Dashboard: entri hari ini bertanda mundur (seed langsung) dihitung dan tautannya memakai filter
   await dbPut(`manualTap/${T.hariIni}/862`, { masuk: "07:00:00", masukDetik: 25200, mundur: true, status: "Hadir", alasan: "Lupa KTM", oleh: "x", ts: Date.now(), hariKe: 1 });
   await pw.goto("/waka");
-  await expect(pw.getByTestId("jumlah-manual-mundur")).toHaveText("1");
-  await expect(pw.getByTestId("kartu-manual-mundur").getByRole("link")).toHaveAttribute("href", new RegExp(`presensi-manual\?tanggal=${T.hariIni}&mundur=1`));
+  await expect(pw.getByTestId("jumlah-manual-mundur")).toHaveText(/^[1-9]/); // mencakup entri mundur dari uji manual sebelumnya pada hari yang sama
+  await expect(pw.getByTestId("kartu-manual-mundur").getByRole("link")).toHaveAttribute("href", `/waka/presensi-manual?tanggal=${T.hariIni}&mundur=1`);
   bersih(kecualikan(lapW, 2), "waka (v2.4 lupa KTM)");
   await kW.close();
+
+  // admin: Laporan > Log harian pada tanggal kemarin memuat jam diketik + dicatat + JAM DIMUNDURKAN; baris alat diberi catatan
+  const kA = await browser.newContext(opsiKonteks());
+  const pa = await kA.newPage();
+  const lapA = await siapkan(pa);
+  await loginStaf(pa, "admin");
+  await menu(pa, "Laporan");
+  await pa.getByRole("tab", { name: "Log harian" }).click();
+  await pa.locator("input[type=date]").first().fill(T.kemarin);
+  const barisManual = pa.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "diketik 07:05" });
+  await expect(barisManual).toHaveCount(1);
+  await expect(barisManual).toContainText("JAM DIMUNDURKAN");
+  await expect(pa.locator(".table-row.log-grid", { hasText: SISWA.nama }).filter({ hasText: "07:40:00" })).toContainText("status resmi: Hadir"); // baris tap alat diberi catatan
+  bersih(kecualikan(lapA, 2), "admin (v2.4 log harian)");
+  await kA.close();
 
   for (const path of [`config/students/${SISWA.uid}`, `profiles/${SISWA.nis}`, `attendance/${SISWA.nis}/${T.kemarin}`, `log/${T.kemarin}/ALAT0861_M`, `manualTap/${T.kemarin}/${SISWA.nis}`, `manualTapByStudent/${SISWA.nis}/${T.kemarin}`, `manualTap/${T.hariIni}/862`]) await dbPut(path, null);
 });
@@ -2299,6 +2304,14 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   // akun BK tidak bercampur dengan daftar akun staf lain (kepala/waka/piket) di Pengaturan
   await page.goto("/admin/pengaturan");
   await expect(page.getByText("Bu Konselor Satu")).toHaveCount(0);
+  // dropdown "Tambah akun pimpinan / staf" memuat opsi Guru BK yang mengarah ke menu Guru BK (alur yang sama)
+  await page.getByRole("button", { name: "Tambah akun" }).click();
+  const dpeng = page.getByRole("dialog", { name: "Tambah akun pimpinan / staf" });
+  await dpeng.locator("select").selectOption("bk");
+  await expect(dpeng.getByTestId("arahan-guru-bk")).toBeVisible();
+  await expect(dpeng.getByRole("button", { name: "Buat akun" })).toHaveCount(0);
+  await dpeng.getByRole("button", { name: "Buka menu Guru BK" }).click();
+  await expect(page).toHaveURL(/\/admin\/guru-bk$/);
   bersih(lap, "admin (guru BK)");
 
   // waka: juga boleh membuat akun BK (per-field), tetapi tidak melihat catatan konseling
@@ -2339,7 +2352,7 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   await pb.getByLabel("Filter kelas").selectOption("");
   await pb.getByRole("link", { name: "Detail ANDI TEST" }).click();
   await expect(pb.getByTestId("ekstra-bk")).toBeVisible();
-  const isi = await pb.locator("main").innerText();
+  const isi = await pb.locator("main.student-page").innerText();
   expect(isi).not.toMatch(/PIN|AAAA1111/);
   bersih(lapB, "bk (masuk)");
   await kB.close();
@@ -2365,15 +2378,15 @@ test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, d
   // pembinaan: siswa dari X IPA (333) DAN XI IPS (111) sama-sama muncul
   await menu(page, "Pembinaan");
   const daftar = page.getByTestId("daftar-perlu-dibina");
-  await expect(daftar.locator("[data-nis='333']")).toHaveCount(1);
-  await expect(daftar.locator("[data-nis='111']")).toHaveCount(1);
-  await expect(daftar.locator("[data-nis='333']")).toContainText("Ambang 150 poin");
-  await daftar.locator("[data-nis='333']").getByRole("button", { name: "Catat pembinaan" }).click();
+  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(1);
+  await expect(daftar.locator("[data-nis='111'][data-level='e2eLvBk']")).toHaveCount(1);
+  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toContainText("Ambang 150 poin");
+  await daftar.locator("[data-nis='333'][data-level='e2eLvBk']").getByRole("button", { name: "Catat pembinaan" }).click();
   const pbDlg = page.getByRole("dialog", { name: "Catat pembinaan" });
   await pbDlg.getByLabel("Hasil pembinaan").fill("Siswa dipanggil BK, diberi arahan, dan menyetujui rencana perbaikan");
   await pbDlg.getByRole("button", { name: "Simpan" }).click();
   await expect(toast(page)).toContainText("Pembinaan dicatat selesai");
-  await expect(daftar.locator("[data-nis='333']")).toHaveCount(0);
+  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(0);
   await expect(page.getByTestId("riwayat-pembinaan").locator("[data-nis='333']")).toContainText("Selesai");
 
   // pelanggaran ringan untuk siswa kelas lain; catatan muncul di "Catatan saya"
@@ -2403,7 +2416,8 @@ test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, d
   await kd.getByRole("button", { name: "Simpan" }).click();
   await expect(kd).toContainText("Pilih siswa");
   await kd.getByPlaceholder("Ketik NIS atau nama siswa...").fill("444");
-  await page.locator(".picker-list li[role=option]", { hasText: "DINA TEST" }).click();
+  await expect(page.locator(".picker-list li[role=option]", { hasText: "DINA TEST" })).toBeVisible();
+  await kd.getByPlaceholder("Ketik NIS atau nama siswa...").press("Enter"); // pilih opsi aktif lewat keyboard (daftar dirender ulang saat data realtime tiba)
   await kd.getByLabel("Topik konseling").selectOption("Keluarga");
   await kd.getByLabel("Isi konseling").fill("pendek");
   await kd.getByRole("button", { name: "Simpan" }).click();

@@ -814,7 +814,7 @@
             ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
           },
           "aksi": {
-            ".validate": "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|alfa-jam|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|catat-konseling|ubah-konseling|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)"
+            ".validate": "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|alfa-jam|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|catat-konseling|ubah-konseling|atur-bk|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci)$/)"
           },
           "nis": {
             ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,20}$/)"

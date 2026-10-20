@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { ORTU_DOMAIN } from "../lib/firebase";
@@ -70,6 +71,7 @@ export default function StaffAccounts() {
 function TambahDialog({ onClose }: { onClose: () => void }) {
   const notify = useToast();
   const [f, setF] = useState({ nama: "", email: "", password: "", ulang: "" });
+  const navigate = useNavigate();
   const [role, setRole] = useState<PeranStaf>("waka");
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -136,8 +138,18 @@ function TambahDialog({ onClose }: { onClose: () => void }) {
         <Field label="Peran" hint={role === "kepala" ? "Memantau seluruh data, mencatat izin/sakit, dan mengelola kesiswaan." : role === "waka" ? "Mengelola validasi harian, presensi per jam, dan pelanggaran/remisi." : "Akun BERSAMA meja piket: izin harian & per jam (S/I/D) dan pelanggaran ringan. Gunakan nama akun seperti 'Meja Piket'; nama petugas dipilih di aplikasi."}>
           <select className="text-input" value={role} onChange={(e) => setRole(e.target.value as PeranStaf)}>
             {PERAN_STAF_UMUM.map((k) => <option key={k} value={k}>{PERAN_STAF[k]}</option>)}
+            <option value="bk">{PERAN_STAF.bk}</option>
           </select>
         </Field>
+        {role === "bk" ? (
+          <>
+            <div className="notice" role="status" data-testid="arahan-guru-bk"><Icon name="users" size={17} /><span>Akun Guru BK (per guru, lintas semua kelas) dibuat dan dikelola di menu <b>Guru BK</b>, dengan alur yang sama dan daftar tersendiri.</span></div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={onClose}>Batal</button>
+              <button type="button" className="primary-button" onClick={() => { onClose(); navigate("/admin/guru-bk"); }}>Buka menu Guru BK</button>
+            </div>
+          </>
+        ) : (<>
         <Field label="Nama lengkap" error={err.nama}><input className="text-input" value={f.nama} maxLength={60} onChange={(e) => setF({ ...f, nama: e.target.value })} /></Field>
         <Field label="Email (harus email asli)" error={err.email} hint="Dipakai untuk login dan menerima email reset password."><input className="text-input" type="email" autoComplete="off" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
         <div className="form-grid">
@@ -150,6 +162,7 @@ function TambahDialog({ onClose }: { onClose: () => void }) {
           <button type="button" className="secondary-button" onClick={onClose}>Batal</button>
           <button className="primary-button" disabled={busy}>{busy ? <Spinner /> : null}Buat akun</button>
         </div>
+        </>)}
       </form>
     </Modal>
   );
