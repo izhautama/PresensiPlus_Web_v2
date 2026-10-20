@@ -128,6 +128,9 @@ Sebuah tanggal adalah **hari efektif** hanya bila ada bukti sekolah berlangsung 
 - **Laporan per jam** memisahkan "A per jam (bolos)" dan "Alfa seharian (hari)"; portal orang tua menampilkan Alfa seharian satu baris.
 - Uji: `npm run test:mutation:perjam`, `tests/turunan.test.mjs`, `tests/perjam.test.mjs`.
 
+### Status uji v2.3.1 (tag `v2.3.1-deployed`)
+Dijalankan sebelum tag: unit semua berkas, rules 1618 lolos, mutasi **hanya kelompok yang disentuh** (perjam 30/30, piket 53/53 + 3 ekuivalen, dasar 28/28 + 2 ekuivalen), E2E desktop+HP 78/78, mobile 5x berturut-turut 39/39. Mutasi kelompok **wali, pembinaan, manual, saran, kalender** tidak dijalankan ulang untuk v2.3.1 (tidak disentuh; terakhir bersih pada v2.3) dan ikut tercakup oleh regresi v2.4. Hash rules ter-deploy: `40215ca1dd2647225e199be961f6b5acbfd2a6f63957f3aac55c9bf0bb8cb372`.
+
 ## Panduan pengguna
 Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_WALI.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.
 Isinya dibuat dari satu sumber, `src/lib/panduan.ts`, yang juga dipakai menu **Panduan** di aplikasi (halaman statis tanpa data). Setelah mengubah isi, jalankan `node scripts/buat-panduan.mjs`; `tests/panduan.test.mjs` memastikan docs dan aplikasi selalu sama.
