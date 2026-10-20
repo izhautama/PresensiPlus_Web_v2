@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:emu": "node scripts/preflight-emulator.mjs && node scripts/dev-emulator.mjs",
     "rules": "node scripts/build-rules.mjs",
     "test:unit": "node tests/perjam.test.mjs && node tests/saran.test.mjs && node tests/attendance.test.mjs && node tests/piket.test.mjs && node tests/perangkat.test.mjs && node tests/rekapjam.test.mjs && node tests/tanggal.test.mjs && node tests/manual.test.mjs && node tests/panduan.test.mjs && node tests/hariEfektif.test.mjs && node tests/wali.test.mjs && node tests/konsistensi.test.mjs && node tests/pembinaan.test.mjs && node tests/emu.test.mjs && node tests/waktu.test.mjs && node tests/turunan.test.mjs && node tests/konseling.test.mjs",
     "test:mutation": "npm run rules && node scripts/preflight-emulator.mjs && node tests/mutation.mjs",

@@ -150,6 +150,15 @@ Akun PER GURU (role `bk`), dibuat admin atau waka di menu **Guru BK**; login lew
 - Uji: `npm run test:mutation:bk`, `tests/konseling.test.mjs`, blok "BK" di `tests/rules.test.mjs`, E2E "bk: ...".
 - Daftar "Perlu dibina (BK)" + lencana menu memakai data kedisiplinan seluruh siswa (satu langganan per node, bukan per siswa).
 
+## Status pengerjaan v2.4 (mode FITUR DULU; belum di-tag, belum di-deploy)
+Branch `v2.4`. Fitur v2.4-a (bukti hadir paling awal, jam manual, kunci tap pertama) dan v2.4-b (peran BK, konseling rahasia, opsi Guru BK di Pengaturan) sudah ditulis. Coba lokal tanpa menyentuh produksi: `npm run dev:emu` (emulator + data uji + akun contoh; lihat keluaran terminal).
+Pemeriksaan per fitur yang sudah dijalankan: `tsc` + build, uji unit, `npm run test:rules` (1930 lolos). Hasil pendukung yang sempat dijalankan sebelum mode ini: E2E desktop+HP 86/86 (v2.4-a + BK), mutasi `alat` 7/7, `bk` 60/60 (+1 ekuivalen), `piket` 53/53, `dasar` 28/28.
+**Uji yang DITUNDA ke fase pengujian akhir** (jalankan setelah semua fitur selesai, di emulator bersih):
+- mutasi: `manual` (setelah perubahan v2.4-a, hasil terakhir belum final), `saran`, `dasar`, `wali`, `pembinaan`, `piket`, `alat`, `bk`, `kalender`;
+- E2E penuh desktop+HP dan mobile 5x berturut-turut ("admin: kesiswaan hanya lihat"); E2E v2.4-a memerlukan jam nyata mesin sekitar 08:30 WIB atau lebih (rules memakai jam nyata);
+- uji fisik ESP32 (tap masuk, tap kedua tidak menimpa, retry setelah WiFi putus, Serial Monitor tanpa DITOLAK untuk tap pertama);
+- snapshot `releases/v2.4`, CARA-DEPLOY v2.4, merge ke `main`, tag `v2.4`.
+
 ### Status uji v2.3.1 (tag `v2.3.1-deployed`)
 Dijalankan sebelum tag: unit semua berkas, rules 1618 lolos, mutasi **hanya kelompok yang disentuh** (perjam 30/30, piket 53/53 + 3 ekuivalen, dasar 28/28 + 2 ekuivalen), E2E desktop+HP 78/78, mobile 5x berturut-turut 39/39. Mutasi kelompok **wali, pembinaan, manual, saran, kalender** tidak dijalankan ulang untuk v2.3.1 (tidak disentuh; terakhir bersih pada v2.3) dan ikut tercakup oleh regresi v2.4. Hash rules ter-deploy: `40215ca1dd2647225e199be961f6b5acbfd2a6f63957f3aac55c9bf0bb8cb372`.
 
