@@ -821,7 +821,7 @@ const mutasi = [
   { nama: "bk: BK dapat membaca log tap", ubah: (r) => { r.log[".read"] = r.log[".read"].replace(/\)$/, ` || ${BK})`); } },
   { nama: "bk: BK dapat membaca seluruh attendance", ubah: (r) => { r.attendance[".read"] = r.attendance[".read"].replace(/\)$/, ` || ${BK})`); } },
   { nama: "bk: BK dapat menulis Alfa per jam (sel lessons)", ubah: (r) => { const c = r.lessons.$tgl.$kelas.absen.$nis.$jam; c[".write"] = `(${c[".write"]}) || (auth != null && ${BK})`; } },
-  { nama: "bk: BK dapat menulis kalender efektif", ubah: (r) => { const n = r.kalenderEfektif.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
+  { nama: "bk: BK dapat menulis kalender efektif (aturan tulis + validasi peran pada field normal)", ubah: (r) => { const n = r.kalenderEfektif.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; n.normal[".validate"] = "newData.val() === true"; } },
   { nama: "bk: BK dapat menulis master aturan", ubah: (r) => { const n = r.discipline.rules.$ruleId; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
   { nama: "bk: BK dapat menulis master ambang", ubah: (r) => { const n = r.discipline.levels.$lvlId; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
   { nama: "bk: BK dapat menulis roles", ubah: (r) => { const n = r.roles.$uid; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
