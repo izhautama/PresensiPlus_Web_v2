@@ -133,7 +133,7 @@ function TambahDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Tambah akun pimpinan / staf" subtitle="Pilih peran sesuai tugas. Akun hanya mendapat hak akses perannya." onClose={onClose}>
+    <Modal title="Tambah akun pimpinan / staf" subtitle="Pilih peran sesuai tugas. Akun hanya mendapat hak akses perannya. Akun Wali Kelas dibuat di menu Wali kelas (perlu pemetaan kelas)." onClose={onClose}>
       <form className="modal-form" onSubmit={submit} noValidate>
         <Field label="Peran" hint={role === "kepala" ? "Memantau seluruh data, mencatat izin/sakit, dan mengelola kesiswaan." : role === "waka" ? "Mengelola validasi harian, presensi per jam, dan pelanggaran/remisi." : "Akun BERSAMA meja piket: izin harian & per jam (S/I/D) dan pelanggaran ringan. Gunakan nama akun seperti 'Meja Piket'; nama petugas dipilih di aplikasi."}>
           <select className="text-input" value={role} onChange={(e) => setRole(e.target.value as PeranStaf)}>

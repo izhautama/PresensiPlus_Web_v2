@@ -34,7 +34,7 @@ export function kelompokBaca(peran: PeranPembinaan | string | null | undefined):
 /** Kelompok untuk sebuah nilai penanggung jawab: nilai lama `waka` dibaca bersama kelompok kepala bila belum dimigrasi tidak ada (path hanya wali|bk|kepala). */
 export const kelompokPj = (pj: PenanggungJawab | undefined): "wali" | "bk" | "kepala" => (pj === "wali" || pj === "bk" ? pj : "kepala");
 /** Boleh mengoreksi record 'selesai' berpenanggung jawab `pj`: hanya peringkat LEBIH TINGGI (waka untuk wali/bk, kepala untuk semua). */
-export const bolehKoreksi = (peran: PeranPembinaan, pj: "wali" | "bk" | "kepala") => PERINGKAT[peran] > PERINGKAT[pj] && (peran === "kepala" || pj !== "kepala");
+export const bolehKoreksi = (peran: PeranPembinaan, pj: "wali" | "bk" | "kepala") => (peran === "waka" || peran === "kepala") && PERINGKAT[peran] > PERINGKAT[pj] && (peran === "kepala" || pj !== "kepala");
 
 /** pembinaan/{pj}/{nis}/{ta}_{levelId}: satu catatan per (TA, ambang). Tidak dapat dihapus fisik. `pj` = salinan penanggung jawab ambang saat dibuat (tetap). */
 export type Pembinaan = {

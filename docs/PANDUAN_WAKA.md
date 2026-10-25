@@ -50,7 +50,7 @@ Untuk: Waka Kesiswaan
 
 ## Pembinaan dan usulan remisi
 
-1. Menu Pembinaan: rekap pembinaan wali kelas dan BK (pembinaan Kepala tidak terlihat oleh Waka). Waka tidak mencatat pembinaan, tetapi dapat mengoreksi yang Selesai dengan alasan. Menu Penugasan BK: Tunjuk atau Pindahkan guru BK. Menu Izin ke orang tua: orang tua tidak melihat pembinaan sampai Anda mengizinkan (ringkas atau lengkap); izin yang dibatalkan Kepala mengunci level itu.
+1. Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK: Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.
 2. Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.
 3. Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.
 

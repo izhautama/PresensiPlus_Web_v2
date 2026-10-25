@@ -11,7 +11,7 @@ export type BarisJam = { tanggal: string; jam: number; kode: string; mapel?: str
 export function htmlLembar(a: {
   nama: string; nis: string; kelas: string; ta: string;
   ringkas: Ringkas; sekarang: LevelItem | null; berikut: LevelItem | null;
-  riwayat: EntriRiwayat[]; perJam: BarisJam[]; pembinaan?: Pembinaan[]; dicetak: string; dicetakOleh: string;
+  riwayat: EntriRiwayat[]; perJam: BarisJam[]; pembinaan?: Pembinaan[]; /** admin tidak membaca pembinaan: bagian itu tidak dirender */ tanpaPembinaan?: boolean; dicetak: string; dicetakOleh: string;
 }): string {
   const pembinaan = (a.pembinaan ?? []).slice().sort((x, y) => x.tanggal.localeCompare(y.tanggal)).map((p) => `<tr><td>${esc(formatTanggal(p.tanggal, false))}</td><td>${esc(p.levelPoin)} poin<br><small>${esc(p.tindakan)}</small></td><td>${esc(p.metode)}</td><td>${p.status === "selesai" ? "Selesai" : "Dijadwalkan"}<br><small>${esc(p.olehNama)}</small></td><td>${esc(p.hasil)}${p.tindakLanjut ? `<br><small>Tindak lanjut: ${esc(p.tindakLanjut)}</small>` : ""}</td></tr>`).join("");
   const kodeLabel: Record<string, string> = { A: "Alfa", I: "Izin", S: "Sakit", D: "Dispensasi" };
@@ -35,7 +35,7 @@ ${a.berikut ? `<b>Ambang berikutnya</b><span>${esc(a.berikut[1].poin)} poin (${e
 ${a.ringkas.sangatBerat ? `<b>Catatan</b><span>Terdapat pelanggaran kategori Sangat Berat.</span>` : ""}</div>
 <h2>Riwayat pelanggaran &amp; remisi</h2>
 ${baris ? `<table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th>Poin</th></tr></thead><tbody>${baris}</tbody></table>` : "<p>Belum ada catatan.</p>"}
-${a.pembinaan === undefined ? "" : `<h2>Riwayat pembinaan</h2>
+${a.tanpaPembinaan ? "" : `<h2>Riwayat pembinaan</h2>
 ${pembinaan ? `<table><thead><tr><th>Tanggal</th><th>Ambang</th><th>Metode</th><th>Status / pelaksana</th><th>Hasil</th></tr></thead><tbody>${pembinaan}</tbody></table>` : "<p>Belum ada pembinaan tercatat.</p>"}`}
 <h2>Ketidakhadiran per jam pelajaran</h2>
 ${jam ? `<table><thead><tr><th>Tanggal</th><th>Jam</th><th>Keterangan</th></tr></thead><tbody>${jam}</tbody></table>` : "<p>Tidak ada ketidakhadiran per jam tercatat.</p>"}

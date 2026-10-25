@@ -143,7 +143,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.",
       ], catatan: "Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log aktivitas." },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: rekap pembinaan wali kelas dan BK (pembinaan Kepala tidak terlihat oleh Waka). Waka tidak mencatat pembinaan, tetapi dapat mengoreksi yang Selesai dengan alasan. Menu Penugasan BK: Tunjuk atau Pindahkan guru BK. Menu Izin ke orang tua: orang tua tidak melihat pembinaan sampai Anda mengizinkan (ringkas atau lengkap); izin yang dibatalkan Kepala mengunci level itu.",
+        "Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK: Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.",
         "Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.",
         "Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.",
       ], catatan: "Remisi Tanpa prestasi hanya untuk siswa yang punya catatan pelanggaran pada tahun ajaran ini; usulan yang tidak memenuhi syarat tidak dapat disetujui." },
@@ -244,7 +244,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "BK fokus membina: pelanggaran dicatat wali kelas, piket, atau waka. Catatan lama bersumber BK tetap berlaku.",
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.",
+        "Menu Pembinaan (Perlu dibina): siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.",
         "Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksi.",
         "Menu Usulan remisi: pilih siswa dan remisi dari daftar resmi, tulis alasan, lalu Kirim usulan. Keputusan setuju atau tolak ada pada Waka atau Kepala.",
       ] },

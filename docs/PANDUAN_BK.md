@@ -15,7 +15,7 @@ Untuk: Guru Bimbingan Konseling (akun per guru)
 
 ## Pembinaan dan usulan remisi
 
-1. Menu Pembinaan: siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.
+1. Menu Pembinaan (Perlu dibina): siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.
 2. Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksi.
 3. Menu Usulan remisi: pilih siswa dan remisi dari daftar resmi, tulis alasan, lalu Kirim usulan. Keputusan setuju atau tolak ada pada Waka atau Kepala.
 

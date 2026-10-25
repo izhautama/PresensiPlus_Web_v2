@@ -303,7 +303,8 @@ const pembinaanBlok = () => ({
     ".read": anyOf(isKepala),
     ".validate": `$nis.matches(${nisRe})`,
     $id: {
-      ".write": `auth != null && ${isKepala} && !newData.exists() && ${actOk(3, ["migrasi-pembinaan"])}`,
+      // hapus hanya bila salinan di jalur berperingkat SUDAH ada (pada update yang sama) di kelompok sesuai penanggung jawab ambang
+      ".write": `auth != null && ${isKepala} && !newData.exists() && ${actOk(3, ["migrasi-pembinaan"])} && ${nav(3)}.child('pembinaan').child(root.child('discipline').child('levels').child(data.child('levelId').val()).child('penanggungJawab').val()).child($nis).child($id).exists()`,
     },
   },
 });

@@ -40,4 +40,4 @@ console.log("panduan.test: OK");
 
 // v2.4-b: panduan BK memuat konseling rahasia; admin/kepala/waka menyebut Guru BK / Konseling
 assert.match(teks("bk"), /Konseling/); assert.match(teks("bk"), /rahasia/i); assert.match(teks("bk"), /Perlu dibina/); assert.match(teks("bk"), /tidak dapat dihapus/i);
-assert.match(teks("admin"), /Guru BK/); assert.match(teks("waka"), /Guru BK/); assert.match(teks("kepala"), /Konseling/);
+assert.match(teks("admin"), /Guru BK/); assert.match(teks("waka"), /Guru BK/); assert.match(teks("kepala"), /tidak oleh Kepala/); assert.match(teks("kepala"), /Penugasan BK/); assert.match(teks("kepala"), /Migrasi pembinaan/); assert.match(teks("waka"), /Izin ke orang tua/); assert.match(teks("bk"), /Klaim/);

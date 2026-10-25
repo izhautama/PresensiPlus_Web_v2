@@ -196,6 +196,7 @@
       }
     },
     "pembinaan": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala'",
       "wali": {
         ".read": "auth != null && (root.child('roles').child(auth.uid).val() === 'bk' || root.child('roles').child(auth.uid).val() === 'waka' || root.child('roles').child(auth.uid).val() === 'kepala')",
         "$nis": {
@@ -375,7 +376,7 @@
         ".read": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala'",
         ".validate": "$nis.matches(/^[0-9]{1,20}$/)",
         "$id": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !newData.exists() && newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'migrasi-pembinaan')"
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !newData.exists() && newData.parent().parent().parent().child('activityLast').child(auth.uid).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('ts').val() === now && newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('uid').val() === auth.uid && (newData.parent().parent().parent().child('activity').child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('tgl').val()).child(newData.parent().parent().parent().child('activityLast').child(auth.uid).child('id').val()).child('aksi').val() === 'migrasi-pembinaan') && newData.parent().parent().parent().child('pembinaan').child(root.child('discipline').child('levels').child(data.child('levelId').val()).child('penanggungJawab').val()).child($nis).child($id).exists()"
         }
       }
     },

@@ -86,9 +86,10 @@ assert.deepEqual(d.map((x) => x.nis), ["3", "20"]);
 assert.equal(penanggungJawabBawaan("lv01", { poin: 100 }), "wali");
 assert.equal(penanggungJawabBawaan("lv02", { poin: 200 }), "bk");
 assert.equal(penanggungJawabBawaan("lv03", { poin: 300 }), "kepala");
-assert.equal(penanggungJawabBawaan("lv05", { poin: 500 }), "waka");
+assert.equal(penanggungJawabBawaan("lv05", { poin: 500 }), "kepala", "v2.5: lv04-lv06 menjadi kepala");
+assert.equal(penanggungJawabBawaan("lv04", { poin: 400 }), "kepala");
 assert.equal(penanggungJawabBawaan("xyz", { poin: 100 }), "wali", "id kustom: menurut ambang 100");
-assert.equal(penanggungJawabBawaan("xyz", { poin: 450 }), "waka");
+assert.equal(penanggungJawabBawaan("xyz", { poin: 450 }), "kepala");
 assert.equal(penanggungJawabBawaan("xyz", { poin: 150 }), null, "ambang tak lazim: dibiarkan (diatur manual)");
 
 // ---- validasi pembinaan

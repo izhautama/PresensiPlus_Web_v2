@@ -162,6 +162,40 @@ Pemeriksaan per fitur yang sudah dijalankan: `tsc` + build, uji unit, `npm run t
 ### Status uji v2.3.1 (tag `v2.3.1-deployed`)
 Dijalankan sebelum tag: unit semua berkas, rules 1618 lolos, mutasi **hanya kelompok yang disentuh** (perjam 30/30, piket 53/53 + 3 ekuivalen, dasar 28/28 + 2 ekuivalen), E2E desktop+HP 78/78, mobile 5x berturut-turut 39/39. Mutasi kelompok **wali, pembinaan, manual, saran, kalender** tidak dijalankan ulang untuk v2.3.1 (tidak disentuh; terakhir bersih pada v2.3) dan ikut tercakup oleh regresi v2.4. Hash rules ter-deploy: `40215ca1dd2647225e199be961f6b5acbfd2a6f63957f3aac55c9bf0bb8cb372`.
 
+## Pembinaan berperingkat, klaim BK, dan izin orang tua (v2.5)
+
+Branch `v2.5` (belum di-tag, belum di-deploy). Mode kerja "fitur dulu": uji mutasi, E2E, dan mobile 5x ditunda (lihat "Uji tertunda v2.5").
+
+**Ambang dan penanggung jawab.** lv01 wali, lv02 BK, lv03 sampai lv06 Kepala (lv04 sampai lv06 sebelumnya waka). Waka tidak punya level sendiri. Hanya Kepala yang dapat mengubah `penanggungJawab`, dan hanya selama ambang belum dipakai: record pembinaan pertama menulis `discipline/levelTerpakai/{levelId}: true` pada update yang sama (dipaksa rules), lalu penanggung jawab terkunci. UI Tata tertib menonaktifkan pilihan itu bagi waka dan untuk ambang terpakai. Waka tetap mengubah poin dan tindakan.
+
+**Hierarki baca** (`wali 1 < bk 2 < waka 3 < kepala 4`; admin tidak ikut). Peringkat ada di path: `pembinaan/{wali|bk|kepala}/{nis}/{ta}_{levelId}`, karena RTDB tidak memfilter isi daftar. Field `pj` ikut tersimpan, sama dengan jalurnya, dan tidak dapat diubah.
+
+| Pembaca | wali | bk | kepala |
+|---|---|---|---|
+| wali (siswa binaan) | ya | tidak | tidak |
+| BK | ya | ya | tidak |
+| waka | ya | ya | tidak |
+| kepala | ya | ya | ya |
+| admin, piket, ortu, alat | tidak | tidak | tidak |
+
+Penulis: wali (jalur wali), BK pemegang klaim (jalur bk), kepala (jalur kepala). Waka tidak membuat record. Setelah `selesai`, hanya waka (jalur wali/bk) dan kepala (semua) yang mengoreksi, dengan aksi log `koreksi-pembinaan` yang `detail`-nya adalah alasan murni (10 sampai 300 karakter). Pembacaan di aplikasi per kelompok: `bacaPembinaanSiswa(nis, peran)` di `src/services/pembinaanLanjut.ts`. Admin tidak lagi membaca pembinaan: menu rekap hilang dan lembar cetak tidak merender bagian pembinaan untuk admin.
+
+**Klaim BK** (`klaimBK/{nis}/{ta}_{levelId}`): BK mengklaim hanya bila node belum ada (dua klaim serentak: tepat satu menang, teruji). Lepas klaim (aksi `lepas-klaim-bk`, alasan murni di `detail`, hanya sebelum pembinaan `selesai`). Waka/kepala menunjuk (`tunjuk-bk`) atau memindahkan (`pindah-bk`, alasan wajib) ke BK yang `bkAkun/{uid}/aktif`. Pembinaan lama tetap atas nama pembuatnya; BK baru melanjutkan pada record yang sama. Panel BK: Belum ditangani, Tangani saya, Ditangani BK lain; lencana = dua kelompok pertama. Usul remisi BK hanya untuk siswa yang ia klaim (field `klaimKey`).
+
+**Izin orang tua** (bawaan: tersembunyi). `izinOrtu/{nis}/{ta}/{levelId}` (mode `ringkas` atau `lengkap`), `kunciOrtu` (hanya kepala), penanda baca-saja `izinOrtuAda`, dan proyeksi `pembinaanOrtu` yang dibaca orang tua (tanpa nama pembina, uid, konseling, atau klaim). Rules menegakkan konsistensi dua arah: proyeksi hanya ada bila izin ada dan sama persis dengan record; setiap tulis record yang punya izin aktif wajib memperbarui proyeksi pada update yang sama; mencabut izin menghapus proyeksi. Waka: level wali/BK yang tidak terkunci, hanya mencabut izin buatannya. Kepala: semua; membatalkan izin waka mengunci level (kunci + hapus izin dalam satu update); hanya kepala membuka kunci. `pembinaanStatus` dihapus. Dampak yang disengaja: orang tua yang tadinya melihat status pembinaan lv01 tidak melihat apa pun sampai diizinkan.
+
+**Konseling.** Baca: hanya akun BK (semua BK). Kepala, waka, admin, wali, piket, ortu, alat: tidak (Permendikbud 111/2014). Tulis: BK untuk siswa terindeks mana pun (tanpa klaim). Koreksi hanya oleh pembuat lewat `konselingAudit`. Log aktivitas hanya aksi dan NIS. Admin SDK (notebook, skrip migrasi, backup) melewati rules: akses kredensial Admin SDK sama dengan akses data konseling.
+
+**BK dan pelanggaran.** BK tidak lagi mencatat atau menghapus pelanggaran. Catatan lama bersumber `bk` tetap sah, terbaca, dan dihitung.
+
+**Whitelist baca BK** (tanpa tulis): `config/students` tidak termasuk. Dibuka: `siswaKelas`, `profiles`, `attendance`, `lessonsByStudent`, `manualTapByStudent`, `validasiByStudent`, `discipline/records`, `discipline/recordMeta`, `discipline/levels`, `discipline/rules`, `discipline/remisi`, `discipline/settings`, `kalenderEfektif`, `pembinaan/wali`, `pembinaan/bk`, `klaimBK`, `bkAkun`, `izinOrtuAda` (siswa terindeks), `konseling`, `konselingAudit`. Tertutup: `parents` (PIN), `staff`, `roles` orang lain, `device`, `piket*`, `manualTap`, `izin`, `validasi`, `lessons`, `activity`. Catatan: `izin`, `validasi`, dan `lessons` sengaja tidak dibuka (keputusan v2.4: BK memakai salinan per siswa). Isi `profiles` per field belum diaudit ulang.
+
+**Migrasi (Kepala, menu Migrasi pembinaan):** pratinjau dry-run (jumlah per kelompok, ambang diubah, record tak bisa dipindah), lalu terapkan: ambang `waka`/kosong menjadi kepala atau bawaan; record lama dipindah per batch 20 (tulis jalur baru + hapus jalur lama + penanda terpakai dalam satu update); `pembinaanStatus` dihapus. Semua berlog `migrasi-pembinaan`. Aman diulang. Urutan deploy: rules dulu (`--only database`), lalu hosting, lalu jalankan migrasi sekali sebagai Kepala. Selama belum migrasi, record lama tidak terlihat di rekap baru.
+
+**Uji v2.5 yang sudah dijalankan:** `tsc` dan `npm run build` bersih; `npm run test:unit` lolos (termasuk `tests/bk.test.mjs`); `npm run test:rules` 2177 lolos, 0 gagal.
+
+**Uji tertunda v2.5** (fase pengujian akhir): mutasi semua grup (mutan lama untuk `pembinaan`, `bk`, dan `wali` merujuk struktur sebelum v2.5 dan perlu disusun ulang; grup baru klaim/izin/migrasi belum ada); E2E desktop dan HP (alur BK, izin orang tua, kunci, migrasi, dan opsi Guru BK perlu diperbarui karena menu Pelanggaran BK dan Konseling Kepala dihapus); mobile 5x; `npm run test:migrasi`; E2E v2.4-a pada jam nyata setelah 08:30 WIB.
+
 ## Panduan pengguna
 Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_WALI.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.
 Isinya dibuat dari satu sumber, `src/lib/panduan.ts`, yang juga dipakai menu **Panduan** di aplikasi (halaman statis tanpa data). Setelah mengubah isi, jalankan `node scripts/buat-panduan.mjs`; `tests/panduan.test.mjs` memastikan docs dan aplikasi selalu sama.

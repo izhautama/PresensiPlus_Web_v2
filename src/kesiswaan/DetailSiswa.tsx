@@ -53,7 +53,8 @@ export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelLis
     try {
       const snap = await get(refDb(`lessonsByStudent/${siswa.nis}`));
       // v2.5: pembinaan dibaca per kelompok sesuai peringkat peran; ADMIN tidak membaca pembinaan (bagian itu tidak dirender, tanpa permission denied).
-      const pembinaan: Pembinaan[] | undefined = session?.role === "admin" ? undefined : Object.values(await bacaPembinaanSiswa(siswa.nis, session?.role)).filter((p) => p.ta === ta);
+      const tanpaPembinaan = session?.role === "admin";
+      const pembinaan: Pembinaan[] = tanpaPembinaan ? [] : Object.values(await bacaPembinaanSiswa(siswa.nis, session?.role)).filter((p) => p.ta === ta);
       const perJam: BarisJam[] = [];
       for (const [tgl, jams] of Object.entries((snap.val() ?? {}) as Record<string, Record<string, { k: string; mapel?: string }>>)) {
         if (tgl < awalTa(ta) || tgl > akhirTa(ta)) continue;
@@ -62,7 +63,7 @@ export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelLis
       perJam.sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.jam - b.jam);
       const html = htmlLembar({
         nama: siswa.nama, nis: siswa.nis, kelas: siswa.kelas, ta, ringkas: r, sekarang, berikut,
-        riwayat: daftarRecord(recs, metas, ta, false), perJam, pembinaan,
+        riwayat: daftarRecord(recs, metas, ta, false), perJam, pembinaan, tanpaPembinaan,
         dicetak: new Date(waktuServer()).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }), dicetakOleh: actor.nama,
       });
       w.document.open(); w.document.write(html); w.document.close();
