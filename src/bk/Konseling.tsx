@@ -45,7 +45,7 @@ export function KonselingDialog({ dialog, siswa, today, onClose }: { dialog: Non
 
   const nama = siswa.find((s) => s.nis === (dialog.nis ?? nis[0]))?.nama;
   return (
-    <Modal title={ubah ? "Koreksi catatan konseling" : "Catatan konseling baru"} subtitle={nama ? `${nama} · rahasia` : "Rahasia: hanya BK dan Kepala yang dapat membaca"} onClose={onClose} width={580}>
+    <Modal title={ubah ? "Koreksi catatan konseling" : "Catatan konseling baru"} subtitle={nama ? `${nama} · rahasia` : "Rahasia: hanya akun BK yang dapat membaca"} onClose={onClose} width={580}>
       <form className="modal-form" onSubmit={submit} noValidate data-testid="form-konseling">
         {!ubah && !dialog.nis && <Field label="Siswa" error={err.siswa}><StudentPicker students={siswa} value={nis} onChange={setNis} /></Field>}
         <div className="form-grid">
@@ -73,7 +73,7 @@ export function KonselingDialog({ dialog, siswa, today, onClose }: { dialog: Non
   );
 }
 
-/** Daftar catatan konseling rahasia. BK: tulis/koreksi catatan sendiri. Kepala: hanya membaca. */
+/** Daftar catatan konseling rahasia (v2.5): hanya akun BK; tulis/koreksi catatan sendiri. */
 export default function KonselingHalaman() {
   const mode = usePanelMode();
   const bk = mode === "bk";
@@ -98,7 +98,7 @@ export default function KonselingHalaman() {
   return (
     <section className="data-page" data-testid="halaman-konseling">
       <div className="section-heading">
-        <div><p>Konseling</p><span><Icon name="eye" size={14} /> Catatan RAHASIA · hanya BK dan Kepala Madrasah yang dapat membaca{bk ? "" : " · Anda hanya membaca"}</span></div>
+        <div><p>Konseling</p><span><Icon name="eye" size={14} /> Catatan RAHASIA · hanya akun BK yang dapat membaca{bk ? "" : " · Anda hanya membaca"}</span></div>
         {bk && <button className="primary-button" onClick={() => setDlg({})}><Icon name="plus" size={16} />Catatan baru</button>}
       </div>
       <div className="filter-bar">

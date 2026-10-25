@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { onValue } from "firebase/database";
 import { useAdminData } from "../admin/AdminData";
 import { taKey, type DiscRecord, type Level, type RecordMeta } from "../lib/discipline";
-import { daftarPerluDibina, type ItemDibina, type Pembinaan } from "../lib/pembinaan";
+import { daftarPerluDibina, type ItemDibina, type KlaimBk, type Pembinaan } from "../lib/pembinaan";
 import type { StudentRow } from "../lib/types";
 import { r, useLive } from "../services/db";
 
@@ -15,6 +15,8 @@ export type DisiplinKelasValue = {
   recs: PerNis<DiscRecord>;
   meta: PerNis<RecordMeta>;
   pembinaan: PerNis<Pembinaan>;
+  /** klaim BK per siswa (hanya panel BK): klaimBK/{nis}/{ta}_{levelId} */
+  klaim?: Record<string, Record<string, KlaimBk>>;
   /** siswa yang perlu dibina oleh wali (saldo pernah melewati ambang berpenanggung jawab wali dan belum ada pembinaan selesai) */
   items: ItemDibina[];
   memuat: boolean;
@@ -58,7 +60,7 @@ export function DisiplinKelasProvider({ children }: { children: ReactNode }) {
       };
       pasang<DiscRecord>(`discipline/records/${nis}`, setRecs);
       pasang<RecordMeta>(`discipline/recordMeta/${nis}`, setMeta);
-      pasang<Pembinaan>(`pembinaan/${nis}`, setPembinaan);
+      pasang<Pembinaan>(`pembinaan/wali/${nis}`, setPembinaan); // v2.5: hanya kelompok 'wali' (peringkat di path)
     }
     return () => stops.forEach((f) => f());
     // eslint-disable-next-line react-hooks/exhaustive-deps

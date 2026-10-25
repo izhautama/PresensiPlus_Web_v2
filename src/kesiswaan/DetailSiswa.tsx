@@ -14,6 +14,8 @@ import { r as refDb, useLive } from "../services/db";
 import { get } from "firebase/database";
 import { htmlLembar, type BarisJam } from "../lib/lembar";
 import type { Pembinaan } from "../lib/pembinaan";
+import { useAuth } from "../auth/AuthContext";
+import { bacaPembinaanSiswa } from "../services/pembinaanLanjut";
 
 type Props = {
   siswa: StudentRow;
@@ -31,6 +33,7 @@ type Props = {
 
 /** Kartu pembinaan satu siswa: saldo, level, dan riwayat pelanggaran/remisi (termasuk yang dihapus, khusus staf). */
 export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelList, bisaTulis, actor, onTa, onCatat, onClose }: Props) {
+  const { session } = useAuth();
   const [denganTerhapus, setDenganTerhapus] = useState(false);
   const [edit, setEdit] = useState<EntriRiwayat | null>(null);
   const [hapus, setHapus] = useState<EntriRiwayat | null>(null);
@@ -49,8 +52,8 @@ export default function DetailSiswa({ siswa, ta, taOpsi, records, meta, levelLis
     w.document.write("<p style='font-family:sans-serif'>Menyiapkan lembar pembinaan…</p>");
     try {
       const snap = await get(refDb(`lessonsByStudent/${siswa.nis}`));
-      const pbSnap = await get(refDb(`pembinaan/${siswa.nis}`)).catch(() => null); // riwayat pembinaan (wali kelas & pejabat) ikut dicetak
-      const pembinaan = Object.values((pbSnap?.val() ?? {}) as Record<string, Pembinaan>).filter((p) => p.ta === ta);
+      // v2.5: pembinaan dibaca per kelompok sesuai peringkat peran; ADMIN tidak membaca pembinaan (bagian itu tidak dirender, tanpa permission denied).
+      const pembinaan: Pembinaan[] | undefined = session?.role === "admin" ? undefined : Object.values(await bacaPembinaanSiswa(siswa.nis, session?.role)).filter((p) => p.ta === ta);
       const perJam: BarisJam[] = [];
       for (const [tgl, jams] of Object.entries((snap.val() ?? {}) as Record<string, Record<string, { k: string; mapel?: string }>>)) {
         if (tgl < awalTa(ta) || tgl > akhirTa(ta)) continue;

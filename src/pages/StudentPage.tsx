@@ -12,13 +12,13 @@ import { daftarRecord, labelTa, levelDari, poinBertanda, ringkas, urutLevel, typ
 import { KODE_LABEL, type LessonsSiswa } from "../lib/perjam";
 import type { DayRecord, Kategori, ScheduleRow } from "../lib/types";
 import type { ManualTapAnak } from "../lib/manual";
-import type { PembinaanStatus } from "../lib/pembinaan";
+import type { PembinaanOrtu } from "../lib/pembinaan";
 import { logout } from "../services/auth";
 import { waktuServer } from "../services/aktivitas";
 import { r } from "../services/db";
 import { bacaSekali } from "../services/koneksi";
 
-type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level>; pembinaan: Record<string, Record<string, PembinaanStatus>> };
+type Disiplin = { records: Record<string, DiscRecord>; levels: Record<string, Level>; pembinaan: Record<string, Record<string, PembinaanOrtu>> };
 type PerJamData = { jam: Record<string, Record<string, LessonsSiswa>>; alfa: Record<string, { status: "Alfa" }> };
 /** `alat` = attendance/{nis} MENTAH (tap alat + keterangan); `manual` = salinan presensi manual; `hariEfektif` = kalenderEfektif (agregat, tanpa data siswa).
  *  Semua rekap memakai SATU rumus: rekapSiswa() (lib/hariEfektif.ts). */
@@ -28,7 +28,7 @@ const LABEL: Partial<Record<Kategori, string>> = { Hadir: "Tepat waktu", Alpha: 
 
 /**
  * Portal siswa. `embedded` = dipakai di dalam panel wali kelas (tanpa header portal/Keluar); `ekstra` = bagian tambahan khusus wali
- * (catatan internal, pembinaan). Orang tua melihat status pembinaan (dijadwalkan/selesai + tanggal) tanpa isi dan tanpa nama.
+ * (catatan internal, pembinaan). Orang tua melihat pembinaan HANYA bila diizinkan waka/kepala per level: mode ringkas (status + tanggal) atau lengkap; tanpa nama pembina.
  */
 export default function StudentPage({ embedded = false, ekstra }: { embedded?: boolean; ekstra?: (nis: string, profil: { nama: string; kelas: string }) => ReactNode } = {}) {
   const { nis = "" } = useParams();
@@ -50,7 +50,7 @@ export default function StudentPage({ embedded = false, ekstra }: { embedded?: b
         get(r(`lessonsByStudent/${nis}`)).catch(() => null), get(r(`validasiByStudent/${nis}`)).catch(() => null),
         get(r(`manualTapByStudent/${nis}`)).catch(() => null),
         get(query(r("kalenderEfektif"), orderByKey(), startAt(mulaiTa), endAt(todayWIB(new Date(waktuServer()))))).catch(() => null),
-        get(r(`pembinaanStatus/${nis}`)).catch(() => null),
+        get(r(`pembinaanOrtu/${nis}`)).catch(() => null), // v2.5: hanya yang DIIZINKAN waka/kepala (bawaan: tersembunyi)
       ]));
       if (!p.exists()) { setErr("Data siswa tidak ditemukan. Hubungi TU sekolah."); return; }
       setData({
@@ -326,7 +326,7 @@ function Kedisiplinan({ disiplin, ta }: { disiplin: Disiplin; ta: string }) {
   const levels = urutLevel(disiplin.levels);
   const { sekarang, berikut } = levelDari(r.saldo, levels);
   const daftar = daftarRecord(disiplin.records, undefined, ta, false);
-  const pembinaan = Object.values(disiplin.pembinaan[ta] ?? {}).sort((a, b) => a.levelPoin - b.levelPoin);
+  const pembinaan = Object.entries(disiplin.pembinaan[ta] ?? {}).map(([lv, p]) => ({ ...p, id: lv })).sort((a, b) => a.levelPoin - b.levelPoin);
   return (
     <section className="panel no-print">
       <div className="panel-header"><div><p className="panel-title">Kedisiplinan</p><span>{labelTa(ta)} · poin pelanggaran dikurangi remisi</span></div></div>
@@ -345,8 +345,9 @@ function Kedisiplinan({ disiplin, ta }: { disiplin: Disiplin; ta: string }) {
           {pembinaan.map((p) => (
             <div key={p.id} data-status={p.status}>
               <b>Pembinaan {p.levelPoin} poin</b>
-              <small>{levels.find(([id]) => id === p.id.slice(ta.length + 1))?.[1].tindakan ?? "Pembinaan oleh sekolah"}</small>
+              <small>{p.mode === "lengkap" && p.tindakan ? p.tindakan : levels.find(([id]) => id === p.id)?.[1].tindakan ?? "Pembinaan oleh sekolah"}</small>
               <StatusBadge status={p.status === "selesai" ? `Selesai ${formatTanggal(p.tanggal, false)}` : `Dijadwalkan ${formatTanggal(p.tanggal, false)}`} />
+              {p.mode === "lengkap" && p.hasil && <small data-testid="pembinaan-hasil">Hasil: {p.hasil}{p.tindakLanjut ? ` · Tindak lanjut: ${p.tindakLanjut}` : ""}</small>}
             </div>
           ))}
         </div>

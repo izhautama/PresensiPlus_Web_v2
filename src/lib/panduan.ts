@@ -47,7 +47,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Guru BK", langkah: [
         "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.",
-        "Cabut dan Pasang kembali seperti wali. Catatan konseling hanya terbaca BK dan Kepala.",
+        "Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.",
       ] },
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.",
@@ -91,8 +91,8 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.",
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: rekap pembinaan wali kelas, BK, dan pejabat; saring lalu Unduh CSV.",
-        "Menu Konseling: Anda dapat membaca catatan konseling rahasia dari BK beserta riwayat koreksinya (hanya baca).",
+        "Menu Pembinaan: rekap pembinaan semua kelompok (wali kelas, BK, kepala); saring lalu Unduh CSV. Kepala mencatat pembinaan ambang Kepala dan dapat mengoreksi pembinaan Selesai di bawahnya (alasan wajib).",
+        "Menu Penugasan BK, Izin ke orang tua, dan Migrasi pembinaan (sekali, pratinjau dulu). Catatan konseling rahasia hanya terbaca BK, tidak oleh Kepala.",
         "Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.",
       ] },
       { judul: "Yang tidak dapat dilakukan", langkah: [
@@ -143,9 +143,9 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.",
       ], catatan: "Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log aktivitas." },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: rekap pembinaan wali kelas dan pejabat. Saring menurut tahun ajaran, status, atau kelas; Unduh CSV untuk arsip. Anda dapat mencatat atau mengoreksi pembinaan, termasuk yang Selesai.",
+        "Menu Pembinaan: rekap pembinaan wali kelas dan BK (pembinaan Kepala tidak terlihat oleh Waka). Waka tidak mencatat pembinaan, tetapi dapat mengoreksi yang Selesai dengan alasan. Menu Penugasan BK: Tunjuk atau Pindahkan guru BK. Menu Izin ke orang tua: orang tua tidak melihat pembinaan sampai Anda mengizinkan (ringkas atau lengkap); izin yang dibatalkan Kepala mengunci level itu.",
         "Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.",
-        "Tata tertib, tab Ambang pembinaan: atur Penanggung jawab tiap ambang (wali kelas, BK, Kepala, atau Waka). Pada data lama tekan Isi penanggung jawab bawaan.",
+        "Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.",
       ], catatan: "Remisi Tanpa prestasi hanya untuk siswa yang punya catatan pelanggaran pada tahun ajaran ini; usulan yang tidak memenuhi syarat tidak dapat disetujui." },
       { judul: "Pelanggaran, piket, dan pengawasan", langkah: [
         "Pelanggaran: catat pelanggaran atau remisi untuk satu atau banyak siswa; ubah, hapus (beralasan), atau pulihkan.",
@@ -217,7 +217,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Menu Pembinaan menampilkan daftar Perlu dibina: siswa yang saldo poinnya mencapai ambang pembinaan wali kelas pada tahun ajaran berjalan (mis. 100 poin). Lencana angka di menu menunjukkan jumlahnya.",
         "Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai.",
         "Siswa hilang dari daftar setelah pembinaan berstatus Selesai. Bila saldo siswa sudah turun tetapi belum dibina, ia tetap tampil dengan label saldo sudah turun.",
-        "Pembinaan tidak dapat dihapus. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksinya. Orang tua hanya melihat status dan tanggal, tidak isinya.",
+        "Pembinaan tidak dapat dihapus. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksinya. Orang tua tidak melihat pembinaan kecuali Waka atau Kepala mengizinkan.",
       ] },
       { judul: "Usulan remisi", langkah: [
         "Menu Usulan remisi: pilih siswa binaan, pilih remisi dari daftar resmi, tulis alasan (10 sampai 300 karakter), lalu Kirim usulan.",
@@ -236,22 +236,22 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
     bagian: [
       { judul: "Masuk dan menu", langkah: [
         "Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).",
-        "Menu: Dashboard, Siswa, Pelanggaran, Pembinaan, Usulan remisi, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.",
-        "Anda tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.",
+        "Menu: Dashboard, Siswa, Pembinaan, Usulan remisi, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.",
+        "Anda tidak mencatat pelanggaran dan tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.",
       ] },
       { judul: "Siswa dan pelanggaran ringan", langkah: [
         "Menu Siswa: cari nama atau NIS, saring menurut kelas, lihat saldo poin dan level. Ketuk nama untuk rekap kehadiran, per jam, riwayat poin dan pencatat, serta pembinaan. PIN orang tua dan UID kartu tidak ditampilkan.",
-        "Menu Pelanggaran: catat pelanggaran Ringan atau yang bertakziran dari daftar tata tertib untuk siswa mana pun. Poin dan takziran tetap dari daftar resmi. Catatan Anda dapat dihapus dengan alasan.",
+        "BK fokus membina: pelanggaran dicatat wali kelas, piket, atau waka. Catatan lama bersumber BK tetap berlaku.",
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Menu Pembinaan: daftar Perlu dibina berisi siswa yang saldonya mencapai ambang yang penanggung jawabnya BK (mis. Teguran 2). Lencana angka di menu menunjukkan jumlahnya.",
+        "Menu Pembinaan: siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.",
         "Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksi.",
         "Menu Usulan remisi: pilih siswa dan remisi dari daftar resmi, tulis alasan, lalu Kirim usulan. Keputusan setuju atau tolak ada pada Waka atau Kepala.",
       ] },
       { judul: "Catatan konseling rahasia", langkah: [
         "Menu Konseling atau detail siswa: tekan Catatan baru, pilih topik (Akademik, Pribadi, Sosial, Karier, Keluarga, Lainnya), isi konseling (10 sampai 2000 karakter) dan tindak lanjut (opsional).",
-        "Hanya BK dan Kepala Madrasah yang dapat MEMBACA catatan; Waka, admin, wali kelas, piket, dan orang tua tidak dapat melihatnya. Catatan tidak pernah muncul di portal orang tua, laporan, atau log aktivitas.",
-        "Catatan tidak dapat dihapus. Koreksi hanya oleh pembuat catatan: isi lama otomatis disimpan di riwayat koreksi yang hanya terbaca BK dan Kepala.",
+        "Semua akun BK dapat MEMBACA catatan (agar penanganan berlanjut); Kepala, Waka, admin, wali kelas, piket, dan orang tua tidak. Layanan konseling untuk semua siswa, tanpa klaim. Catatan tidak pernah muncul di portal orang tua, laporan, atau log aktivitas.",
+        "Catatan tidak dapat dihapus. Koreksi hanya oleh pembuat catatan: isi lama otomatis disimpan di riwayat koreksi yang hanya terbaca BK.",
       ], catatan: "Jaga kerahasiaan: keluar dari aplikasi setelah selesai, terutama di komputer bersama." },
     ],
   },
@@ -279,7 +279,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Presensi hari ini (jam masuk dan pulang), grafik minggu dan bulan ini, serta persen kehadiran.",
         "Kartu rekap menulis Hari efektif ke-N: hanya hari yang benar-benar ada kegiatan presensi. Bulan tanpa kegiatan tertulis Belum ada kegiatan presensi, bukan 0 persen.",
         "Riwayat 10 hari terakhir dan rekap per bulan dalam satu tahun ajaran.",
-        "Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level). Hari Alfa atau berketerangan penuh tampil satu baris (Alfa seharian), bukan sembilan baris jam.",
+        "Kehadiran per jam pelajaran dan catatan kedisiplinan anak (poin dan level). Pembinaan tampil hanya bila sekolah mengizinkan: ringkas (status dan tanggal) atau lengkap. Hari Alfa atau berketerangan penuh tampil satu baris (Alfa seharian), bukan sembilan baris jam.",
         "Data diperbarui otomatis tiap 1 menit; tekan tulisan \"Diperbarui\" untuk memuat ulang sekarang.",
       ] },
       { judul: "Lupa PIN atau tidak bisa masuk", langkah: [

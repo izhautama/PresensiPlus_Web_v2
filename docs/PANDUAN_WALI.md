@@ -24,7 +24,7 @@ Untuk: Wali kelas (akun per guru)
 1. Menu Pembinaan menampilkan daftar Perlu dibina: siswa yang saldo poinnya mencapai ambang pembinaan wali kelas pada tahun ajaran berjalan (mis. 100 poin). Lencana angka di menu menunjukkan jumlahnya.
 2. Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai.
 3. Siswa hilang dari daftar setelah pembinaan berstatus Selesai. Bila saldo siswa sudah turun tetapi belum dibina, ia tetap tampil dengan label saldo sudah turun.
-4. Pembinaan tidak dapat dihapus. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksinya. Orang tua hanya melihat status dan tanggal, tidak isinya.
+4. Pembinaan tidak dapat dihapus. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksinya. Orang tua tidak melihat pembinaan kecuali Waka atau Kepala mengizinkan.
 
 ## Usulan remisi
 

@@ -46,7 +46,7 @@ Untuk: Administrator / TU sekolah
 ## Guru BK
 
 1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.
-2. Cabut dan Pasang kembali seperti wali. Catatan konseling hanya terbaca BK dan Kepala.
+2. Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.
 
 ## Wali kelas
 

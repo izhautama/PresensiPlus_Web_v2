@@ -294,6 +294,7 @@ const pembinaanGrup = (pj) => {
   };
 };
 const pembinaanBlok = () => ({
+  ".read": anyOf(isKepala), // untuk migrasi (pratinjau seluruh node); peran lain hanya per kelompok
   wali: pembinaanGrup("wali"),
   bk: pembinaanGrup("bk"),
   kepala: pembinaanGrup("kepala"),

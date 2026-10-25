@@ -9,8 +9,7 @@ const Dashboard = lazy(() => import("./Dashboard"));
 const Siswa = lazy(() => import("./Siswa"));
 const DetailSiswa = lazy(() => import("./DetailSiswa"));
 const Konseling = lazy(() => import("./Konseling"));
-const Pelanggaran = lazy(() => import("../piket/Pelanggaran"));
-const Pembinaan = lazy(() => import("../wali/Pembinaan"));
+const Pembinaan = lazy(() => import("./PembinaanBk"));
 const UsulanRemisi = lazy(() => import("../wali/UsulanRemisi"));
 const Panduan = lazy(() => import("../pages/Panduan"));
 
@@ -24,7 +23,6 @@ export default function BkLayout() {
             <Route index element={<Dashboard />} />
             <Route path="siswa" element={<Siswa />} />
             <Route path="siswa/:nis" element={<DetailSiswa />} />
-            <Route path="pelanggaran" element={<Pelanggaran />} />
             <Route path="pembinaan" element={<Pembinaan />} />
             <Route path="usulan" element={<UsulanRemisi />} />
             <Route path="konseling" element={<Konseling />} />

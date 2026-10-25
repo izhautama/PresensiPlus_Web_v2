@@ -30,6 +30,13 @@ export default function UsulanRemisi() {
   const [busy, setBusy] = useState(false);
   const [batal, setBatal] = useState("");
   const siswa = useMemo(() => new Map(d.siswa.map((s) => [s.nis, s])), [d.siswa]);
+  // BK (v2.5): hanya siswa yang ia klaim (klaimBK/{nis}/{ta}_{lv}.bkUid = uid); kuncinya dikirim sebagai klaimKey agar rules dapat memeriksa.
+  const klaimSaya = useMemo(() => {
+    const m = new Map<string, string>();
+    if (pembina.peran === "bk") for (const [n, per] of Object.entries(d.klaim ?? {})) for (const [kunci, k] of Object.entries(per)) if (k.bkUid === pembina.uid && !m.has(n)) m.set(n, kunci);
+    return m;
+  }, [d.klaim, pembina.peran, pembina.uid]);
+  const siswaPilihan = useMemo(() => (pembina.peran === "bk" ? d.siswa.filter((s) => klaimSaya.has(s.nis)) : d.siswa), [d.siswa, pembina.peran, klaimSaya]);
 
   const daftarRemisi = useMemo(() => Object.entries(master.data ?? {}).filter(([, x]) => x.aktif).sort((a, b) => a[1].kelompok.localeCompare(b[1].kelompok) || b[1].poin - a[1].poin), [master.data]);
   const daftarUsul = useMemo(() => Object.entries(usul.data ?? {}).sort((a, b) => b[1].ts - a[1].ts), [usul.data]);
@@ -38,7 +45,7 @@ export default function UsulanRemisi() {
     e.preventDefault();
     const s = nis[0] ? siswa.get(nis[0]) : undefined;
     const v: Record<string, string> = {};
-    if (!s) v.siswa = pembina.peran === "bk" ? "Pilih siswa" : "Pilih siswa kelas binaan";
+    if (!s) v.siswa = pembina.peran === "bk" ? "Pilih siswa yang Anda klaim" : "Pilih siswa kelas binaan";
     const remisi = master.data?.[remId];
     const punyaPel = s ? ringkas(d.recs[s.nis], d.ta).pel > 0 : false;
     Object.assign(v, validasiUsul({ remisi, alasan, punyaPelanggaranTa: punyaPel, usulLain: Object.values(usul.data ?? {}), nis: s?.nis ?? "", remId }));
@@ -46,7 +53,7 @@ export default function UsulanRemisi() {
     if (Object.keys(v).length || !s || !remisi) return;
     setBusy(true);
     try {
-      await buatUsulRemisi({ nis: s.nis, nama: s.nama, remId, remisi, alasan }, { uid, nama });
+      await buatUsulRemisi({ nis: s.nis, nama: s.nama, remId, remisi, alasan, klaimKey: klaimSaya.get(s.nis) }, { uid, nama });
       notify("Usulan dikirim ke Waka/Kepala");
       setNis([]); setRemId(""); setAlasan("");
     } catch (ex) {
@@ -63,12 +70,12 @@ export default function UsulanRemisi() {
 
   return (
     <section className="data-page" data-testid="halaman-usulan">
-      <div className="section-heading"><div><p>Usulan remisi</p><span>Usulkan pengurangan poin untuk siswa binaan. Keputusan ada pada Waka Kesiswaan atau Kepala Madrasah.</span></div></div>
+      <div className="section-heading"><div><p>Usulan remisi</p><span>Usulkan pengurangan poin untuk siswa binaan (BK: siswa yang Anda klaim). Keputusan ada pada Waka Kesiswaan atau Kepala Madrasah.</span></div></div>
 
       <article className="panel master-group">
         <div className="panel-header"><div><p className="panel-title">Buat usulan</p><span>Nama dan poin remisi mengikuti daftar resmi tata tertib dan tidak dapat diubah.</span></div></div>
         <form className="modal-form" onSubmit={kirim} noValidate data-testid="form-usulan">
-          <Field label="Siswa" error={err.siswa}><StudentPicker students={d.siswa} value={nis} onChange={setNis} /></Field>
+          <Field label="Siswa" error={err.siswa}><StudentPicker students={siswaPilihan} value={nis} onChange={setNis} /></Field>
           <Field label="Remisi" error={err.remisi}>
             <select className="text-input" value={remId} onChange={(e) => setRemId(e.target.value)} aria-label="Remisi">
               <option value="">Pilih remisi…</option>

@@ -30,8 +30,8 @@ Untuk: Kepala Madrasah
 
 ## Pembinaan dan usulan remisi
 
-1. Menu Pembinaan: rekap pembinaan wali kelas, BK, dan pejabat; saring lalu Unduh CSV.
-2. Menu Konseling: Anda dapat membaca catatan konseling rahasia dari BK beserta riwayat koreksinya (hanya baca).
+1. Menu Pembinaan: rekap pembinaan semua kelompok (wali kelas, BK, kepala); saring lalu Unduh CSV. Kepala mencatat pembinaan ambang Kepala dan dapat mengoreksi pembinaan Selesai di bawahnya (alasan wajib).
+2. Menu Penugasan BK, Izin ke orang tua, dan Migrasi pembinaan (sekali, pratinjau dulu). Catatan konseling rahasia hanya terbaca BK, tidak oleh Kepala.
 3. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
 
 ## Yang tidak dapat dilakukan

@@ -2,6 +2,8 @@ import { useState, type FormEvent } from "react";
 import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner, StatusBadge } from "../components/ui";
 import { useBisaTulisKesiswaan, useToast } from "../admin/AdminLayout";
+import { useAuth } from "../auth/AuthContext";
+import { useLive } from "../services/db";
 import { KATEGORI_LIST, type KategoriPelanggaran, type Kelompok, type Level, type PenanggungJawab, type Remisi, type Rule } from "../lib/discipline";
 import { PJ_LABEL, PJ_LIST } from "../lib/pembinaan";
 import { SEMUA_TIPE_SARAN, TIPE_LABEL, cariAturanBawaan } from "../lib/saran";
@@ -16,6 +18,7 @@ export default function TataTertib() {
   const d = useDiscipline();
   const actor = useActor();
   const bisaTulis = useBisaTulisKesiswaan();
+  const peran = useAuth().session?.role;
   const notify = useToast();
   const [tab, setTab] = useState<Tab>("rules");
   const [edit, setEdit] = useState<Edit>(null);
@@ -127,7 +130,7 @@ export default function TataTertib() {
           {tab === "levels" && (
             <article className="panel master-group">
               <div className="panel-header"><div><p className="panel-title">Ambang akumulasi poin</p><span>Level siswa = ambang tertinggi yang sudah dilewati saldo poinnya. Penanggung jawab menentukan siapa yang membina siswa pada ambang itu (daftar "Perlu dibina" wali kelas memakai ambang berpenanggung jawab wali).</span></div></div>
-              {bisaTulis && Object.values(d.levels).some((l) => !l.penanggungJawab) && (
+              {bisaTulis && peran === "kepala" && Object.values(d.levels).some((l) => !l.penanggungJawab) && (
                 <div className="notice warn" data-testid="pj-belum"><Icon name="warning" size={17} /><span>Sebagian ambang belum punya penanggung jawab, sehingga wali kelas belum menerima daftar "Perlu dibina".
                   <button className="primary-button sm" disabled={pjBusy} onClick={isiPj}>{pjBusy ? <Spinner /> : null}Isi penanggung jawab bawaan</button></span></div>
               )}
@@ -168,6 +171,8 @@ function MasterRow({ nama, poin, aktif, sub, minus, bisaTulis, onEdit, onToggle 
 
 function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d: ReturnType<typeof useDiscipline>; actor: Actor; onClose: () => void }) {
   const notify = useToast();
+  const peran = useAuth().session?.role;
+  const terpakai = useLive<Record<string, true>>("discipline/levelTerpakai");
   const { jenis, id } = edit;
   const lama = (id ? (jenis === "rules" ? d.rules[id] : jenis === "remisi" ? d.remisi[id] : d.levels[id]) : undefined) as (Rule & Remisi & Level) | undefined;
   const [f, setF] = useState({
@@ -184,6 +189,8 @@ function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d:
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [hapus, setHapus] = useState(false);
+  // v2.5: hanya kepala yang mengubah penanggung jawab, dan hanya selama ambang belum dipakai pembinaan (rules menegakkan keduanya).
+  const pjBisaDiubah = peran === "kepala" && !(id && terpakai.data?.[id]);
   const judul = jenis === "rules" ? "pelanggaran" : jenis === "remisi" ? "remisi" : "ambang";
 
   const submit = async (e: FormEvent) => {
@@ -215,10 +222,11 @@ function MasterDialog({ edit, d, actor, onClose }: { edit: NonNullable<Edit>; d:
         {jenis === "levels" ? (
           <>
             <Field label="Tindakan"><textarea className="text-input area" rows={2} maxLength={200} value={f.tindakan} onChange={(e) => setF({ ...f, tindakan: e.target.value })} /></Field>
-            <Field label="Penanggung jawab" hint="Wali kelas: ambang ini muncul di daftar Perlu dibina wali.">
-              <select className="text-input" value={f.penanggungJawab} aria-label="Penanggung jawab" onChange={(e) => setF({ ...f, penanggungJawab: e.target.value as PenanggungJawab | "" })}>
+            <Field label="Penanggung jawab" hint={!pjBisaDiubah ? (peran !== "kepala" ? "Hanya Kepala Madrasah yang dapat mengubah penanggung jawab." : "Terkunci: ambang ini sudah dipakai pembinaan, sehingga penanggung jawabnya tidak dapat diubah.") : "Wali kelas: ambang ini muncul di daftar Perlu dibina wali."}>
+              <select className="text-input" value={f.penanggungJawab} disabled={!pjBisaDiubah} aria-label="Penanggung jawab" onChange={(e) => setF({ ...f, penanggungJawab: e.target.value as PenanggungJawab | "" })}>
                 <option value="">Belum diatur</option>
                 {PJ_LIST.map((k) => <option key={k} value={k}>{PJ_LABEL[k]}</option>)}
+                {f.penanggungJawab === "waka" && <option value="waka">{PJ_LABEL.waka} (nilai lama)</option>}
               </select>
             </Field>
           </>

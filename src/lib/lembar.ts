@@ -35,8 +35,8 @@ ${a.berikut ? `<b>Ambang berikutnya</b><span>${esc(a.berikut[1].poin)} poin (${e
 ${a.ringkas.sangatBerat ? `<b>Catatan</b><span>Terdapat pelanggaran kategori Sangat Berat.</span>` : ""}</div>
 <h2>Riwayat pelanggaran &amp; remisi</h2>
 ${baris ? `<table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th>Poin</th></tr></thead><tbody>${baris}</tbody></table>` : "<p>Belum ada catatan.</p>"}
-<h2>Riwayat pembinaan</h2>
-${pembinaan ? `<table><thead><tr><th>Tanggal</th><th>Ambang</th><th>Metode</th><th>Status / pelaksana</th><th>Hasil</th></tr></thead><tbody>${pembinaan}</tbody></table>` : "<p>Belum ada pembinaan tercatat.</p>"}
+${a.pembinaan === undefined ? "" : `<h2>Riwayat pembinaan</h2>
+${pembinaan ? `<table><thead><tr><th>Tanggal</th><th>Ambang</th><th>Metode</th><th>Status / pelaksana</th><th>Hasil</th></tr></thead><tbody>${pembinaan}</tbody></table>` : "<p>Belum ada pembinaan tercatat.</p>"}`}
 <h2>Ketidakhadiran per jam pelajaran</h2>
 ${jam ? `<table><thead><tr><th>Tanggal</th><th>Jam</th><th>Keterangan</th></tr></thead><tbody>${jam}</tbody></table>` : "<p>Tidak ada ketidakhadiran per jam tercatat.</p>"}
 <div class="ttd"><div>Wali Kelas<br><br><br><br>( ........................ )</div><div>Waka Kesiswaan<br><br><br><br>( ........................ )</div><div>Orang Tua / Wali<br><br><br><br>( ........................ )</div></div>

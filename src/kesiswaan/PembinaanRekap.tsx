@@ -3,10 +3,10 @@ import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
 import StudentPicker from "../components/StudentPicker";
 import { useAdminData } from "../admin/AdminData";
-import { useBisaTulisKesiswaan } from "../admin/AdminLayout";
+import { useAuth } from "../auth/AuthContext";
 import { downloadCSV } from "../lib/attendance";
 import { labelTa, taKey } from "../lib/discipline";
-import { PJ_LABEL, type Pembinaan } from "../lib/pembinaan";
+import { PJ_LABEL, bolehKoreksi, kelompokPj, type Pembinaan } from "../lib/pembinaan";
 import { formatTanggal } from "../lib/time";
 import { useLive } from "../services/db";
 import FormPembinaan from "./FormPembinaan";
@@ -14,13 +14,25 @@ import { useActor, useDiscipline } from "./useDiscipline";
 
 type PerNis = Record<string, Record<string, Pembinaan>>;
 
-/** Rekap pembinaan (wali kelas dan pejabat) untuk waka/kepala/admin: filter TA/status/kelas, CSV, catat atau koreksi (waka & kepala). */
+/**
+ * Rekap pembinaan (v2.5, berperingkat) untuk waka dan kepala: waka membaca kelompok wali+BK; kepala semuanya. Admin TIDAK membaca pembinaan.
+ * Waka tidak membuat pembinaan: hanya MENGOREKSI yang sudah selesai (alasan wajib). Kepala membuat/ubah pembinaan berpenanggung jawab kepala dan mengoreksi semua.
+ */
 export default function PembinaanRekap() {
-  const bisaTulis = useBisaTulisKesiswaan();
+  const { session } = useAuth();
+  const peran = session?.role === "kepala" ? "kepala" : "waka";
+  const bisaTulis = peran === "kepala";
   const actor = useActor();
   const { students, today } = useAdminData();
   const d = useDiscipline();
-  const live = useLive<PerNis>("pembinaan");
+  const pbWali = useLive<PerNis>("pembinaan/wali");
+  const pbBk = useLive<PerNis>("pembinaan/bk");
+  const pbKepala = useLive<PerNis>(peran === "kepala" ? "pembinaan/kepala" : null);
+  const live = useMemo(() => {
+    const data: PerNis = {};
+    for (const g of [pbWali.data, pbBk.data, pbKepala.data]) for (const [nis, per] of Object.entries(g ?? {})) data[nis] = { ...data[nis], ...per };
+    return { data, loading: pbWali.loading || pbBk.loading || pbKepala.loading, error: pbWali.error ?? pbBk.error ?? pbKepala.error };
+  }, [pbWali.data, pbBk.data, pbKepala.data, pbWali.loading, pbBk.loading, pbKepala.loading, pbWali.error, pbBk.error, pbKepala.error]);
   const taNow = taKey(today);
   const [ta, setTa] = useState(taNow);
   const [status, setStatus] = useState("");
@@ -44,17 +56,16 @@ export default function PembinaanRekap() {
   const csv = () => downloadCSV(`pembinaan_${ta}.csv`, ["NIS", "Nama", "Kelas", "Tahun ajaran", "Ambang (poin)", "Penanggung jawab ambang", "Tanggal", "Metode", "Status", "Pelaksana", "Hasil", "Tindak lanjut"],
     baris.map(({ nis, pb }) => {
       const s = siswa.get(nis);
-      const lv = d.levels[pb.levelId];
-      return [nis, s?.nama ?? "", s?.kelas ?? "", pb.ta, pb.levelPoin, lv?.penanggungJawab ? PJ_LABEL[lv.penanggungJawab] : "", pb.tanggal, pb.metode, pb.status === "selesai" ? "Selesai" : "Dijadwalkan", pb.olehNama, pb.hasil, pb.tindakLanjut ?? ""];
+      return [nis, s?.nama ?? "", s?.kelas ?? "", pb.ta, pb.levelPoin, pb.pj ? PJ_LABEL[pb.pj] : "", pb.tanggal, pb.metode, pb.status === "selesai" ? "Selesai" : "Dijadwalkan", pb.olehNama, pb.hasil, pb.tindakLanjut ?? ""];
     }));
 
   return (
     <section className="data-page" data-testid="rekap-pembinaan">
       <div className="section-heading">
-        <div><p>Pembinaan</p><span>Rekap pembinaan wali kelas dan pejabat · {labelTa(ta)}{bisaTulis ? "" : " · hanya lihat"}</span></div>
+        <div><p>Pembinaan</p><span>Rekap pembinaan · {labelTa(ta)} · {peran === "kepala" ? "semua penanggung jawab" : "wali kelas dan BK (pembinaan kepala tertutup bagi waka)"}</span></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={csv} disabled={baris.length === 0}><Icon name="download" size={16} />Unduh CSV</button>
-          {bisaTulis && <button className="primary-button" onClick={() => setBaru(true)}><Icon name="plus" size={16} />Catat pembinaan</button>}
+          {bisaTulis && <button className="primary-button" onClick={() => setBaru(true)}><Icon name="plus" size={16} />Catat pembinaan kepala</button>}
         </div>
       </div>
       <div className="filter-bar">
@@ -77,7 +88,8 @@ export default function PembinaanRekap() {
                   </span>
                   <span className="row-actions">
                     <button className="ghost-button" onClick={() => setBuka(buka === `${nis}-${id}` ? null : `${nis}-${id}`)}>{buka === `${nis}-${id}` ? "Tutup" : "Lihat isi"}</button>
-                    {bisaTulis && d.levels[pb.levelId] && <button className="ghost-button" onClick={() => setForm({ nis, levelId: pb.levelId, ada: pb })}>Koreksi</button>}
+                    {d.levels[pb.levelId] && pb.status === "selesai" && pb.pj && bolehKoreksi(peran, pb.pj) && <button className="ghost-button" onClick={() => setForm({ nis, levelId: pb.levelId, ada: pb })}>Koreksi</button>}
+                    {d.levels[pb.levelId] && pb.status !== "selesai" && peran === "kepala" && pb.pj === "kepala" && <button className="ghost-button" onClick={() => setForm({ nis, levelId: pb.levelId, ada: pb })}>Ubah</button>}
                   </span>
                 </div>
               );
@@ -93,14 +105,14 @@ export default function PembinaanRekap() {
   );
 }
 
-/** Langkah 1 mencatat pembinaan baru oleh waka/kepala: pilih siswa dan ambang (penanggung jawab mana pun). */
+/** Langkah 1 mencatat pembinaan baru oleh kepala: pilih siswa dan ambang yang penanggung jawabnya kepala. */
 function PilihBaru({ students, levels, onPilih, onClose }: {
   students: { nis: string; nama: string; kelas: string; uid?: string }[]; levels: Record<string, { poin: number; tindakan: string; penanggungJawab?: keyof typeof PJ_LABEL }>;
   pembinaan: PerNis; ta: string; onPilih: (nis: string, levelId: string) => void; onClose: () => void;
 }) {
   const [nis, setNis] = useState<string[]>([]);
   const [levelId, setLevelId] = useState("");
-  const daftar = Object.entries(levels).sort((a, b) => a[1].poin - b[1].poin);
+  const daftar = Object.entries(levels).filter(([, l]) => kelompokPj(l.penanggungJawab) === "kepala").sort((a, b) => a[1].poin - b[1].poin);
   return (
     <Modal title="Catat pembinaan" subtitle="Pilih siswa dan ambang pembinaan" onClose={onClose}>
       <div className="modal-form">

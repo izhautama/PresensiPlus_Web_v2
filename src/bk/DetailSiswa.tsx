@@ -6,7 +6,8 @@ import { useAuth } from "../auth/AuthContext";
 import FormPembinaan from "../kesiswaan/FormPembinaan";
 import { daftarRecord, labelTa } from "../lib/discipline";
 import { ringkasIsi, urutKonseling, type Konseling } from "../lib/konseling";
-import { perluDibina } from "../lib/pembinaan";
+import { idPembinaan, perluDibina } from "../lib/pembinaan";
+import { klaimSiswa } from "../services/pembinaanLanjut";
 import { formatTanggal } from "../lib/time";
 import StudentPage from "../pages/StudentPage";
 import { useLive } from "../services/db";
@@ -37,7 +38,12 @@ function EkstraBk({ nis, profil }: { nis: string; profil: { nama: string; kelas:
         {perlu.length > 0 && (
           <div className="notice warn" data-testid="detail-perlu-dibina"><Icon name="warning" size={17} />
             <span>Perlu dibina: ambang {perlu.map((x) => x.level.poin).join(", ")} poin.{" "}
-              {perlu.map((x) => <button key={x.levelId} className="ghost-button" onClick={() => setForm({ levelId: x.levelId })}>{x.status === "dijadwalkan" ? "Lanjutkan pembinaan" : "Catat pembinaan"} ({x.level.poin})</button>)}</span>
+              {perlu.map((x) => {
+                const kl = d.klaim?.[nis]?.[idPembinaan(d.ta, x.levelId)];
+                if (!kl) return <button key={x.levelId} className="ghost-button" data-testid="klaim-detail" onClick={() => klaimSiswa({ nis, nama: profil.nama, ta: d.ta, levelId: x.levelId }, ctx).catch(() => undefined)}>Klaim ({x.level.poin})</button>;
+                if (kl.bkUid !== ctx.uid) return <small key={x.levelId} className="badge badge-lemah" data-testid="ditangani-lain">Ditangani {kl.bkNama} ({x.level.poin})</small>;
+                return <button key={x.levelId} className="ghost-button" onClick={() => setForm({ levelId: x.levelId })}>{x.status === "dijadwalkan" ? "Lanjutkan pembinaan" : "Catat pembinaan"} ({x.level.poin})</button>;
+              })}</span>
           </div>
         )}
 

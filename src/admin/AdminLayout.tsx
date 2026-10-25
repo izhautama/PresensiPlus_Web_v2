@@ -28,7 +28,6 @@ const TataTertib = lazy(() => import("../kesiswaan/TataTertib"));
 const Audit = lazy(() => import("../kesiswaan/Audit"));
 const PresensiManual = lazy(() => import("../piket/PresensiManual"));
 const Panduan = lazy(() => import("../pages/Panduan"));
-const PembinaanRekap = lazy(() => import("../kesiswaan/PembinaanRekap"));
 const UsulanRemisi = lazy(() => import("../kesiswaan/UsulanRemisi"));
 const WaliKelas = lazy(() => import("../kesiswaan/WaliKelas"));
 const GuruBk = lazy(() => import("../kesiswaan/GuruBk"));
@@ -50,16 +49,20 @@ const laporanKes = (base: string, label: string): NavItem => ({ to: `${base}/lap
 const kesiswaan = (base: string, denganHarian: boolean): NavItem[] => {
   const baru: NavItem[] = [
     { to: `${base}/pelanggaran`, label: "Pelanggaran", icon: "warning", title: "Pelanggaran & remisi" },
-    { to: `${base}/pembinaan`, label: "Pembinaan", icon: "users", title: "Rekap pembinaan" },
     { to: `${base}/usulan-remisi`, label: "Usulan remisi", icon: "file", title: "Usulan remisi dari wali kelas" },
     { to: `${base}/tata-tertib`, label: "Tata tertib", icon: "file", title: "Tata tertib" },
     { to: `${base}/audit`, label: "Jejak audit", icon: "activity", title: "Jejak audit kesiswaan" },
   ];
   baru.splice(baru.findIndex((x) => x.to.endsWith("/audit")), 0, laporanKes(base, "Laporan kesiswaan"));
+  // v2.5: admin TIDAK membaca pembinaan (tanpa menu rekap). Waka dan kepala: rekap berperingkat, penugasan BK, izin tampil ke orang tua.
+  if (base !== "/admin") {
+    const i = baru.findIndex((x) => x.to.endsWith("/usulan-remisi"));
+    baru.splice(i, 0, { to: `${base}/pembinaan`, label: "Pembinaan", icon: "users", title: "Rekap pembinaan" }, { to: `${base}/penugasan-bk`, label: "Penugasan BK", icon: "users", title: "Penugasan BK" }, { to: `${base}/izin-ortu`, label: "Izin ke orang tua", icon: "eye", title: "Izin tampil ke orang tua" });
+  }
+  if (base === "/kepala") baru.push({ to: `${base}/migrasi-pembinaan`, label: "Migrasi pembinaan", icon: "activity", title: "Migrasi pembinaan v2.5" });
   if (base === "/admin") baru.push({ to: `${base}/petugas-piket`, label: "Petugas piket", icon: "users", title: "Petugas piket" });
   if (base === "/admin") baru.push({ to: `${base}/wali-kelas`, label: "Wali kelas", icon: "users", title: "Wali kelas" });
   if (base === "/admin") baru.push({ to: `${base}/guru-bk`, label: "Guru BK", icon: "users", title: "Guru BK" });
-  if (base === "/kepala") baru.push({ to: `${base}/konseling`, label: "Konseling", icon: "eye", title: "Konseling (baca saja)" });
   if (base === "/admin") baru.push({ to: `${base}/log-aktivitas`, label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" });
   const daftar = denganHarian ? [...harian(base), ...baru] : baru;
   return daftar.map((x, i) => (i === 0 ? { ...x, section: "KESISWAAN" } : x));
@@ -116,7 +119,6 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
     nav: [
       { to: "/bk", label: "Dashboard", icon: "grid", title: "Dashboard BK" },
       { to: "/bk/siswa", label: "Siswa", icon: "users", title: "Siswa (semua kelas)" },
-      { to: "/bk/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
       { to: "/bk/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
       { to: "/bk/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
       { to: "/bk/konseling", label: "Konseling", icon: "eye", title: "Catatan konseling (rahasia)" },
@@ -167,7 +169,6 @@ export default function AdminLayout() {
           <Route path="laporan-kesiswaan" element={<LaporanKes />} />
           <Route path="per-jam" element={<PerJam />} />
           <Route path="pelanggaran" element={<Pelanggaran />} />
-          <Route path="pembinaan" element={<PembinaanRekap />} />
           <Route path="usulan-remisi" element={<UsulanRemisi />} />
           <Route path="tata-tertib" element={<TataTertib />} />
           <Route path="audit" element={<Audit />} />
@@ -202,7 +203,9 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
   const lencana: Record<string, number> = {
     [`${P.base}/usulan-remisi`]: antreanUsul(usul.data).length,
     "/wali/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
-    "/bk/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
+    // BK: Belum ditangani + Tangani saya (yang ditangani BK lain tidak dihitung)
+    "/bk/pembinaan": dibina && !dibina.memuat && session?.role === "bk"
+      ? dibina.items.filter((it) => { const kl = dibina.klaim?.[it.nis]?.[`${dibina.ta}_${it.levelId}`]; return !kl || kl.bkUid === session.uid; }).length : 0,
   };
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {

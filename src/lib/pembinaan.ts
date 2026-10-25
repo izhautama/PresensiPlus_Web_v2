@@ -1,18 +1,19 @@
-// Pembinaan oleh wali kelas dan usulan remisi (fungsi MURNI; dicerminkan di Security Rules pembinaan/pembinaanStatus/usulRemisi).
+// Pembinaan berperingkat (wali < BK < kepala), klaim BK, izin orang tua, dan usulan remisi (fungsi MURNI; dicerminkan di Security Rules).
 import { ringkas, taKey, type DiscRecord, type Level, type PenanggungJawab, type RecordMeta, type Remisi } from "./discipline.ts";
 
 export type { PenanggungJawab };
-export const PJ_LIST: PenanggungJawab[] = ["wali", "bk", "kepala", "waka"];
+/** Yang ditawarkan UI Tata tertib (v2.5). `waka` tetap dikenali sebagai nilai lama agar data lama terbaca. */
+export const PJ_LIST: PenanggungJawab[] = ["wali", "bk", "kepala"];
 export const PJ_LABEL: Record<PenanggungJawab, string> = { wali: "Wali kelas", bk: "BK", kepala: "Kepala Madrasah", waka: "Waka Kesiswaan" };
 
 /** Nilai bawaan untuk ambang lama yang belum punya penanggung jawab: lv01..lv06 dari data awal, atau menurut ambang 100/200/300/>=400. */
 export function penanggungJawabBawaan(id: string, level: Pick<Level, "poin">): PenanggungJawab | null {
-  const seed: Record<string, PenanggungJawab> = { lv01: "wali", lv02: "bk", lv03: "kepala", lv04: "waka", lv05: "waka", lv06: "waka" };
+  const seed: Record<string, PenanggungJawab> = { lv01: "wali", lv02: "bk", lv03: "kepala", lv04: "kepala", lv05: "kepala", lv06: "kepala" };
   if (seed[id]) return seed[id];
   if (level.poin === 100) return "wali";
   if (level.poin === 200) return "bk";
   if (level.poin === 300) return "kepala";
-  if (level.poin >= 400) return "waka";
+  if (level.poin >= 400) return "kepala";
   return null;
 }
 
@@ -20,13 +21,53 @@ export const METODE_PB = ["Tatap muka", "Telepon/WhatsApp", "Kunjungan rumah", "
 export type MetodePB = (typeof METODE_PB)[number];
 export type StatusPB = "dijadwalkan" | "selesai";
 
-/** pembinaan/{nis}/{ta}_{levelId}: satu catatan per (TA, ambang). Tidak dapat dihapus fisik. */
+/** Peringkat peran untuk hak baca pembinaan: wali 1 < bk 2 < waka 3 < kepala 4. Admin TIDAK ikut hierarki (tidak membaca pembinaan). */
+export type PeranPembinaan = "wali" | "bk" | "waka" | "kepala";
+export const PERINGKAT: Record<PeranPembinaan, number> = { wali: 1, bk: 2, waka: 3, kepala: 4 };
+/** Kelompok pembinaan/{pj} yang boleh dibaca peran: wali = wali; bk = wali+bk; waka = wali+bk (TIDAK kepala); kepala = semua. */
+export function kelompokBaca(peran: PeranPembinaan | string | null | undefined): ("wali" | "bk" | "kepala")[] {
+  if (peran === "wali") return ["wali"];
+  if (peran === "bk" || peran === "waka") return ["wali", "bk"];
+  if (peran === "kepala") return ["wali", "bk", "kepala"];
+  return [];
+}
+/** Kelompok untuk sebuah nilai penanggung jawab: nilai lama `waka` dibaca bersama kelompok kepala bila belum dimigrasi tidak ada (path hanya wali|bk|kepala). */
+export const kelompokPj = (pj: PenanggungJawab | undefined): "wali" | "bk" | "kepala" => (pj === "wali" || pj === "bk" ? pj : "kepala");
+/** Boleh mengoreksi record 'selesai' berpenanggung jawab `pj`: hanya peringkat LEBIH TINGGI (waka untuk wali/bk, kepala untuk semua). */
+export const bolehKoreksi = (peran: PeranPembinaan, pj: "wali" | "bk" | "kepala") => PERINGKAT[peran] > PERINGKAT[pj] && (peran === "kepala" || pj !== "kepala");
+
+/** pembinaan/{pj}/{nis}/{ta}_{levelId}: satu catatan per (TA, ambang). Tidak dapat dihapus fisik. `pj` = salinan penanggung jawab ambang saat dibuat (tetap). */
 export type Pembinaan = {
-  ta: string; levelId: string; levelPoin: number; tindakan: string; tanggal: string; metode: MetodePB;
+  pj?: "wali" | "bk" | "kepala"; ta: string; levelId: string; levelPoin: number; tindakan: string; tanggal: string; metode: MetodePB;
   hasil: string; tindakLanjut?: string; status: StatusPB; oleh: string; olehNama: string; dibuatTs: number; diubahOleh?: string; diubahTs?: number;
 };
-/** pembinaanStatus/{nis}/{ta}/{levelId}: salinan untuk portal orang tua (tanpa isi, tanpa nama). */
-export type PembinaanStatus = { id: string; status: StatusPB; tanggal: string; levelPoin: number };
+
+// ---------------------------------------------------------------- izin & proyeksi orang tua
+export type ModeOrtu = "ringkas" | "lengkap";
+export const MODE_ORTU_LABEL: Record<ModeOrtu, string> = { ringkas: "Hanya status dan tanggal", lengkap: "Status, tindakan, hasil, dan tindak lanjut" };
+/** izinOrtu/{nis}/{ta}/{levelId} (dibaca waka & kepala). */
+export type IzinOrtu = { mode: ModeOrtu; olehUid: string; olehPeran: "waka" | "kepala"; ts: number };
+/** kunciOrtu/{nis}/{ta}/{levelId}: hanya kepala yang menulis. */
+export type KunciOrtu = { olehUid: string; ts: number; alasan: string };
+/** pembinaanOrtu/{nis}/{ta}/{levelId}: proyeksi yang dibaca orang tua. TIDAK PERNAH memuat nama pembina, uid, konseling, atau klaim. */
+export type PembinaanOrtu = { status: StatusPB; tanggal: string; levelPoin: number; mode: ModeOrtu; tindakan?: string; hasil?: string; tindakLanjut?: string };
+export function proyeksiOrtu(pb: Pick<Pembinaan, "status" | "tanggal" | "levelPoin" | "tindakan" | "hasil" | "tindakLanjut">, mode: ModeOrtu): PembinaanOrtu {
+  const dasar: PembinaanOrtu = { status: pb.status, tanggal: pb.tanggal, levelPoin: pb.levelPoin, mode };
+  if (mode === "ringkas") return dasar;
+  return { ...dasar, tindakan: pb.tindakan, hasil: pb.hasil, ...(pb.tindakLanjut ? { tindakLanjut: pb.tindakLanjut } : {}) };
+}
+/** Siapa yang boleh memberi/mengubah izin untuk level berpenanggung jawab `pj`, dengan atau tanpa kunci. */
+export function bolehBeriIzin(peran: "waka" | "kepala", pj: "wali" | "bk" | "kepala", terkunci: boolean): boolean {
+  if (peran === "kepala") return true;
+  return !terkunci && pj !== "kepala";
+}
+/** Waka mencabut hanya izin yang ia berikan dan belum terkunci; kepala mencabut semua. */
+export const bolehCabutIzin = (peran: "waka" | "kepala", izin: Pick<IzinOrtu, "olehPeran" | "olehUid">, uid: string, terkunci: boolean) =>
+  peran === "kepala" || (!terkunci && izin.olehPeran === "waka" && izin.olehUid === uid);
+
+// ---------------------------------------------------------------- klaim BK
+/** klaimBK/{nis}/{ta}_{levelId}: siapa cepat dia dapat. */
+export type KlaimBk = { bkUid: string; bkNama: string; sejak: number; cara: "klaim" | "tunjuk"; olehUid: string; ta: string; levelId: string };
 
 export const idPembinaan = (ta: string, levelId: string) => `${ta}_${levelId}`;
 
