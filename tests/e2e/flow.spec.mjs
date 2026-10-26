@@ -1791,10 +1791,10 @@ test("admin: kartu Indeks kelas — selisih terdeteksi otomatis, Perbaiki (dry-r
   await k.close();
 });
 
-test("waka: penanggung jawab ambang — data lama tanpa penanggung jawab diisi bawaan", async ({ page }) => {
+test("kepala: penanggung jawab ambang — data lama diisi bawaan (lv04-06 = Kepala); waka tidak dapat mengubah", async ({ page, browser }) => {
   const lap = await siapkan(page);
   for (const id of ["lv01", "lv02", "lv03", "lv04", "lv05", "lv06"]) await dbRest("DELETE", `discipline/levels/${id}/penanggungJawab`);
-  await loginStaf(page, "waka");
+  await loginStaf(page, "kepala"); // v2.5: hanya KEPALA yang mengubah penanggung jawab ambang
   await menu(page, "Tata tertib");
   await page.getByRole("tab", { name: "Ambang pembinaan" }).click();
   await expect(page.getByTestId("pj-belum")).toBeVisible();
@@ -1805,16 +1805,30 @@ test("waka: penanggung jawab ambang — data lama tanpa penanggung jawab diisi b
   await expect(page.locator("[data-level=lv01] [data-testid=pj-level]")).toContainText("Wali kelas");
   await expect(page.locator("[data-level=lv02] [data-testid=pj-level]")).toContainText("BK");
   await expect(page.locator("[data-level=lv03] [data-testid=pj-level]")).toContainText("Kepala Madrasah");
-  await expect(page.locator("[data-level=lv05] [data-testid=pj-level]")).toContainText("Waka Kesiswaan");
-  // ubah penanggung jawab lewat dialog
+  await expect(page.locator("[data-level=lv05] [data-testid=pj-level]")).toContainText("Kepala Madrasah");
+  // kepala mengubah penanggung jawab lewat dialog (ambang belum dipakai pembinaan)
   await page.locator("[data-level=lv04]").getByRole("button", { name: "Ubah ambang" }).click();
   const dlg = page.getByRole("dialog", { name: /Ubah ambang/ });
-  await dlg.getByLabel("Penanggung jawab").selectOption("kepala");
+  await dlg.getByLabel("Penanggung jawab").selectOption("bk");
   await dlg.getByRole("button", { name: "Simpan" }).click();
   await expect(toast(page)).toContainText("Tersimpan");
-  await expect(page.locator("[data-level=lv04] [data-testid=pj-level]")).toContainText("Kepala Madrasah");
-  await dbRest("PUT", "discipline/levels/lv04/penanggungJawab", "waka");
-  bersih(lap, "waka (penanggung jawab ambang)");
+  await expect(page.locator("[data-level=lv04] [data-testid=pj-level]")).toContainText("BK");
+  await dbRest("PUT", "discipline/levels/lv04/penanggungJawab", "kepala");
+  bersih(lap, "kepala (penanggung jawab ambang)");
+
+  // waka: kolom Penanggung jawab dinonaktifkan (poin dan tindakan tetap dapat diubah)
+  const kW = await browser.newContext(opsiKonteks());
+  const pw = await kW.newPage();
+  const lapW = await siapkan(pw);
+  await loginStaf(pw, "waka");
+  await menu(pw, "Tata tertib");
+  await pw.getByRole("tab", { name: "Ambang pembinaan" }).click();
+  await pw.locator("[data-level=lv04]").getByRole("button", { name: "Ubah ambang" }).click();
+  const dw = pw.getByRole("dialog", { name: /Ubah ambang/ });
+  await expect(dw.getByLabel("Penanggung jawab")).toBeDisabled();
+  await expect(dw.getByLabel("Tindakan")).toBeEnabled();
+  bersih(lapW, "waka (penanggung jawab terkunci)");
+  await kW.close();
 });
 
 test("wali: Perlu dibina -> pembinaan selesai -> hilang -> ortu melihat status tanpa isi; usul remisi disetujui waka; kelas lain terkunci", async ({ page, browser }) => {
@@ -1907,12 +1921,9 @@ test("wali: Perlu dibina -> pembinaan selesai -> hilang -> ortu melihat status t
   const po = await kO.newPage();
   const lapO = await siapkan(po);
   await loginOrtu(po, "111", "482915");
-  await expect(po.getByTestId("status-pembinaan")).toContainText("Selesai");
-  await expect(po.getByTestId("status-pembinaan")).toContainText("Pembinaan 100 poin");
+  // v2.5: pembinaan TERSEMBUNYI bagi orang tua sampai waka/kepala mengizinkan (bawaan: tidak ada apa pun, termasuk lv01)
+  await expect(po.getByTestId("status-pembinaan"), "sebelum diizinkan: tidak tampil").toHaveCount(0);
   await expect(po.locator("body")).not.toContainText(HASIL);
-  await expect(po.locator("body")).not.toContainText("Pak Dua Kelas");
-  bersih(lapO, "ortu (status pembinaan)");
-  await kO.close();
 
   // waka: antrean usulan + lencana, rekap pembinaan (+CSV), setujui -> saldo berkurang
   const kW = await browser.newContext(opsiKonteks());
@@ -1954,7 +1965,20 @@ test("wali: Perlu dibina -> pembinaan selesai -> hilang -> ortu melihat status t
   await expect(pw.getByTestId("isi-pembinaan")).toContainText(HASIL);
   const [unduh] = await Promise.all([pw.waitForEvent("download"), pw.getByRole("button", { name: "Unduh CSV" }).click()]);
   expect(unduh.suggestedFilename()).toBe(`pembinaan_${ta}.csv`);
-  bersih(lapW, "waka (usulan, rekap pembinaan)");
+  // izin tampil ke orang tua (v2.5): waka memberi izin RINGKAS -> ortu melihat status + tanggal tanpa isi dan tanpa nama pelaksana
+  await menu(pw, "Izin ke orang tua");
+  const iz = pw.getByTestId("baris-izin").locator("[data-nis='111']");
+  await expect(iz).toHaveCount(1);
+  await iz.getByTestId("izin-ringkas").click();
+  await expect(iz.getByTestId("mode-izin")).toContainText("ringkas");
+  await po.reload();
+  await expect(po.getByTestId("status-pembinaan")).toContainText("Selesai");
+  await expect(po.getByTestId("status-pembinaan")).toContainText("Pembinaan 100 poin");
+  await expect(po.locator("body")).not.toContainText(HASIL);
+  await expect(po.locator("body")).not.toContainText("Pak Dua Kelas");
+  bersih(lapO, "ortu (status pembinaan)");
+  await kO.close();
+  bersih(lapW, "waka (usulan, rekap pembinaan, izin ortu)");
   await kW.close();
 
   // wali: kartu usulan menunjukkan keputusan; wali kelas lain TIDAK dapat membuka siswa kelas yang bukan binaannya
@@ -1976,10 +2000,10 @@ test("wali: Perlu dibina -> pembinaan selesai -> hilang -> ortu melihat status t
 test("admin dan kepala: rekap pembinaan & usulan hanya lihat (tanpa tombol tulis)", async ({ page, browser }) => {
   const lap = await siapkan(page);
   await loginStaf(page, "admin");
-  await menu(page, "Pembinaan");
-  await expect(page.getByTestId("baris-pembinaan").locator("[data-nis='111']")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Catat pembinaan" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Koreksi" })).toHaveCount(0);
+  // v2.5: admin TIDAK membaca pembinaan (tanpa menu rekap); rute lama dialihkan ke Dashboard
+  await expect(page.locator("aside.sidebar").getByRole("link", { name: /^Pembinaan/ })).toHaveCount(0);
+  await page.goto("/admin/pembinaan");
+  await expect(page).toHaveURL(/\/admin$/);
   await menu(page, "Usulan remisi");
   await expect(page.getByRole("button", { name: /Setujui usulan|Tolak usulan/ })).toHaveCount(0);
   bersih(lap, "admin (pembinaan hanya lihat)");
@@ -2341,7 +2365,8 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   await expect(pb).toHaveURL(/\/bk$/);
   await expect(pb.getByTestId("bk-jumlah-siswa")).not.toHaveText("0");
   const sb = pb.locator("aside.sidebar");
-  for (const m of ["Dashboard", "Siswa", "Pelanggaran", "Pembinaan", "Usulan remisi", "Konseling", "Panduan"]) await expect(sb.getByRole("link", { name: new RegExp(`^${m}`) })).toHaveCount(1);
+  for (const m of ["Dashboard", "Siswa", "Pembinaan", "Usulan remisi", "Laporan", "Konseling", "Panduan"]) await expect(sb.getByRole("link", { name: new RegExp(`^${m}`) })).toHaveCount(1);
+  await expect(sb.getByRole("link", { name: /^Pelanggaran/ }), "v2.5: BK tidak mencatat pelanggaran (tanpa menu)").toHaveCount(0);
   for (const m of ["Izin", "Presensi manual", "Presensi per jam", "Kalender", "Validasi", "Tata tertib"]) await expect(sb.getByRole("link", { name: new RegExp(m) })).toHaveCount(0);
   await menu(pb, "Siswa");
   await expect(pb.locator(".students-grid[data-nis='111']")).toHaveCount(1); // kelas XI IPS
@@ -2358,7 +2383,7 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   await kB.close();
 });
 
-test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, dan konseling rahasia (tulis, koreksi, riwayat)", async ({ page }) => {
+test("bk: klaim lalu pembinaan ambang BK lintas kelas, usulan remisi siswa yang diklaim, dan konseling rahasia (tulis, koreksi, riwayat)", async ({ page }) => {
   const tgl = T.hariIni, ta = taDari(tgl);
   // ambang berpenanggung jawab BK; dua siswa dari KELAS BERBEDA melewatinya
   await dbRest("PUT", "discipline/levels/e2eLvBk", { poin: 150, tindakan: "Teguran 2 — pembinaan BK", penanggungJawab: "bk" });
@@ -2377,31 +2402,34 @@ test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, d
 
   // pembinaan: siswa dari X IPA (333) DAN XI IPS (111) sama-sama muncul
   await menu(page, "Pembinaan");
-  const daftar = page.getByTestId("daftar-perlu-dibina");
-  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(1);
-  await expect(daftar.locator("[data-nis='111'][data-level='e2eLvBk']")).toHaveCount(1);
-  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toContainText("Ambang 150 poin");
-  await daftar.locator("[data-nis='333'][data-level='e2eLvBk']").getByRole("button", { name: "Catat pembinaan" }).click();
+  const belum = page.getByTestId("daftar-belum-ditangani");
+  await expect(belum.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(1);
+  await expect(belum.locator("[data-nis='111'][data-level='e2eLvBk']")).toHaveCount(1);
+  await expect(belum.locator("[data-nis='333'][data-level='e2eLvBk']")).toContainText("Ambang 150 poin");
+  // v2.5: klaim dulu (siapa cepat dia dapat), baru dibina; yang diklaim pindah ke "Tangani saya"
+  await belum.locator("[data-nis='333'][data-level='e2eLvBk']").getByTestId("klaim-siswa").click();
+  const saya = page.getByTestId("daftar-tangani-saya");
+  await expect(saya.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(1);
+  await expect(belum.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(0);
+  await saya.locator("[data-nis='333'][data-level='e2eLvBk']").getByTestId("catat-pembinaan").click();
   const pbDlg = page.getByRole("dialog", { name: "Catat pembinaan" });
   await pbDlg.getByLabel("Hasil pembinaan").fill("Siswa dipanggil BK, diberi arahan, dan menyetujui rencana perbaikan");
   await pbDlg.getByRole("button", { name: "Simpan" }).click();
   await expect(toast(page)).toContainText("Pembinaan dicatat selesai");
-  await expect(daftar.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(0);
+  await expect(saya.locator("[data-nis='333'][data-level='e2eLvBk']")).toHaveCount(0);
   await expect(page.getByTestId("riwayat-pembinaan").locator("[data-nis='333']")).toContainText("Selesai");
 
-  // pelanggaran ringan untuk siswa kelas lain; catatan muncul di "Catatan saya"
-  await menu(page, "Pelanggaran");
-  await page.getByPlaceholder("Ketik NIS atau nama siswa...").fill("555");
-  await page.locator(".picker-list li[role=option]", { hasText: "EKO TEST" }).click();
-  await page.locator("[role=listbox] button[role=option]").first().click();
-  await page.getByRole("button", { name: /^Catat/ }).click();
-  await expect(toast(page)).toContainText("Pelanggaran dicatat untuk 1 siswa");
-  await expect(page.getByTestId("catatan-piket")).toContainText("EKO TEST");
+  // v2.5: BK tidak lagi mencatat pelanggaran: tanpa menu, rute lama dialihkan
+  await expect(page.locator("aside.sidebar").getByRole("link", { name: /^Pelanggaran/ })).toHaveCount(0);
+  await page.goto("/bk/pelanggaran");
+  await expect(page).toHaveURL(/\/bk$/);
 
-  // usulan remisi
+  // usulan remisi (v2.5: hanya siswa yang diklaim BK; 555 yang tidak diklaim tidak ada di pilihan)
   await menu(page, "Usulan remisi");
   await page.getByTestId("form-usulan").getByPlaceholder("Ketik NIS atau nama siswa...").fill("555");
-  await page.locator(".picker-list li[role=option]", { hasText: "EKO TEST" }).click();
+  await expect(page.locator(".picker-list li[role=option]", { hasText: "EKO TEST" })).toHaveCount(0);
+  await page.getByTestId("form-usulan").getByPlaceholder("Ketik NIS atau nama siswa...").fill("333");
+  await page.locator(".picker-list li[role=option]", { hasText: "CITRA TEST" }).click();
   const opsiRemisi = page.getByLabel("Remisi", { exact: true }).locator("option").nth(1);
   await page.getByLabel("Remisi", { exact: true }).selectOption({ index: 1 });
   expect(await opsiRemisi.count()).toBe(1);
@@ -2447,22 +2475,18 @@ test("bk: pembinaan ambang BK lintas kelas, pelanggaran ringan, usulan remisi, d
   await page.getByRole("link", { name: "Detail DINA TEST" }).click();
   await expect(page.getByTestId("konseling-siswa")).toContainText("rahasia");
   await expect(page.getByTestId("konseling-siswa")).toContainText("mulai reda");
-  bersih(kecualikan(lap, 2), "bk (pembinaan, pelanggaran, usulan, konseling)");
+  bersih(kecualikan(lap, 2), "bk (klaim, pembinaan, usulan, konseling)");
 });
 
-test("bk: kepala hanya MEMBACA konseling; waka, admin, wali, dan orang tua tidak melihatnya; usulan BK diputuskan waka", async ({ page, browser }) => {
-  // kepala: baca saja
+test("bk: konseling HANYA terbaca akun BK (kepala, waka, admin, wali, dan orang tua tidak); usulan BK diputuskan waka", async ({ page, browser }) => {
+  // v2.5: kepala tidak lagi membaca konseling; semua akun BK membaca
   const lap = await siapkan(page);
   await loginStaf(page, "kepala");
-  await menu(page, "Konseling");
-  await expect(page.getByTestId("halaman-konseling")).toContainText("Anda hanya membaca");
-  const baris = page.getByTestId("daftar-konseling").locator("[data-nis='444']");
-  await expect(baris).toContainText("Keluarga");
-  await baris.getByRole("button", { name: /^Buka catatan/ }).click();
-  await expect(baris.getByTestId("riwayat-koreksi")).toContainText("perselisihan di rumah");
-  await expect(page.getByRole("button", { name: "Catatan baru" })).toHaveCount(0);
-  await expect(baris.getByRole("button", { name: /Koreksi/ })).toHaveCount(0);
-  bersih(lap, "kepala (konseling)");
+  await expect(page.locator("aside.sidebar").getByRole("link", { name: /^Konseling/ })).toHaveCount(0);
+  await page.goto("/kepala/konseling");
+  await expect(page).toHaveURL(/\/kepala$/);
+  await expect(page.locator("body")).not.toContainText("perselisihan di rumah");
+  bersih(lap, "kepala (tanpa konseling)");
 
   // waka & admin: tidak ada menu Konseling; membuka /…/konseling langsung dialihkan; usulan BK masuk antrean keputusan waka
   for (const peran of ["waka", "admin"]) {
@@ -2475,7 +2499,7 @@ test("bk: kepala hanya MEMBACA konseling; waka, admin, wali, dan orang tua tidak
     await expect(p).toHaveURL(new RegExp(`/${peran}$`));
     if (peran === "waka") {
       await menu(p, "Usulan remisi");
-      await expect(p.locator("body")).toContainText("EKO TEST"); // usulan BK terlihat sebagai usulan biasa
+      await expect(p.locator("body")).toContainText("CITRA TEST"); // usulan BK terlihat sebagai usulan biasa
       await expect(p.locator("body")).not.toContainText("perselisihan di rumah"); // isi konseling tidak pernah bocor
     }
     bersih(l, `${peran} (tanpa konseling)`);
