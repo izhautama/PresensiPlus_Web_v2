@@ -23,7 +23,3 @@ export async function batalTandaHapus(uid: string, email: string) {
   sisipkanAktivitas(u, { aksi: "batal-hapus-akun", detail: `Batalkan tanda hapus ${email}`.slice(0, 300) });
   await kirimUpdate(u, { cadangan: false });
 }
-
-/** Nama akun untuk tampilan: "(akun dihapus)" bila uid sudah tidak ada di peta (akun dihapus permanen; jejak audit tetap menyimpan nama lama). */
-export const namaAkunAtauDihapus = (peta: Record<string, { nama?: string }> | null | undefined, uid: string, namaCadangan?: string) =>
-  peta?.[uid]?.nama ?? (namaCadangan || "(akun dihapus)");
