@@ -10,7 +10,7 @@ Untuk: Administrator / TU sekolah
 
 ## Memeriksa alat presensi
 
-1. Buka menu Dashboard: lihat tulisan Online atau Offline dan jam alat terakhir terlihat.
+1. Dashboard: lihat Online atau Offline dan jam terakhir alat terlihat.
 2. Buka menu Perangkat untuk detail (WiFi, memori, antrean, versi data).
 3. Alat Offline: periksa listrik dan WiFi, lalu tekan Restart di menu Perangkat.
 4. Bila alat belum pulih, minta piket memakai Presensi manual (lihat SOP harian).
@@ -20,12 +20,12 @@ Untuk: Administrator / TU sekolah
 1. Menu Siswa: Tambah siswa, isi nama, kelas, NIS, dan UID kartu.
 2. Tombol Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru. PIN tampil sekali: catat dan berikan ke orang tua.
 3. Ikon dokumen = catat Izin, Sakit, atau Dispensasi untuk siswa itu.
-4. Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas/hari khusus mengalahkan baris "Semua"). Hari Minggu libur otomatis.
+4. Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas atau hari khusus mengalahkan "Semua"; Minggu libur).
 
 ## Laporan
 
 1. Menu Laporan, tab Rekap bulanan: pilih bulan dan kelas, lalu Unduh CSV atau Cetak.
-2. Tab Log harian: semua tap pada satu tanggal, termasuk presensi manual (diberi tanda Manual beserta alasan dan petugas).
+2. Tab Log harian: semua tap satu tanggal, termasuk presensi manual (bertanda Manual, beserta alasan dan petugas).
 3. Persen kehadiran = (Hadir + Terlambat + Dispensasi) dibagi hari efektif.
 
 ## Akun staf (Pengaturan)
@@ -37,32 +37,37 @@ Untuk: Administrator / TU sekolah
 
 ## Kalender akademik dan hari efektif
 
-1. Hari efektif ditentukan oleh BUKTI: ada tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti (libur, alat mati seharian, sistem belum dipakai) bukan hari efektif dan siswa tidak dihitung Alpha.
+1. Hari efektif ditentukan oleh BUKTI: tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti bukan hari efektif dan siswa tidak dihitung Alpha.
 2. Menu Kalender: klik tanggal, pilih Libur atau Efektif, isi alasan, lalu Simpan override. Override menang atas hitungan otomatis.
-3. Override Efektif pada tanggal tanpa bukti membuat semua siswa tanpa data tercatat Alpha: isi dulu presensi manual (mode alat bermasalah), lalu centang pernyataan.
-4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang tanggal lampau lalu Hitung ulang (aman diulang).
-5. Migrasi sekali jalan (admin): Periksa (dry-run), baca ringkasan, baru Terapkan migrasi. Ini mengisi ringkasan seluruh tahun ajaran dan tanggal "aktif sejak" siswa lama.
+3. Override Efektif tanpa bukti membuat semua siswa tanpa data Alpha: isi presensi manual dulu, lalu centang pernyataan.
+4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang lampau, lalu Hitung ulang.
+5. Migrasi sekali jalan: Periksa (dry-run), baca ringkasan, lalu Terapkan migrasi.
 
 ## Guru BK
 
 1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.
 2. Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.
 
+## Hapus akun permanen
+
+1. Pada akun yang sudah dicabut (Wali kelas, Guru BK, Akun Pimpinan dan Staf) tekan Tandai hapus permanen: isi alasan, ketik email akun, simpan. Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).
+2. Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.
+3. BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu.
+
 ## Wali kelas
 
 1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.
 2. Bila kelas yang dipilih sudah punya wali, muncul peringatan. Hanya admin yang boleh menambah wali kedua untuk kelas yang sama.
 3. Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkannya lagi.
-4. Pergantian tahun ajaran: ubah kelas utama semua wali sekaligus di kartu Wali kelas per tahun ajaran, lalu simpan satu kali. Indeks siswa-kelas ikut disinkronkan pada penyimpanan yang sama (ubah kelas siswa dulu di menu Data siswa).
-5. Kartu Indeks kelas (Dashboard dan menu Wali kelas) membandingkan daftar siswa dengan indeks siswa-kelas, serta akun wali dengan cermin waliAkun. Pemeriksaan berjalan otomatis saat Dashboard dibuka.
-6. Bila ada selisih, tekan Perbaiki: baca pratinjau (dry-run), lalu Terapkan perbaikan. Data dibaca ulang sebelum ditulis dan perbaikan tercatat di log aktivitas.
+4. Pergantian tahun ajaran: ubah kelas utama semua wali sekaligus di kartu Wali kelas per tahun ajaran, lalu simpan satu kali (indeks siswa-kelas ikut disinkronkan; ubah kelas siswa dulu di menu Siswa).
+5. Kartu Indeks kelas membandingkan daftar siswa dengan indeks siswa-kelas dan akun wali dengan cerminnya. Bila ada selisih tekan Perbaiki, baca pratinjau (dry-run), lalu Terapkan.
 
-> Catatan: Indeks siswa-kelas dipakai aturan keamanan untuk membatasi wali pada siswa kelasnya; ia terisi otomatis saat siswa ditambah, diubah, atau dihapus.
+> Catatan: Indeks siswa-kelas membatasi wali pada siswa kelasnya; terisi otomatis saat siswa diubah.
 
 ## Log aktivitas dan backup
 
-1. Menu Log aktivitas: pilih tanggal, lihat siapa (nama petugas yang dipilih sendiri), perangkat, dan aksinya. Perangkat baru diberi tanda.
-2. Pengaturan, kartu Backup terakhir: tekan Buka Firebase Console, pilih Realtime Database, menu titik tiga, Ekspor JSON, simpan berkas di tempat aman.
+1. Menu Log aktivitas: pilih tanggal, lihat siapa (nama petugas pilihan sendiri), perangkat, dan aksinya. Perangkat baru bertanda.
+2. Pengaturan, kartu Backup terakhir: Buka Firebase Console, Realtime Database, menu titik tiga, Ekspor JSON, simpan berkas di tempat aman.
 3. Kembali ke aplikasi, tekan Tandai sudah backup. Lakukan tiap Sabtu.
 
 > Catatan: Nama petugas piket dipilih sendiri; log membantu melacak lewat perangkat, bukan bukti identitas.

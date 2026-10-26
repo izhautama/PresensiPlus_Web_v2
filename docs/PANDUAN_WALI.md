@@ -5,7 +5,7 @@ Untuk: Wali kelas (akun per guru)
 ## Masuk dan menu
 
 1. Buka alamat aplikasi, pilih tab Admin, isi email dan password akun wali kelas dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).
-2. Menu: Dashboard, Izin & kehadiran, Siswa kelas, Pelanggaran, Pembinaan, Usulan remisi, Panduan, Pengaturan (ganti password), dan Keluar.
+2. Menu: Dashboard, Izin & kehadiran, Siswa kelas, Pelanggaran, Pembinaan, Usulan remisi, Laporan, Panduan, Pengaturan (ganti password), dan Keluar.
 3. Bila memegang lebih dari satu kelas, pilih kelas di bagian atas halaman. Anda hanya melihat siswa kelas binaan; siswa kelas lain tidak tampil.
 
 ## Izin dan sakit
@@ -18,6 +18,12 @@ Untuk: Wali kelas (akun per guru)
 
 1. Menu Pelanggaran: pilih siswa kelas binaan dan pelanggaran Ringan atau yang bertakziran dari daftar tata tertib. Poin dan takziran tetap dari daftar resmi.
 2. Catatan Anda tampil di Catatan saya dan dapat dihapus dengan alasan. Pelanggaran Sedang/Berat dicatat oleh Waka.
+
+## Laporan
+
+1. Menu Laporan: pilih tahun ajaran dan tanggal dari sampai (maksimal 1 tahun ajaran), lalu tekan Tampilkan. Isinya satu baris per siswa kelas binaan yang sedang dipilih.
+2. Kolom: hari efektif, Hadir, Terlambat, Izin, Sakit, Dispensasi (dihitung hadir), Alpha, persen kehadiran, A/I/S/D per jam, poin, saldo, level, dan status pembinaan (status dan tanggal saja).
+3. Unduh CSV (pemisah titik koma, langsung rapi di Excel) atau Cetak. Setiap ekspor tercatat di log aktivitas tanpa nama siswa.
 
 ## Pembinaan
 

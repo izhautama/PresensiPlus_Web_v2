@@ -10,16 +10,16 @@ Untuk: Waka Kesiswaan
 ## Sore hari: validasi harian
 
 1. Menu Validasi harian: daftar siswa yang tidak tap masuk dan tanpa keterangan.
-2. Pilih Izin, Sakit, atau Dispensasi bila ada kabar, lengkap dengan keterangan.
+2. Pilih Izin, Sakit, atau Dispensasi bila ada kabar, beserta keterangan.
 3. Bila tidak masuk tanpa kabar, tekan Konfirmasi Alfa (setelah batas keterlambatan lewat). Siswa yang dicatat Presensi manual tidak masuk daftar ini.
 
 ## Presensi manual
 
-1. Menu Presensi manual: untuk siswa yang hadir tetapi tidak tercatat alat (KTM lupa/hilang, kartu rusak, alat mati).
+1. Presensi manual: untuk siswa hadir yang tidak tercatat alat (KTM lupa/hilang, kartu rusak, alat mati).
 2. Pada siswa, tekan Hadir manual, pilih alasan, isi jam masuk. Hadir atau Terlambat dihitung dari jadwal kelas.
 3. Alat bermasalah satu kelas: pilih kelas di kotak Mode alat bermasalah, centang siswa yang TIDAK hadir, tekan Tandai hadir.
-4. Bila Alfa siswa sudah dikonfirmasi, aplikasi memberi peringatan; menyimpan akan membatalkan Alfa itu dan tercatat di jejak audit.
-5. Bukti masuk PALING AWAL yang dipakai (manual 07:05 lalu tap alat 07:40 tetap Hadir). Jam dimundurkan lebih dari 15 menit muncul di kartu Dashboard untuk ditinjau.
+4. Bila Alfa sudah dikonfirmasi, menyimpan membatalkan Alfa itu (tercatat di jejak audit).
+5. Bukti masuk PALING AWAL yang dipakai. Jam dimundurkan lebih dari 15 menit muncul di kartu Dashboard.
 
 ## Presensi per jam dan saran
 
@@ -27,7 +27,7 @@ Untuk: Waka Kesiswaan
 2. Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan dari status harian, tidak disimpan, dan hilang bila ada tap atau manual.
 3. Kartu A dari piket hari ini di Dashboard: tekan Tinjau di grid.
 4. Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM). Alfa seharian bukan pelanggaran otomatis; catat manual bila perlu.
-5. Centang saran lalu Setujui terpilih (poin tercatat) atau Abaikan. Tidak ada poin tercatat tanpa persetujuan Anda.
+5. Centang saran lalu Setujui terpilih atau Abaikan. Tidak ada poin tanpa persetujuan Anda.
 6. Saran yang belum dipetakan ke aturan diberi peringatan; atur di Tata tertib, tab Pemetaan saran.
 
 ## Kalender dan tap rendah
@@ -38,19 +38,19 @@ Untuk: Waka Kesiswaan
 
 ## Guru BK
 
-1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali.
-2. Catatan konseling BK tidak dapat Anda baca.
+1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Konseling hanya terbaca BK.
+2. Klaim aktif tampil per akun. Mencabut BK yang masih memegang klaim menampilkan daftar siswa dan tombol ke Penugasan BK.
 
 ## Wali kelas
 
 1. Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).
 2. Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.
 
-> Catatan: Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log aktivitas.
+> Catatan: Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log.
 
 ## Pembinaan dan usulan remisi
 
-1. Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK: Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.
+1. Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK (lencana = siswa BK belum diklaim): Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.
 2. Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.
 3. Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.
 

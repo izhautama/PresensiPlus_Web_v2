@@ -5,7 +5,7 @@ Untuk: Guru Bimbingan Konseling (akun per guru)
 ## Masuk dan menu
 
 1. Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).
-2. Menu: Dashboard, Siswa, Pembinaan, Usulan remisi, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.
+2. Menu: Dashboard, Siswa, Pembinaan, Usulan remisi, Laporan, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.
 3. Anda tidak mencatat pelanggaran dan tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.
 
 ## Siswa dan pelanggaran ringan
@@ -18,6 +18,12 @@ Untuk: Guru Bimbingan Konseling (akun per guru)
 1. Menu Pembinaan (Perlu dibina): siswa yang saldonya mencapai ambang BK terbagi Belum ditangani, Tangani saya, dan Ditangani BK lain. Tekan Klaim (siapa cepat dia dapat); waka dapat menunjuk atau memindahkan. Lencana menghitung dua kelompok pertama.
 2. Tekan Catat pembinaan: isi tanggal, metode, hasil (10 sampai 1000 karakter), tindak lanjut (opsional), dan status Dijadwalkan atau Selesai. Setelah Selesai hanya Waka atau Kepala yang dapat mengoreksi.
 3. Menu Usulan remisi: pilih siswa dan remisi dari daftar resmi, tulis alasan, lalu Kirim usulan. Keputusan setuju atau tolak ada pada Waka atau Kepala.
+
+## Laporan
+
+1. Menu Laporan: pilih tahun ajaran, tanggal dari sampai (maksimal 1 tahun ajaran), dan kelas (bawaan semua), lalu tekan Tampilkan. Satu baris per siswa; data dibaca sekali agar hemat kuota.
+2. Kolom seperti laporan wali, dengan status pembinaan level wali dan BK (status dan tanggal saja). Isi pembinaan, konseling, dan klaim tidak ikut.
+3. Unduh CSV atau Cetak. Setiap ekspor tercatat di log aktivitas tanpa nama siswa.
 
 ## Catatan konseling rahasia
 
