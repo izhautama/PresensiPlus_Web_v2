@@ -1657,7 +1657,9 @@ test("wali: hanya melihat siswa kelas binaan, Izin/Sakit tanpa Dispensasi, pelan
   await expect(page.getByText("Siapa yang bertugas?")).toHaveCount(0);
   const sidebar = page.locator("aside.sidebar");
   for (const n of ["Izin & kehadiran", "Siswa kelas", "Pelanggaran", "Pengaturan"]) await expect(sidebar.getByRole("link", { name: n, exact: true })).toHaveCount(1); // Pengaturan = ganti password akun sendiri
-  for (const n of ["Laporan", "Tata tertib", "Jejak audit", "Validasi harian", "Log aktivitas", "Status alat"]) await expect(sidebar.getByRole("link", { name: n, exact: true })).toHaveCount(0);
+  for (const n of ["Tata tertib", "Jejak audit", "Validasi harian", "Log aktivitas", "Status alat"]) await expect(sidebar.getByRole("link", { name: n, exact: true })).toHaveCount(0);
+  // v2.5.1: wali punya Laporan SENDIRI (kelas binaan); bukan laporan sekolah
+  await expect(sidebar.getByRole("link", { name: "Laporan", exact: true })).toHaveAttribute("href", "/wali/laporan");
   for (const tujuan of ["/waka", "/admin", "/piket", "/kepala/siswa"]) { await page.goto(tujuan); await expect(page).toHaveURL(/\/wali$/); }
 
   // daftar siswa: hanya X IPA (333,444,555,666,777); XI IPS (111,222) tidak tampil
