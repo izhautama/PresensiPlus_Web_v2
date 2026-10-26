@@ -212,6 +212,18 @@ Branch `v2.5.1` (dari `v2.5`, belum di-tag, belum di-deploy).
 
 **Uji tertunda** (fase uji akhir v2.4 + v2.5 + v2.5.1): mutasi semua grup; E2E penuh `flow.spec.mjs`; mobile 5x.
 
+## Status uji sprint final (tag `v2.5.1`; mencakup v2.4 + v2.5 + v2.5.1)
+
+Dijalankan 26 Oktober 2026 di emulator; tiap proses uji dibatasi 10 menit (log di luar repo).
+- `tsc` + `npm run build` bersih; `npm run test:unit` lolos; `npm run test:rules` **2277 lolos, 0 gagal**; `npm run test:migrasi` **97 + 41 lolos** (migrasi + hapus akun).
+- **E2E penuh** (`flow.spec.mjs` + `v251.spec.mjs`): desktop **48/48**, HP **48/48**. Skenario usang disesuaikan (BK tanpa pelanggaran + klaim dulu, konseling hanya BK, ortu tidak melihat pembinaan sampai diizinkan, admin tanpa menu Pembinaan, penanggung jawab ambang hanya kepala). E2E v2.4-a (jam manual, lupa KTM) ikut lolos karena dijalankan setelah 08:30 WIB.
+- **Mutasi** (`tests/mutation.mjs`; kini berhenti pada kegagalan uji pertama via `RULES_FAIL_FAST`): grup `kritis` (baru, 42 mutan: hierarki baca, konseling, penanggung jawab, klaim, izin/kunci/proyeksi ortu, hapus akun, BK) **41/41 tertangkap + 1 ekuivalen** (hapusAkun diri sendiri: lapisan roles menahan); grup `alat` **7/7**; grup `dasar` **28/28 + 2 ekuivalen**. Satu mutan awalnya LOLOS (waka mencabut izin saat level terkunci): ditambahkan uji isolasi di rules.test, lalu tertangkap.
+- Regresi nyata yang ditemukan E2E dan diperbaiki: (1) "Isi data awal" oleh waka ditolak karena penanggung jawab ambang kini hanya kepala (seed lv04 sampai lv06 kini kepala; waka mengisi tanpa penanggung jawab, kepala mengisi bawaan); (2) detail siswa di panel wali/BK membaca `pembinaanOrtu` (ditolak rules, galat di konsol): kini tidak dibaca di panel staf.
+- Harness mutasi: mutan yang polanya sudah tidak ada setelah v2.5 dilaporkan sebagai USANG (tidak dihapus, tidak menggagalkan seluruh run): `pembinaan` 39 USANG (+38 masih berlaku), `bk` 16 USANG (+46), `wali` 0 USANG (43).
+
+**Belum dijalankan di sprint ini (pengerasan pasca-rilis, wajib dalam 7 hari sejak deploy):** mutan lengkap `pembinaan`, `bk`, dan `wali` (55 mutan USANG disusun ulang; yang masih berlaku dijalankan), grup `manual`, `saran`, `kalender`, `perjam`, `piket` (terakhir dijalankan sebelum v2.4/v2.5), grup baru klaim/izin/migrasi/hapus-akun/laporan yang lebih rinci, dan mobile 5x berturut-turut. Uji fisik ESP32 (tap masuk, tap kedua tidak menimpa, retry setelah WiFi putus, Serial Monitor tanpa DITOLAK) hanya dapat dilakukan manusia di alat.
+
+
 ## Panduan pengguna
 Folder `docs/` berisi panduan singkat (maks. 2 halaman per peran): `PANDUAN_ADMIN.md`, `PANDUAN_KEPALA.md`, `PANDUAN_WAKA.md`, `PANDUAN_PIKET.md`, `PANDUAN_WALI.md`, `PANDUAN_ORANG_TUA.md`, dan `SOP_HARIAN.md`.
 Isinya dibuat dari satu sumber, `src/lib/panduan.ts`, yang juga dipakai menu **Panduan** di aplikasi (halaman statis tanpa data). Setelah mengubah isi, jalankan `node scripts/buat-panduan.mjs`; `tests/panduan.test.mjs` memastikan docs dan aplikasi selalu sama.
