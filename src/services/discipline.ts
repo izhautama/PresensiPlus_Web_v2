@@ -171,12 +171,16 @@ export async function simpanAutoMap(tipe: string, ruleId: string | null, sebelum
 }
 
 /** Isi data tata tertib awal (hanya dipanggil saat master masih kosong). */
-export async function isiDataAwal(a: Actor) {
+/**
+ * Isi data tata tertib awal. v2.5: hanya KEPALA yang boleh menulis penanggungJawab ambang; saat waka yang mengisi, ambang ditulis TANPA penanggung jawab
+ * (kepala mengisinya lewat "Isi penanggung jawab bawaan").
+ */
+export async function isiDataAwal(a: Actor, denganPenanggungJawab = true) {
   const u: Updates = {};
   const meta = { diubahOleh: a.uid, diubahTs: serverTimestamp() };
   for (const [id, x] of Object.entries(SEED_RULES)) u[`${DB}/rules/${id}`] = { ...x, aktif: true, ...meta };
   for (const [id, x] of Object.entries(SEED_REMISI)) u[`${DB}/remisi/${id}`] = { ...x, aktif: true, ...meta };
-  for (const [id, x] of Object.entries(SEED_LEVELS)) u[`${DB}/levels/${id}`] = x;
+  for (const [id, x] of Object.entries(SEED_LEVELS)) u[`${DB}/levels/${id}`] = denganPenanggungJawab ? x : { poin: x.poin, tindakan: x.tindakan };
   for (const [k, v] of Object.entries(SEED_AUTOMAP)) u[`${DB}/autoMap/${k}`] = v;
   tambahAudit(u, a, "ubah-master", `${DB}/*`, null, {
     isiDataAwal: true, pelanggaran: Object.keys(SEED_RULES).length, remisi: Object.keys(SEED_REMISI).length, ambang: Object.keys(SEED_LEVELS).length,

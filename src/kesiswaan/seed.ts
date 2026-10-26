@@ -67,9 +67,9 @@ export const SEED_LEVELS: Record<string, Level> = {
   lv01: { poin: 100, tindakan: "Teguran 1 — pembinaan wali kelas", penanggungJawab: "wali" },
   lv02: { poin: 200, tindakan: "Teguran 2 — pembinaan BK", penanggungJawab: "bk" },
   lv03: { poin: 300, tindakan: "Teguran 3 — surat peringatan pembinaan & pembinaan intensif oleh Kepala Madrasah dan Ndalem", penanggungJawab: "kepala" },
-  lv04: { poin: 400, tindakan: "Surat Peringatan 1", penanggungJawab: "waka" },
-  lv05: { poin: 500, tindakan: "Surat Peringatan 2 + pemanggilan orang tua/wali", penanggungJawab: "waka" },
-  lv06: { poin: 600, tindakan: "Surat Peringatan 3, sidang disiplin, pertimbangan pengembalian murid kepada orang tua/wali", penanggungJawab: "waka" },
+  lv04: { poin: 400, tindakan: "Surat Peringatan 1", penanggungJawab: "kepala" },
+  lv05: { poin: 500, tindakan: "Surat Peringatan 2 + pemanggilan orang tua/wali", penanggungJawab: "kepala" },
+  lv06: { poin: 600, tindakan: "Surat Peringatan 3, sidang disiplin, pertimbangan pengembalian murid kepada orang tua/wali", penanggungJawab: "kepala" },
 };
 
 /** Alfa sengaja kosong: tidak ada saran poin untuk Alfa sampai diatur. */

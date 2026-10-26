@@ -42,6 +42,9 @@ async function buatUser(emailAsli) {
 }
 
 const hasil = { lolos: 0, gagal: [] };
+/** RULES_FAIL_FAST=1 (dipakai uji mutasi): berhenti pada kegagalan PERTAMA. Mutan sudah tertangkap bila ada >= 1 uji gagal; sisanya tidak perlu dijalankan. */
+const gagalCepat = (ok) => { if (!ok && process.env.RULES_FAIL_FAST) { console.log(`
+${hasil.lolos} lolos, ${hasil.gagal.length} gagal (berhenti pada kegagalan pertama: RULES_FAIL_FAST)`); process.exit(1); } };
 async function uji(nama, who, op, path, body, harap /* "izin" | "tolak" */) {
   const token = who?.token;
   const r = await http(op, path, { token, body });
@@ -51,6 +54,7 @@ async function uji(nama, who, op, path, body, harap /* "izin" | "tolak" */) {
   if (ok) hasil.lolos++;
   else hasil.gagal.push(`${nama}  [harap ${harap}, status ${r.status} ${JSON.stringify(r.json)}]`);
   console.log(`${ok ? "  ✓" : "  ✗"} ${nama}`);
+  gagalCepat(ok);
 }
 const izin = (nama, who, op, path, body) => uji(nama, who, op, path, body, "izin");
 const tolak = (nama, who, op, path, body) => uji(nama, who, op, path, body, "tolak");
@@ -139,6 +143,7 @@ async function cek(nama, who, path, fn) {
   try { ok = r.status === 200 && Boolean(fn(r.json)); } catch (e) { alasan = String(e); }
   if (ok) hasil.lolos++; else hasil.gagal.push(`${nama}  [status ${r.status} ${alasan} ${JSON.stringify(r.json)?.slice(0, 200)}]`);
   console.log(`${ok ? "  ✓" : "  ✗"} ${nama}`);
+  gagalCepat(ok);
 }
 const audit = (u, o = {}) => ({ aksi: "buat", path: "discipline/records/111/x", oleh: u.uid, olehNama: "Staf", ts: SV, ...o });
 const bersih = (obj, ...hapus) => { const x = { ...obj }; for (const k of hapus) delete x[k]; return x; };

@@ -79,6 +79,19 @@ function ubahTeksSetelah(teks, jangkar, dari, ke) {
 }
 function ubahSetelah(node, kunci, jangkar, dari, ke) { node[kunci] = ubahTeksSetelah(node[kunci], jangkar, dari, ke); }
 
+// ---- pembantu mutasi KRITIS v2.5.1 (salinan helper rules; harus identik dengan scripts/build-rules.mjs)
+const ADMIN_T = ADMIN, WAKA_T = WAKA, KEPALA_T = KEPALA, BK_T = BK;
+const LV_PJ_T = (lvl) => `root.child('discipline').child('levels').child(${lvl}).child('penanggungJawab').val()`;
+const KUNCI_LAMA_T = "root.child('kunciOrtu').child($nis).child($ta).child($lv).exists()";
+const ALASAN_LOG_T = (n, min, max) => `${ENT(n)}.child('detail').val().length >= ${min} && ${ENT(n)}.child('detail').val().length <= ${max}`;
+const PB_LV_T = "newData.child('levelId').val()";
+const PB_TA_T = "newData.child('ta').val()";
+const IZIN_ADA_R_T = `${nav(4)}.child('izinOrtuAda').child($nis).child(${PB_TA_T}).child(${PB_LV_T})`;
+const ORTU_R_T = `${nav(4)}.child('pembinaanOrtu').child($nis).child(${PB_TA_T}).child(${PB_LV_T})`;
+const ORTU_KONSISTEN_T = `(${IZIN_ADA_R_T}.exists() ? (${ORTU_R_T}.exists() && ${ORTU_R_T}.child('status').val() === newData.child('status').val() && ${ORTU_R_T}.child('tanggal').val() === newData.child('tanggal').val() && ${ORTU_R_T}.child('levelPoin').val() === newData.child('levelPoin').val() && ${ORTU_R_T}.child('mode').val() === ${IZIN_ADA_R_T}.val() && (${IZIN_ADA_R_T}.val() === 'ringkas' ? (!${ORTU_R_T}.child('tindakan').exists() && !${ORTU_R_T}.child('hasil').exists() && !${ORTU_R_T}.child('tindakLanjut').exists()) : (${ORTU_R_T}.child('tindakan').val() === newData.child('tindakan').val() && ${ORTU_R_T}.child('hasil').val() === newData.child('hasil').val() && ${ORTU_R_T}.child('tindakLanjut').val() === newData.child('tindakLanjut').val()))) : !${ORTU_R_T}.exists())`;
+const OR_ADA4_T = `${nav(4)}.child('izinOrtuAda').child($nis).child($ta).child($lv)`;
+const OR_RECORD4_T = `${nav(4)}.child('pembinaan').child(root.child('discipline').child('levels').child($lv).child('penanggungJawab').val()).child($nis).child($ta + '_' + $lv)`;
+
 /** Setiap mutasi mengubah objek rules hasil build (salinan segar) dan WAJIB benar-benar mengubah sesuatu. */
 const mutasi = [
   { nama: "ortu boleh baca discipline/notes", ubah: (r) => { r.discipline.notes.$nis[".read"] = MILIK_ANAK; } },
@@ -828,6 +841,92 @@ const mutasi = [
   { nama: "bk: BK dapat mengisi presensi manual", ubah: (r) => { const n = r.manualTap.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
   { nama: "bk: BK dapat menulis validasi Alfa", ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${BK})`; } },
   { nama: "admin boleh tulis validasi Alfa",ubah: (r) => { const n = r.validasi.$tgl.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  // ================================================================ GRUP "kritis" (sprint v2.5.1): hak baca berperingkat, konseling, pj, klaim, izin/proyeksi ortu, hapus akun, BK
+  // --- hierarki baca pembinaan
+  { nama: "kritis: waka dapat membaca pembinaan/kepala", ubah: (r) => { r.pembinaan.kepala[".read"] += ` || (auth != null && ${WAKA_T})`; } },
+  { nama: "kritis: wali dapat membaca seluruh pembinaan/bk", ubah: (r) => { r.pembinaan.bk[".read"] += ` || (auth != null && ${WALI})`; } },
+  { nama: "kritis: wali membaca pembinaan/wali siswa kelas lain (cek kelas binaan dibuang)", ubah: (r) => { r.pembinaan.wali.$nis[".read"] = `auth != null && ${WALI}`; } },
+  { nama: "kritis: admin dapat membaca seluruh node pembinaan", ubah: (r) => { r.pembinaan[".read"] += ` || (auth != null && ${ADMIN_T})`; } },
+  { nama: "kritis: admin dapat membaca pembinaan/bk", ubah: (r) => { r.pembinaan.bk[".read"] += ` || (auth != null && ${ADMIN_T})`; } },
+  // --- konseling: hanya akun BK
+  { nama: "kritis: kepala dapat membaca konseling", ubah: (r) => { r.konseling[".read"] += ` || (auth != null && ${KEPALA_T})`; } },
+  { nama: "kritis: kepala dapat membaca konselingAudit", ubah: (r) => { r.konselingAudit[".read"] += ` || (auth != null && ${KEPALA_T})`; } },
+  { nama: "kritis: waka dapat membaca konseling", ubah: (r) => { r.konseling[".read"] += ` || (auth != null && ${WAKA_T})`; } },
+  { nama: "kritis: admin dapat membaca konselingAudit", ubah: (r) => { r.konselingAudit[".read"] += ` || (auth != null && ${ADMIN_T})`; } },
+  { nama: "kritis: ortu dapat membaca konseling anak sendiri", ubah: (r) => { r.konseling.$nis[".read"] = MILIK_ANAK; } },
+  { nama: "kritis: konseling milik BK lain dapat diubah (konseling.write + pemilik pada audit)", ubah: (r) => {
+    const k = r.konseling.$nis.$id; k[".write"] = ganti(k[".write"], "(data.exists() && data.child('oleh').val() === auth.uid && ", "(data.exists() && ");
+    const a = r.konselingAudit.$nis.$aid; a[".write"] = ganti(a[".write"], ` && ${nav(3)}.child('konseling').child($nis).child(newData.child('konselingId').val()).child('oleh').val() === auth.uid`, ""); } },
+  // --- penanggung jawab record + ambang
+  { nama: "kritis: pj record dapat diubah/dipalsukan di jalur wali (validate rekaman + field pj)", ubah: (r) => {
+    const n = r.pembinaan.wali.$nis.$id; n[".validate"] = ganti(n[".validate"], " && newData.child('pj').val() === 'wali'", ""); n.pj[".validate"] = "true"; } },
+  { nama: "kritis: pj record 'wali' diterima di jalur bk (validate rekaman + field pj)", ubah: (r) => {
+    const n = r.pembinaan.bk.$nis.$id; n[".validate"] = ganti(n[".validate"], " && newData.child('pj').val() === 'bk'", ""); n.pj[".validate"] = "true"; } },
+  { nama: "kritis: ambang record tidak harus sama dengan jalur (LV_PJ create wali dibuang)", ubah: (r) => {
+    const n = r.pembinaan.wali.$nis.$id; n[".validate"] = ganti(n[".validate"], `${LV_PJ_T(PB_LV_T)} === 'wali' && `, ""); } },
+  { nama: "kritis: penanda levelTerpakai tidak diwajibkan saat record dibuat (jalur wali)", ubah: (r) => {
+    const n = r.pembinaan.wali.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${nav(4)}.child('discipline').child('levelTerpakai').child(${PB_LV_T}).val() === true`, ""); } },
+  { nama: "kritis: waka dapat mengubah penanggungJawab ambang", ubah: (r) => {
+    const n = r.discipline.levels.$lvlId; n[".write"] = ganti(n[".write"], `(${WAKA_T} && newData.child('penanggungJawab').val() === data.child('penanggungJawab').val())`, `(${WAKA_T})`); } },
+  { nama: "kritis: penanggungJawab dapat diubah kepala walau ambang sudah terpakai", ubah: (r) => {
+    const n = r.discipline.levels.$lvlId; n[".write"] = ganti(n[".write"], ` && (newData.child('penanggungJawab').val() === data.child('penanggungJawab').val() || !root.child('discipline').child('levelTerpakai').child($lvlId).exists())`, ""); } },
+  { nama: "kritis: penanda levelTerpakai dapat ditulis siapa pun yang login", ubah: (r) => { r.discipline.levelTerpakai.$lvlId[".write"] = "auth != null"; } },
+  // --- klaimBK
+  { nama: "kritis: klaim dapat menimpa klaim yang sudah ada (cek !data.exists dibuang)", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], "(!data.exists() && newData.exists() && newData.child('bkUid')", "(newData.exists() && newData.child('bkUid')"); } },
+  { nama: "kritis: klaim atas nama BK lain (write bkUid + validate olehUid)", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], "newData.child('bkUid').val() === auth.uid && newData.child('cara').val() === 'klaim'", "newData.child('cara').val() === 'klaim'");
+    n[".validate"] = ganti(n[".validate"], " && newData.child('olehUid').val() === auth.uid", ""); } },
+  { nama: "kritis: lepas klaim tanpa log aktivitas dan tanpa alasan", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], ` && ${actOk(3, ["lepas-klaim-bk"])} && ${ALASAN_LOG_T(3, 10, 300)}`, ""); } },
+  { nama: "kritis: lepas klaim tanpa alasan 10-300 karakter", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], ` && ${ALASAN_LOG_T(3, 10, 300)}`, ""); } },
+  { nama: "kritis: lepas klaim setelah pembinaan selesai", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], " && root.child('pembinaan').child('bk').child($nis).child($k).child('status').val() !== 'selesai'", ""); } },
+  { nama: "kritis: BK dapat menunjuk/memindahkan klaim", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], `(${WAKA_T} || ${KEPALA_T}) && newData.exists() && newData.child('cara').val() === 'tunjuk'`, `(${WAKA_T} || ${KEPALA_T} || ${BK_T}) && newData.exists() && newData.child('cara').val() === 'tunjuk'`); } },
+  { nama: "kritis: tunjuk/pindah ke BK nonaktif diterima", ubah: (r) => {
+    const n = r.klaimBK.$nis.$k; n[".write"] = ganti(n[".write"], " && root.child('bkAkun').child(newData.child('bkUid').val()).child('aktif').val() === true", ""); } },
+  // --- izin / kunci / proyeksi orang tua
+  { nama: "kritis: waka dapat memberi izin level penanggung jawab kepala", ubah: (r) => {
+    const n = r.izinOrtu.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], `(${LV_PJ_T("$lv")} === 'wali' || ${LV_PJ_T("$lv")} === 'bk') && `, ""); } },
+  { nama: "kritis: waka memberi izin saat level terkunci (kunciOrtu)", ubah: (r) => {
+    const n = r.izinOrtu.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], `!${KUNCI_LAMA_T} && (!data.exists() ||`, "(!data.exists() ||"); } },
+  { nama: "kritis: waka mencabut izin saat level terkunci", ubah: (r) => {
+    const n = r.izinOrtu.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], ` && data.child('olehUid').val() === auth.uid && !${KUNCI_LAMA_T}`, " && data.child('olehUid').val() === auth.uid"); } },
+  { nama: "kritis: kepala membatalkan izin waka tanpa mengunci level", ubah: (r) => {
+    const n = r.izinOrtu.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], ` && (data.child('olehPeran').val() !== 'waka' || ${nav(4)}.child('kunciOrtu').child($nis).child($ta).child($lv).exists())`, ""); } },
+  { nama: "kritis: waka dapat menulis/membuka kunciOrtu", ubah: (r) => {
+    const n = r.kunciOrtu.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], `${KEPALA_T} && ((newData.exists()`, `(${KEPALA_T} || ${WAKA_T}) && ((newData.exists()`); } },
+  { nama: "kritis: proyeksi pembinaanOrtu tanpa izin dan tanpa pencocokan record (validate dibuang)", ubah: (r) => {
+    const n = r.pembinaanOrtu.$nis.$ta.$lv; n[".validate"] = "$lv.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['status', 'tanggal', 'levelPoin', 'mode'])"; } },
+  { nama: "kritis: isi proyeksi lengkap tidak dicocokkan dengan record (hasil/tindakan)", ubah: (r) => {
+    const n = r.pembinaanOrtu.$nis.$ta.$lv; n[".validate"] = ganti(n[".validate"], ` && newData.child('hasil').val() === ${OR_RECORD4_T}.child('hasil').val()`, ""); } },
+  { nama: "kritis: status proyeksi tidak dicocokkan dengan record", ubah: (r) => {
+    const n = r.pembinaanOrtu.$nis.$ta.$lv; n[".validate"] = ganti(n[".validate"], ` && ${OR_RECORD4_T}.child('status').val() === newData.child('status').val()`, ""); } },
+  { nama: "kritis: update record tidak wajib memperbarui proyeksi pembinaanOrtu (jalur wali)", ubah: (r) => {
+    const n = r.pembinaan.wali.$nis.$id; n[".validate"] = ganti(n[".validate"], ` && ${ORTU_KONSISTEN_T}`, ""); } },
+  { nama: "kritis: penanda izinOrtuAda tidak harus sama dengan izinOrtu", ubah: (r) => {
+    const n = r.izinOrtuAda.$nis.$ta.$lv; n[".write"] = ganti(n[".write"], `${nav(4)}.child('izinOrtu').child($nis).child($ta).child($lv).child('mode').val() === newData.val() && `, ""); } },
+  // --- hapusAkun
+  { nama: "kritis: hapusAkun menandai akun yang masih punya role (akun aktif)", ubah: (r) => {
+    const n = r.hapusAkun.$uid; n[".write"] = ganti(n[".write"], ` && !${nav(2)}.child('roles').child($uid).exists()`, ""); } },
+  { nama: "kritis: hapusAkun menandai uid tanpa peran staf sah (write + validate peran=staff.role)", ubah: (r) => {
+    const LIST = ["kepala", "waka", "piket", "wali", "bk"].map((x) => `root.child('staff').child($uid).child('role').val() === '${x}'`).join(" || ");
+    const n = r.hapusAkun.$uid; n[".write"] = ganti(n[".write"], ` && (${LIST})`, "");
+    n[".validate"] = ganti(n[".validate"], " && newData.child('peran').val() === root.child('staff').child($uid).child('role').val()", ""); } },
+  { nama: "kritis: non-admin dapat menandai hapusAkun", ubah: (r) => {
+    const n = r.hapusAkun.$uid; n[".write"] = ganti(n[".write"], `${ADMIN_T} && $uid !== auth.uid`, `$uid !== auth.uid`); } },
+  { nama: "kritis: hapusAkun diri sendiri diizinkan (ekuivalen: lapisan roles menahan, admin selalu punya role)", ekuivalen: true, ubah: (r) => {
+    const n = r.hapusAkun.$uid; n[".write"] = ganti(n[".write"], "$uid !== auth.uid && ", ""); } },
+  { nama: "kritis: hapusAkun dapat ditulis tanpa log aktivitas", ubah: (r) => {
+    const n = r.hapusAkun.$uid; n[".write"] = ganti(n[".write"], ` && ${actOk(2, ["tandai-hapus-akun"])}`, ""); } },
+  // --- BK
+  { nama: "kritis: BK dapat menulis pelanggaran (records.write + validate sumber + recordMeta.write)", ubah: (r) => {
+    const a = r.discipline.records.$nis.$recId; a[".write"] = `(${a[".write"]}) || (auth != null && ${BK_T})`;
+    a[".validate"] = ganti(a[".validate"], "(newData.child('sumber').val() !== 'bk' || data.exists())", "true");
+    const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = `(${m[".write"]}) || (auth != null && ${BK_T})`; } },
+  { nama: "kritis: BK dapat membaca parents (PIN orang tua)", ubah: (r) => { r.parents[".read"] = `(${r.parents[".read"]}) || (auth != null && ${BK_T})`; } },
 ];
 
 /** Ganti teks hanya pada BAGIAN BK sebuah aturan: bagian dimulai pada penanda `awal` (bawaan: kemunculan terakhir dari "(BK && root.child('siswaKelas')"). */
@@ -866,9 +965,9 @@ const tidakTerverifikasi = [];
 let dijalankan = 0, dijalankanEkuivalen = 0;
 // Kelompok mutasi (iterasi cepat): `npm run test:mutation --grup=manual` (juga MUTASI_GRUP=manual atau argumen --grup=manual).
 // Kelompok: manual | piket | saran | kalender | wali | dasar (sisanya) | semua. Mutasi penuh (~120 kasus) memakan +-90 menit dan dapat membuat emulator macet.
-const GRUP = (nama) => /^bk:/.test(nama) ? "bk" : /^alfa-jam/.test(nama) ? "perjam" : /^alat-kunci/.test(nama) ? "alat" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
+const GRUP = (nama) => /^kritis:/.test(nama) ? "kritis" : /^bk:/.test(nama) ? "bk" : /^alfa-jam/.test(nama) ? "perjam" : /^alat-kunci/.test(nama) ? "alat" : /^(pembinaan|usul|ambang: penanggung)/.test(nama) ? "pembinaan" : /^wali/.test(nama) ? "wali" : /^kalender|^ambang:|^sistem:|^profiles:/.test(nama) ? "kalender" : /^manual:|^saran:|^autoMap:/.test(nama) ? (/^manual:/.test(nama) ? "manual" : "saran") : /izinMeta|piket|log:|activity|manual|kunci akun|sistem|backup/i.test(nama) ? "piket" : "dasar";
 const grupDipilih = (process.argv.find((a) => a.startsWith("--grup="))?.slice(7) ?? process.env.MUTASI_GRUP ?? process.env.npm_config_grup ?? "semua").toLowerCase();
-if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "alat", "bk", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
+if (grupDipilih !== "semua" && !["manual", "piket", "saran", "kalender", "wali", "pembinaan", "perjam", "alat", "bk", "kritis", "dasar"].includes(grupDipilih)) throw new Error(`grup tidak dikenal: ${grupDipilih}`);
 const hanya = process.env.MUTASI_HANYA ? new Set(process.env.MUTASI_HANYA.split(",").map(Number)) : null;
 // ---- Pengelola emulator: mutasi memakai emulator SENDIRI (bukan firebase emulators:exec) supaya dapat direstart ----
 // Penyebab macet sebelumnya: satu emulator Java melayani ratusan run suite; memorinya menumpuk (+-3 GB) hingga tiap suite timeout.
@@ -932,7 +1031,7 @@ async function jalankanSuite(rules, nama) {
   const file = join(dir, `${nama}.json`);
   const teks = JSON.stringify(rules);
   writeFileSync(file, teks);
-  const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file }, encoding: "utf8", timeout: TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(process.execPath, ["tests/rules.test.mjs"], { env: { ...process.env, RULES_FILE: file, RULES_FAIL_FAST: "1" }, encoding: "utf8", timeout: TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 64 * 1024 * 1024 });
   const stdout = r.stdout ?? "", stderr = r.stderr ?? "";
   await bersihkanNs(/Namespace uji: (rules-[0-9a-f]+)/.exec(stdout)?.[1]);
   const gagal = stdout.split("\n").filter((l) => l.startsWith("  ✗")).map((l) => l.replace("  ✗ ", ""));
@@ -987,13 +1086,20 @@ async function jalankanMutan(i, m, rules, { ulang = false } = {}) {
 }
 
 const antreanUlang = [];
+const usang = []; // mutan yang pola rules-nya sudah tidak ada (struktur rules berubah di v2.5): DILAPORKAN, tidak dihapus; disusun ulang pada pengerasan pasca-rilis
 for (const [i, m] of mutasi.entries()) {
+  const dipilih = (grupDipilih === "semua" || GRUP(m.nama) === grupDipilih) && (!hanya || hanya.has(i + 1));
+  if (!dipilih && !process.env.MUTASI_KERING) continue;
   const rules = JSON.parse(JSON.stringify(buildRules()));
   const sebelum = JSON.stringify(rules);
-  try { m.ubah(rules.rules); } catch (e) { throw new Error(`[${i + 1}] "${m.nama}": ${e.message}`); }
-  if (JSON.stringify(rules) === sebelum) throw new Error(`mutasi "${m.nama}" tidak mengubah apa pun`);
-  if (grupDipilih !== "semua" && GRUP(m.nama) !== grupDipilih) continue;
-  if (hanya && !hanya.has(i + 1)) continue; // MUTASI_HANYA=39,56 : jalankan subset saja (iterasi cepat)
+  try {
+    m.ubah(rules.rules);
+    if (JSON.stringify(rules) === sebelum) throw new Error("mutasi tidak mengubah apa pun");
+  } catch (e) {
+    if (dipilih) { usang.push(`[${i + 1}] ${m.nama}`); console.log(`⊘ USANG [${i + 1}] ${m.nama} (${e.message.slice(0, 90)})`); }
+    continue;
+  }
+  if (!dipilih) continue;
   if (process.env.MUTASI_KERING) { console.log(`  pola OK [${i + 1}] ${m.nama}`); continue; } // hanya validasi pola, tanpa emulator
   const g = GRUP(m.nama);
   if (kelola && ((grupSebelumnya && g !== grupSebelumnya) || sejakRestart >= RESTART_N)) { await mulaiEmulator(g !== grupSebelumnya && grupSebelumnya ? `pindah grup ${grupSebelumnya} → ${g}` : `setiap ${RESTART_N} mutan`); sejakRestart = 0; }
@@ -1026,4 +1132,6 @@ ${dijalankan - dijalankanEkuivalen - selamat}/${dijalankan - dijalankanEkuivalen
 console.log(`Durasi: ${menit} menit, emulator dimulai/direstart ${restartKe}×`);
 if (tidakTerverifikasi.length) console.log(`
 ${tidakTerverifikasi.length} mutasi TIDAK TERVERIFIKASI (emulator macet, juga setelah diulang): jalankan ulang, mis. MUTASI_HANYA=${tidakTerverifikasi.map((x) => x.match(/\d+/)[0]).join(",")}`);
-process.exit(selamat ? 1 : tidakTerverifikasi.length ? 2 : 0);
+if (usang.length) console.log(`
+${usang.length} mutan USANG (pola rules tidak ada lagi; disusun ulang pada pengerasan pasca-rilis): ${usang.map((x) => x.match(/\d+/)[0]).join(",")}`);
+process.exit(selamat ? 1 : tidakTerverifikasi.length ? 2 : usang.length ? 4 : 0);

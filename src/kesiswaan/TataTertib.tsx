@@ -34,7 +34,7 @@ export default function TataTertib() {
 
   const isi = async () => {
     setSeed(true);
-    try { await isiDataAwal(actor); notify("Data tata tertib awal terisi"); }
+    try { await isiDataAwal(actor, peran === "kepala"); notify("Data tata tertib awal terisi"); }
     catch (e) { notify((e as Error).message, "err"); }
     finally { setSeed(false); }
   };
@@ -130,6 +130,9 @@ export default function TataTertib() {
           {tab === "levels" && (
             <article className="panel master-group">
               <div className="panel-header"><div><p className="panel-title">Ambang akumulasi poin</p><span>Level siswa = ambang tertinggi yang sudah dilewati saldo poinnya. Penanggung jawab menentukan siapa yang membina siswa pada ambang itu (daftar "Perlu dibina" wali kelas memakai ambang berpenanggung jawab wali).</span></div></div>
+              {bisaTulis && peran !== "kepala" && Object.values(d.levels).some((l) => !l.penanggungJawab) && (
+                <div className="notice warn" data-testid="pj-belum-waka"><Icon name="warning" size={17} /><span>Sebagian ambang belum punya penanggung jawab. Hanya Kepala Madrasah yang dapat mengisinya (tombol "Isi penanggung jawab bawaan" di halaman ini).</span></div>
+              )}
               {bisaTulis && peran === "kepala" && Object.values(d.levels).some((l) => !l.penanggungJawab) && (
                 <div className="notice warn" data-testid="pj-belum"><Icon name="warning" size={17} /><span>Sebagian ambang belum punya penanggung jawab, sehingga wali kelas belum menerima daftar "Perlu dibina".
                   <button className="primary-button sm" disabled={pjBusy} onClick={isiPj}>{pjBusy ? <Spinner /> : null}Isi penanggung jawab bawaan</button></span></div>
