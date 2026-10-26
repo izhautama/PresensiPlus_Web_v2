@@ -11,14 +11,14 @@ Untuk: Administrator / TU sekolah
 ## Memeriksa alat presensi
 
 1. Dashboard: lihat Online atau Offline dan jam terakhir alat terlihat.
-2. Buka menu Perangkat untuk detail (WiFi, memori, antrean, versi data).
+2. Menu Perangkat: detail WiFi, memori, antrean.
 3. Alat Offline: periksa listrik dan WiFi, lalu tekan Restart di menu Perangkat.
-4. Bila alat belum pulih, minta piket memakai Presensi manual (lihat SOP harian).
+4. Bila belum pulih, minta piket memakai Presensi manual.
 
 ## Mengelola siswa dan orang tua
 
 1. Menu Siswa: Tambah siswa, isi nama, kelas, NIS, dan UID kartu.
-2. Tombol Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru. PIN tampil sekali: catat dan berikan ke orang tua.
+2. Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru; PIN tampil sekali, catat dan berikan ke orang tua.
 3. Ikon dokumen = catat Izin, Sakit, atau Dispensasi untuk siswa itu.
 4. Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas atau hari khusus mengalahkan "Semua"; Minggu libur).
 
@@ -31,8 +31,8 @@ Untuk: Administrator / TU sekolah
 ## Akun staf (Pengaturan)
 
 1. Menu Pengaturan, bagian Akun Pimpinan dan Staf: Tambah akun untuk Kepala, Waka, atau Guru Piket (akun piket dipakai bersama satu meja).
-2. Ikon gembok pada akun Guru Piket = Kunci darurat (sesi yang sedang aktif langsung keluar). Tombol centang pada akun terkunci = Buka kunci.
-3. Ikon kunci (key) = kirim email reset password. Ikon sampah = cabut akses.
+2. Ikon gembok pada akun Guru Piket = Kunci darurat (sesi aktif langsung keluar); tombol centang = Buka kunci.
+3. Ikon key = kirim email reset password; ikon sampah = cabut akses.
 4. Ganti password admin di kartu "Ganti password admin".
 
 ## Kalender akademik dan hari efektif
@@ -50,15 +50,15 @@ Untuk: Administrator / TU sekolah
 
 ## Hapus akun permanen
 
-1. Pada akun yang sudah dicabut (Wali kelas, Guru BK, Akun Pimpinan dan Staf) tekan Tandai hapus permanen: isi alasan, ketik email akun, simpan. Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).
+1. Wali kelas atau Guru BK yang sudah dicabut: tekan Tandai hapus permanen, isi alasan, ketik email. Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).
 2. Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.
-3. BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu.
+3. BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu. Akun yang dicabut sebelum v2.5.1: Firebase Console, Authentication, Users, titik tiga, Delete account.
 
 ## Wali kelas
 
 1. Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.
-2. Bila kelas yang dipilih sudah punya wali, muncul peringatan. Hanya admin yang boleh menambah wali kedua untuk kelas yang sama.
-3. Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkannya lagi.
+2. Kelas yang sudah punya wali memunculkan peringatan; hanya admin yang boleh menambah wali kedua.
+3. Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkan lagi.
 4. Pergantian tahun ajaran: ubah kelas utama semua wali sekaligus di kartu Wali kelas per tahun ajaran, lalu simpan satu kali (indeks siswa-kelas ikut disinkronkan; ubah kelas siswa dulu di menu Siswa).
 5. Kartu Indeks kelas membandingkan daftar siswa dengan indeks siswa-kelas dan akun wali dengan cerminnya. Bila ada selisih tekan Perbaiki, baca pratinjau (dry-run), lalu Terapkan.
 

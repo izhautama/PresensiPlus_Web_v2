@@ -88,11 +88,13 @@ const unduh = async (page, tombol) => {
   return { nama: dl.suggestedFilename(), isi: readFileSync(await dl.path(), "utf8") };
 };
 
-let uidBk, uidBkHapus;
+let uidBk, uidBkHapus, uidCabutA, uidCabutB;
 test.beforeAll(async () => {
   // data awal v2.5.1 (idempoten): level + catatan disiplin bersih + akun BK aktif + akun BK yang SUDAH dicabut
   uidBk = await buatAkun(emailStaf("bk"));
   uidBkHapus = await buatAkun(emailStaf("bkhapus"));
+  uidCabutA = await buatAkun(emailStaf("cabuta"));
+  uidCabutB = await buatAkun(emailStaf("cabutb"));
   const now = Date.now();
   await rest("PATCH", "", {
     "discipline/levels": { lv01: { poin: 100, tindakan: "Teguran 1", penanggungJawab: "wali" }, lv02: { poin: 200, tindakan: "Teguran 2", penanggungJawab: "bk" }, lv03: { poin: 300, tindakan: "Teguran 3", penanggungJawab: "kepala" } },
@@ -103,6 +105,8 @@ test.beforeAll(async () => {
     [`roles/${uidBkHapus}`]: null,
     [`staff/${uidBkHapus}`]: { email: emailStaf("bkhapus"), nama: "BK Dicabut E2E", role: "bk", dibuat: now },
     [`bkAkun/${uidBkHapus}`]: { email: emailStaf("bkhapus"), nama: "BK Dicabut E2E", aktif: false },
+    [`roles/${uidCabutA}`]: "waka", [`staff/${uidCabutA}`]: { email: emailStaf("cabuta"), nama: "Waka Cabut A", role: "waka", dibuat: now },
+    [`roles/${uidCabutB}`]: "waka", [`staff/${uidCabutB}`]: { email: emailStaf("cabutb"), nama: "Waka Cabut B", role: "waka", dibuat: now },
   });
   const catat = (nis, id, poin) => ({ [`discipline/records/${nis}/${id}`]: { jenis: "pelanggaran", nama: "Pelanggaran uji", kategori: "Ringan", poin, tanggal: T.kemarin, ta: TA, sumber: "manual" }, [`discipline/recordMeta/${nis}/${id}`]: { dibuatOleh: "seed", dibuatNama: "Seed", dibuatTs: now } });
   await rest("PATCH", "", { ...catat("333", "r1", 320), ...catat("444", "r1", 210), ...catat("555", "r1", 40) });   // 333 -> ambang BK + Kepala; 444 -> ambang BK; 555 belum
@@ -189,6 +193,41 @@ test("admin: tandai hapus permanen akun BK yang dicabut lalu batalkan; admin tid
   const log = Object.values((await rest("GET", `activity/${hariNyata()}`)) ?? {}).map((e) => e.aksi);
   expect(log).toContain("tandai-hapus-akun"); expect(log).toContain("batal-hapus-akun");
   bersih(lap, "admin hapus akun");
+});
+
+test("admin: Cabut akses — tanda hapus OPSIONAL (bawaan tidak dicentang; tanpa centang = perilaku lama; dengan centang alasan wajib)", async ({ page }) => {
+  const lap = await siapkan(page);
+  await masuk(page, emailStaf("admin"));
+  await menu(page, "Pengaturan");
+  // jalur 1: TANPA centang (bawaan) -> cabut biasa, tidak ada tanda hapus
+  await page.getByRole("button", { name: "Cabut akses Waka Cabut A" }).click();
+  await expect(page.getByTestId("centang-tandai-hapus"), "bawaan TIDAK dicentang").not.toBeChecked();
+  await page.getByLabel("Ketik email untuk konfirmasi").fill(emailStaf("cabuta"));
+  await expect(page.getByTestId("cabut-konfirmasi")).toHaveText("Cabut akses");
+  await page.getByTestId("cabut-konfirmasi").click();
+  await expect(page.getByText("Waka Cabut A")).toHaveCount(0);
+  expect(await rest("GET", `roles/${uidCabutA}`), "role dicabut").toBeNull();
+  expect(await rest("GET", `staff/${uidCabutA}`), "staff dihapus (perilaku lama)").toBeNull();
+  expect(await rest("GET", `hapusAkun/${uidCabutA}`), "TIDAK ada tanda hapus").toBeNull();
+  // jalur 2: DENGAN centang -> alasan wajib 10-300, tanda ditulis dalam update yang sama
+  await page.getByRole("button", { name: "Cabut akses Waka Cabut B" }).click();
+  await page.getByTestId("centang-tandai-hapus").check();
+  await page.getByLabel("Ketik email untuk konfirmasi").fill(emailStaf("cabutb"));
+  await expect(page.getByTestId("cabut-konfirmasi")).toHaveText("Cabut dan tandai hapus");
+  await page.getByTestId("cabut-konfirmasi").click();
+  await expect(page.getByText("Alasan 10-300 karakter")).toBeVisible();
+  expect(await rest("GET", `roles/${uidCabutB}`), "belum dicabut sebelum alasan sah").toBe("waka");
+  await page.getByLabel("Alasan penghapusan").fill("Guru sudah pindah tugas ke sekolah lain");
+  await page.getByTestId("cabut-konfirmasi").click();
+  await expect(page.getByTestId("menunggu-dihapus").getByText("Waka Cabut B"), "hanya tampil di daftar Menunggu dihapus").toHaveCount(1);
+  expect(await rest("GET", `roles/${uidCabutB}`)).toBeNull();
+  expect(await rest("GET", `staff/${uidCabutB}`)).toBeNull();
+  const tanda = await rest("GET", `hapusAkun/${uidCabutB}`);
+  expect(tanda?.peran).toBe("waka"); expect(tanda?.email).toBe(emailStaf("cabutb")); expect(tanda?.alasan).toContain("pindah tugas");
+  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText("1");
+  await page.getByTestId("menunggu-dihapus").getByTestId("batal-tanda-hapus").click();
+  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText("0");
+  bersih(lap, "admin cabut opsional");
 });
 
 test("lencana: Penugasan BK (waka) dan Perlu dibina Kepala muncul lalu hilang setelah ditangani", async ({ page, browser }) => {

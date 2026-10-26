@@ -14,8 +14,8 @@ const tglMs = (ts: number) => formatTanggal(new Date(ts + 7 * 3600_000).toISOStr
  * Tandai akun yang sudah dicabut untuk dihapus permanen (hanya admin). Alasan 10-300 karakter + ketik ulang email. Penghapusan Auth dan node dilakukan
  * skrip lokal `scripts/hapus_akun.py` (dry-run dulu); penghapusan TIDAK BISA dibatalkan dan email menjadi bebas dipakai ulang.
  */
-export function TandaiHapusDialog({ uid, nama, email, peran, sekalianCabut, onClose }: {
-  uid: string; nama: string; email: string; peran: PeranHapus; /** kepala/waka/piket yang masih aktif: cabut akses dan tandai sekaligus */ sekalianCabut?: boolean; onClose: () => void;
+export function TandaiHapusDialog({ uid, nama, email, peran, onClose }: {
+  uid: string; nama: string; email: string; peran: PeranHapus; onClose: () => void;
 }) {
   const { session } = useAuth();
   const notify = useToast();
@@ -30,7 +30,7 @@ export function TandaiHapusDialog({ uid, nama, email, peran, sekalianCabut, onCl
     if (ketik.trim().toLowerCase() !== email.toLowerCase()) { setErr("Ketik email akun persis seperti di atas untuk konfirmasi"); return; }
     if (session?.role !== "admin") return;
     setBusy(true);
-    try { await tandaiHapusAkun({ uid, email, nama, peran, alasan: a, olehUid: session.uid, sekalianCabut }); notify(`${nama} ditandai untuk dihapus permanen`); onClose(); }
+    try { await tandaiHapusAkun({ uid, email, nama, peran, alasan: a, olehUid: session.uid }); notify(`${nama} ditandai untuk dihapus permanen`); onClose(); }
     catch (ex) { setErr(/permission/i.test((ex as Error).message) ? "Ditolak: akun harus sudah dicabut, bukan akun Anda sendiri, dan belum ditandai." : (ex as Error).message); }
     finally { setBusy(false); }
   };
@@ -38,7 +38,6 @@ export function TandaiHapusDialog({ uid, nama, email, peran, sekalianCabut, onCl
     <Modal title="Tandai hapus permanen" subtitle={`${nama} · ${PERAN_HAPUS_LABEL[peran]} · ${email}`} onClose={onClose} width={520}>
       <form className="modal-form" onSubmit={submit} noValidate data-testid="form-tandai-hapus">
         <div className="notice warn"><Icon name="warning" size={17} /><span>Ini hanya MENANDAI. Akun Firebase Authentication dan datanya baru terhapus saat operator menjalankan skrip lokal <b>hapus_akun.py</b> (dry-run dulu). Penghapusan tidak dapat dibatalkan dan email menjadi bebas dipakai ulang. Jejak audit (log, pembinaan, konseling, catatan disiplin) tetap ada.</span></div>
-        {sekalianCabut && <p className="modal-note">Akses akun ini akan dicabut sekarang bersama penandaan.</p>}
         {peran === "bk" && <div className="notice" data-testid="peringatan-klaim-bk"><Icon name="users" size={17} /><span>Pastikan klaim BK akun ini sudah dilepas/dipindah oleh Waka. Skrip akan menolak bila masih ada klaim aktif.</span></div>}
         <Field label="Alasan" hint={`${alasan.trim().length}/300 · minimal 10 karakter · tercatat di log aktivitas`}>
           <textarea className="text-input" rows={3} maxLength={300} value={alasan} onChange={(e) => setAlasan(e.target.value)} aria-label="Alasan penghapusan" />

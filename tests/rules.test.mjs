@@ -2753,6 +2753,22 @@ await uji("hapus akun: admin membatalkan tanda (dengan log) diterima", admin, "P
 await cek("hapus akun: tanda hilang setelah dibatalkan", admin, `hapusAkun/${hWaka.uid}`, (j) => j === null);
 await uji("hapus akun: admin menandai ulang setelah batal diterima", admin, "PATCH", "", markBody(admin, hWaka.uid, "hwaka", "waka"), "izin");
 
+// -- cabut akses akun staf: tanda hapus OPSIONAL (v2.5.1): tanpa tanda = perilaku lama; dengan tanda = satu update + alasan + log
+const hCabutA = await buatUser("hcabuta@uji.test"), hCabutB = await buatUser("hcabutb@uji.test"), hCabutC = await buatUser("hcabutc@uji.test");
+await http("PATCH", "", { owner: true, body: {
+  [`roles/${hCabutA.uid}`]: "waka", [`staff/${hCabutA.uid}`]: stH("hcabuta", "waka"),
+  [`roles/${hCabutB.uid}`]: "piket", [`staff/${hCabutB.uid}`]: stH("hcabutb", "piket"), [`piketAkun/${hCabutB.uid}`]: { email: emailH("hcabutb"), nama: "hcabutb", terkunci: false },
+  [`roles/${hCabutC.uid}`]: "waka", [`staff/${hCabutC.uid}`]: stH("hcabutc", "waka"),
+} });
+await uji("cabut akses: TANPA tanda hapus (perilaku lama, tanpa log) diterima", admin, "PATCH", "", { [`roles/${hCabutA.uid}`]: null, [`staff/${hCabutA.uid}`]: null, [`piketAkun/${hCabutA.uid}`]: null }, "izin");
+await cek("cabut akses tanpa tanda: roles + staff hilang, TIDAK ada hapusAkun", admin, `hapusAkun/${hCabutA.uid}`, (j) => j === null);
+await uji("cabut akses: DENGAN tanda hapus tetapi tanpa log ditolak", admin, "PATCH", "", { ...markBody(admin, hCabutB.uid, "hcabutb", "piket", { act: { tanpa: true } }), [`roles/${hCabutB.uid}`]: null, [`staff/${hCabutB.uid}`]: null, [`piketAkun/${hCabutB.uid}`]: null }, "tolak");
+await uji("cabut akses: DENGAN tanda hapus, alasan < 10 karakter ditolak", admin, "PATCH", "", { ...markBody(admin, hCabutB.uid, "hcabutb", "piket", { data: { alasan: "pindah" } }), [`roles/${hCabutB.uid}`]: null, [`staff/${hCabutB.uid}`]: null, [`piketAkun/${hCabutB.uid}`]: null }, "tolak");
+await uji("cabut akses: tanda hapus TANPA mencabut role (akun masih aktif) ditolak", admin, "PATCH", "", { ...markBody(admin, hCabutC.uid, "hcabutc", "waka"), [`staff/${hCabutC.uid}`]: null }, "tolak");
+await uji("cabut akses: DENGAN tanda hapus + alasan + log (satu update) diterima (piket)", admin, "PATCH", "", { ...markBody(admin, hCabutB.uid, "hcabutb", "piket"), [`roles/${hCabutB.uid}`]: null, [`staff/${hCabutB.uid}`]: null, [`piketAkun/${hCabutB.uid}`]: null }, "izin");
+await cek("cabut akses dengan tanda: staff + roles hilang, hapusAkun tersimpan", admin, `hapusAkun/${hCabutB.uid}`, (j) => j?.peran === "piket" && j.email === emailH("hcabutb"));
+await cek("cabut akses dengan tanda: staff dan roles akun itu kosong", admin, `staff/${hCabutB.uid}`, (j) => j === null);
+
 // -- aksi log baru: ekspor-laporan (wali/BK), hapus-akun-permanen (entri skrip), aksi acak tetap ditolak
 const logSaja = (u, aksi, detail, o = {}) => act(u, aksi, { entri: { detail }, ...o }).body;
 await uji("log: wali A menulis aksi 'ekspor-laporan' (tanpa NIS/nama) diterima", waliA, "PATCH", "", logSaja(waliA, "ekspor-laporan", "CSV laporan wali, kelas X, 2026-10-01 s.d. 2026-10-31, 32 siswa"), "izin");

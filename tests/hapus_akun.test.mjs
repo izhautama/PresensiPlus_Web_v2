@@ -8,6 +8,8 @@ import { randomBytes } from "node:crypto";
 import { muatRulesTerverifikasi } from "./emu.mjs";
 import { readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
+import { selisihCermin } from "../src/lib/konsistensi.ts";
+import { waliPemegangKelas } from "../src/lib/wali.ts";
 
 const DB = "http://127.0.0.1:9000";
 const AUTH = "http://127.0.0.1:9099";
@@ -149,6 +151,26 @@ cek("klaim aktif nol: BK Klaim kini LAYAK", setelahLepas.layak.includes(bkKlaim.
 const akhir = jalan("real", "HAPUS");
 cek("BK Klaim terhapus setelah klaim dilepas", akhir.berhasil.includes(bkKlaim.uid) && (await masuk(bkKlaim)) === null && !(await semua()).staff?.[bkKlaim.uid] && !!(await semua()).hapusAkunRiwayat?.[bkKlaim.uid]);
 cek("pembinaan oleh BK Klaim tetap tersimpan atas namanya", (await semua()).pembinaan.bk[9001][KUNCI].oleh === bkKlaim.uid);
+
+// ================================================================ 5. wali dicabut + dihapus skrip: konsistensi bersih, kelasnya bebas diberikan ke wali baru
+console.log("\n5. Konsistensi wali setelah penghapusan");
+cek("sebelum dihapus: wali tercabut (staff/roles/waliAkun) selaras", selisihCermin(awal.staff, awal.waliAkun, awal.roles).length === 0);
+cek("sebelum dihapus: wali tercabut (aktif=false) tidak dihitung sebagai pemegang kelas X", waliPemegangKelas("X", awal.waliAkun).length === 0);
+const dAkhir = await semua();
+cek("setelah dihapus skrip: pemeriksaan konsistensi (staff/roles/waliAkun) BERSIH", selisihCermin(dAkhir.staff, dAkhir.waliAkun ?? {}, dAkhir.roles ?? {}).length === 0, JSON.stringify(selisihCermin(dAkhir.staff, dAkhir.waliAkun ?? {}, dAkhir.roles ?? {})));
+cek("setelah dihapus: tidak ada sisa waliAkun/staff bekas wali", !dAkhir.waliAkun?.[waliR.uid] && !dAkhir.staff?.[waliR.uid]);
+cek("setelah dihapus: kelas X tidak punya pemegang (waliPemegangKelas kosong)", waliPemegangKelas("X", dAkhir.waliAkun ?? {}).length === 0);
+const waliBaru = await buat("walibaru");
+const beri = await http("PATCH", "", { token: admin.token, body: {
+  [`roles/${waliBaru.uid}`]: "wali",
+  [`staff/${waliBaru.uid}`]: { email: waliBaru.email, nama: "Wali Baru", role: "wali", dibuat: 2, kelasUtama: "X" },
+  [`waliAkun/${waliBaru.uid}`]: { email: waliBaru.email, nama: "Wali Baru", kelasUtama: "X", aktif: true },
+} });
+cek("kelas X diberikan ke wali baru TANPA konflik (lolos rules sebagai admin)", beri.status === 200, JSON.stringify(beri.json));
+const dBaru = await semua();
+const pemegang = waliPemegangKelas("X", dBaru.waliAkun ?? {});
+cek("waliPemegangKelas: tepat satu pemegang kelas X = wali baru (tanpa peringatan konflik)", pemegang.length === 1 && pemegang[0][0] === waliBaru.uid);
+cek("setelah wali baru: konsistensi tetap bersih", selisihCermin(dBaru.staff, dBaru.waliAkun ?? {}, dBaru.roles ?? {}).length === 0);
 
 console.log(`\n${lolos} lolos, ${gagal.length} gagal`);
 if (gagal.length) { for (const g of gagal) console.log(" - " + g); process.exit(1); }

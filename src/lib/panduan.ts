@@ -17,13 +17,13 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Memeriksa alat presensi", langkah: [
         "Dashboard: lihat Online atau Offline dan jam terakhir alat terlihat.",
-        "Buka menu Perangkat untuk detail (WiFi, memori, antrean, versi data).",
+        "Menu Perangkat: detail WiFi, memori, antrean.",
         "Alat Offline: periksa listrik dan WiFi, lalu tekan Restart di menu Perangkat.",
-        "Bila alat belum pulih, minta piket memakai Presensi manual (lihat SOP harian).",
+        "Bila belum pulih, minta piket memakai Presensi manual.",
       ] },
       { judul: "Mengelola siswa dan orang tua", langkah: [
         "Menu Siswa: Tambah siswa, isi nama, kelas, NIS, dan UID kartu.",
-        "Tombol Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru. PIN tampil sekali: catat dan berikan ke orang tua.",
+        "Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru; PIN tampil sekali, catat dan berikan ke orang tua.",
         "Ikon dokumen = catat Izin, Sakit, atau Dispensasi untuk siswa itu.",
         "Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas atau hari khusus mengalahkan \"Semua\"; Minggu libur).",
       ] },
@@ -34,8 +34,8 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Akun staf (Pengaturan)", langkah: [
         "Menu Pengaturan, bagian Akun Pimpinan dan Staf: Tambah akun untuk Kepala, Waka, atau Guru Piket (akun piket dipakai bersama satu meja).",
-        "Ikon gembok pada akun Guru Piket = Kunci darurat (sesi yang sedang aktif langsung keluar). Tombol centang pada akun terkunci = Buka kunci.",
-        "Ikon kunci (key) = kirim email reset password. Ikon sampah = cabut akses.",
+        "Ikon gembok pada akun Guru Piket = Kunci darurat (sesi aktif langsung keluar); tombol centang = Buka kunci.",
+        "Ikon key = kirim email reset password; ikon sampah = cabut akses.",
         "Ganti password admin di kartu \"Ganti password admin\".",
       ] },
       { judul: "Kalender akademik dan hari efektif", langkah: [
@@ -50,14 +50,14 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.",
       ] },
       { judul: "Hapus akun permanen", langkah: [
-        "Pada akun yang sudah dicabut (Wali kelas, Guru BK, Akun Pimpinan dan Staf) tekan Tandai hapus permanen: isi alasan, ketik email akun, simpan. Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
+        "Wali kelas atau Guru BK yang sudah dicabut: tekan Tandai hapus permanen, isi alasan, ketik email. Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
         "Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.",
-        "BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu.",
+        "BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu. Akun yang dicabut sebelum v2.5.1: Firebase Console, Authentication, Users, titik tiga, Delete account.",
       ] },
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: tekan Tambah wali kelas, isi nama, email asli, password sementara, lalu kelas utama dan (opsional) kelas tambahan. Satu wali boleh memegang berapa pun kelas.",
-        "Bila kelas yang dipilih sudah punya wali, muncul peringatan. Hanya admin yang boleh menambah wali kedua untuk kelas yang sama.",
-        "Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkannya lagi.",
+        "Kelas yang sudah punya wali memunculkan peringatan; hanya admin yang boleh menambah wali kedua.",
+        "Cabut menutup akses tanpa menghapus akun; Pasang kembali mengaktifkan lagi.",
         "Pergantian tahun ajaran: ubah kelas utama semua wali sekaligus di kartu Wali kelas per tahun ajaran, lalu simpan satu kali (indeks siswa-kelas ikut disinkronkan; ubah kelas siswa dulu di menu Siswa).",
         "Kartu Indeks kelas membandingkan daftar siswa dengan indeks siswa-kelas dan akun wali dengan cerminnya. Bila ada selisih tekan Perbaiki, baca pratinjau (dry-run), lalu Terapkan.",
       ], catatan: "Indeks siswa-kelas membatasi wali pada siswa kelasnya; terisi otomatis saat siswa diubah." },

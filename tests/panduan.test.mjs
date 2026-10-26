@@ -46,3 +46,4 @@ assert.match(teks("wali"), /Laporan/); assert.match(teks("wali"), /titik koma/);
 assert.match(teks("admin"), /Hapus akun permanen/); assert.match(teks("admin"), /HAPUS/); assert.match(teks("admin"), /tidak dapat dibatalkan/i); assert.match(teks("admin"), /klaim aktif/i);
 assert.match(teks("kepala"), /Perlu dibina \(Kepala\)/); assert.match(teks("waka"), /Klaim aktif/); assert.match(teks("waka"), /lencana/i);
 console.log("panduan v2.5.1 ok");
+assert.match(teks("admin"), /centang Tandai juga untuk hapus permanen/); assert.match(teks("admin"), /Firebase Console, Authentication, Users/);

@@ -8,8 +8,9 @@ import {
   MAKS_STAF, PERAN_STAF, PERAN_STAF_UMUM, PeranGagal, buatAkunStaf, cabutAkunStaf, kirimResetPassword, kunciAkunPiket, pasangPeranStaf, useLive,
   type PeranStaf, type Staff,
 } from "../services/db";
-import type { PeranHapus } from "../services/hapusAkun";
-import { DaftarMenungguHapus, TandaiHapusDialog } from "./HapusAkun";
+import { tandaiHapusAkun, type PeranHapus } from "../services/hapusAkun";
+import { DaftarMenungguHapus } from "./HapusAkun";
+import { useAuth } from "../auth/AuthContext";
 import { useToast } from "./AdminLayout";
 
 const tgl = (ms: number) => formatTanggal(new Date(ms + 7 * 3600_000).toISOString().slice(0, 10));
@@ -20,7 +21,6 @@ export default function StaffAccounts() {
   const notify = useToast();
   const [tambah, setTambah] = useState(false);
   const [cabut, setCabut] = useState<{ uid: string; s: Staff } | null>(null);
-  const [hapus, setHapus] = useState<{ uid: string; s: Staff } | null>(null);
   const [reset, setReset] = useState("");
   // wali kelas punya panel sendiri (Wali kelas) karena butuh pemetaan kelas; tidak dihitung dalam batas akun pimpinan/staf
   const daftar = Object.entries(staff.data ?? {}).filter(([, s]) => s.role !== "wali" && s.role !== "bk").sort((a, b) => a[1].dibuat - b[1].dibuat);
@@ -61,7 +61,6 @@ export default function StaffAccounts() {
                   : <button title="Kunci darurat akun piket (langsung keluar)" aria-label={`Kunci ${s.nama}`} className="danger" disabled={kunciBusy === uid} onClick={() => kunci(uid, s, true)}><Icon name="lock" size={16} /></button>)}
                 <button title="Kirim email reset password" aria-label={`Reset password ${s.nama}`} disabled={reset === s.email} onClick={() => kirimReset(s.email)}><Icon name="key" size={16} /></button>
                 <button title="Cabut akses" aria-label={`Cabut akses ${s.nama}`} className="danger" onClick={() => setCabut({ uid, s })}><Icon name="trash" size={16} /></button>
-                <button title="Cabut akses dan tandai hapus permanen" aria-label={`Tandai hapus permanen ${s.nama}`} className="danger" onClick={() => setHapus({ uid, s })} data-testid="tandai-hapus"><Icon name="x" size={16} /></button>
               </span>
             </div>
           ))}
@@ -69,7 +68,6 @@ export default function StaffAccounts() {
       )}
       {tambah && <TambahDialog onClose={() => setTambah(false)} />}
       {cabut && <CabutDialog uid={cabut.uid} s={cabut.s} onClose={() => setCabut(null)} />}
-      {hapus && <TandaiHapusDialog uid={hapus.uid} nama={hapus.s.nama} email={hapus.s.email} peran={hapus.s.role as PeranHapus} sekalianCabut onClose={() => setHapus(null)} />}
     </article>
     <DaftarMenungguHapus />
     </>
@@ -178,19 +176,42 @@ function TambahDialog({ onClose }: { onClose: () => void }) {
 
 function CabutDialog({ uid, s, onClose }: { uid: string; s: Staff; onClose: () => void }) {
   const notify = useToast();
+  const { session } = useAuth();
   const [k, setK] = useState("");
   const [busy, setBusy] = useState(false);
+  // OPSIONAL (bawaan tidak dicentang): cabut + tandai hapus permanen dalam SATU update. Tanpa centang, cabut berperilaku seperti sebelum v2.5.1.
+  const [tandai, setTandai] = useState(false);
+  const [alasan, setAlasan] = useState("");
+  const [err, setErr] = useState("");
+  const alasanSah = alasan.trim().length >= 10 && alasan.trim().length <= 300;
+  const cabut = async () => {
+    if (tandai && !alasanSah) { setErr("Alasan 10-300 karakter"); return; }
+    if (tandai && session?.role !== "admin") return;
+    setBusy(true);
+    try {
+      if (tandai && session?.role === "admin") {
+        await tandaiHapusAkun({ uid, email: s.email, nama: s.nama, peran: s.role as PeranHapus, alasan, olehUid: session.uid, sekalianCabut: true });
+        notify(`Akses ${s.nama} dicabut dan ditandai untuk dihapus permanen`);
+      } else { await cabutAkunStaf(uid); notify(`Akses ${s.nama} dicabut`); }
+      onClose();
+    } catch (ex) { notify((ex as Error).message, "err"); setBusy(false); }
+  };
   return (
     <Modal title="Cabut akses?" subtitle={`${s.nama} · ${s.email}`} onClose={onClose} width={440}>
       <p className="modal-note">Peran dihapus sehingga akun ini langsung tidak bisa masuk (sesi yang sedang aktif ikut ditutup). Akun login masih tersimpan di Firebase Authentication; untuk menghapus permanen, buka Firebase Console &gt; Authentication (SDK web tidak bisa menghapus pengguna lain tanpa Cloud Functions).</p>
-      <Field label={`Ketik ${s.email} untuk konfirmasi`}><input className="text-input" value={k} onChange={(e) => setK(e.target.value)} autoComplete="off" /></Field>
+      <Field label={`Ketik ${s.email} untuk konfirmasi`}><input className="text-input" value={k} onChange={(e) => setK(e.target.value)} autoComplete="off" aria-label="Ketik email untuk konfirmasi" /></Field>
+      <label className="check-inline"><input type="checkbox" checked={tandai} onChange={(e) => { setTandai(e.target.checked); setErr(""); }} data-testid="centang-tandai-hapus" />Tandai juga untuk hapus permanen</label>
+      {tandai && (
+        <>
+          <p className="modal-note">Hanya menandai: akun Authentication dan datanya baru dihapus saat skrip lokal hapus_akun.py dijalankan (dry-run dulu). Tidak dapat dibatalkan setelah dijalankan; email jadi bebas dipakai ulang.</p>
+          <Field label="Alasan" error={err} hint={`${alasan.trim().length}/300 · minimal 10 karakter · tercatat di log aktivitas`}>
+            <textarea className="text-input" rows={3} maxLength={300} value={alasan} onChange={(e) => setAlasan(e.target.value)} aria-label="Alasan penghapusan" />
+          </Field>
+        </>
+      )}
       <div className="modal-actions">
         <button className="secondary-button" onClick={onClose}>Batal</button>
-        <button className="danger-button" disabled={busy || k.trim().toLowerCase() !== s.email.toLowerCase()} onClick={async () => {
-          setBusy(true);
-          try { await cabutAkunStaf(uid); notify(`Akses ${s.nama} dicabut`); onClose(); }
-          catch (ex) { notify((ex as Error).message, "err"); setBusy(false); }
-        }}>{busy ? <Spinner /> : <Icon name="trash" size={15} />}Cabut akses</button>
+        <button className="danger-button" disabled={busy || k.trim().toLowerCase() !== s.email.toLowerCase()} onClick={cabut} data-testid="cabut-konfirmasi">{busy ? <Spinner /> : <Icon name="trash" size={15} />}{tandai ? "Cabut dan tandai hapus" : "Cabut akses"}</button>
       </div>
     </Modal>
   );
