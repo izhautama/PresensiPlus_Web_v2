@@ -2025,6 +2025,13 @@ await beri("izin ortu: waka dapat mengizinkan lagi SETELAH kunci dibuka", waka, 
 await uji("izin ortu: kepala memasang kunci tersendiri (kunci-ortu) diterima", kepala, "PATCH", "", { ...act(kepala, "kunci-ortu").body, [KU("703", ta5, "lvB")]: { olehUid: kepala.uid, ts: SV, alasan: "Dikunci sebelum ada izin dari waka" } }, "izin");
 await beri("izin ortu: waka TIDAK mengizinkan level yang dikunci sebelum izin (lvB)", waka, "waka", "703", ta5, "lvB", "ringkas", null, "tolak");
 await uji("izin ortu: kunci dengan field asing ditolak", kepala, "PATCH", "", { ...act(kepala, "kunci-ortu").body, [KU("703", ta5, "lvK")]: { olehUid: kepala.uid, ts: SV, alasan: "Kunci dengan field asing uji", x: 1 } }, "tolak");
+// -- terkunci SAAT waka masih memegang izinnya sendiri: waka tidak dapat mencabutnya (isolasi lapisan kunci; bukan karena olehUid)
+const ta6 = taFresh();
+await beri("izin ortu: waka memberi izin sendiri (ta6) lalu kepala memasang kunci tersendiri", waka, "waka", "703", ta6, "lvW", "ringkas", null, "izin");
+await uji("izin ortu: kepala memasang kunci tanpa mencabut izin waka (kunci-ortu) diterima", kepala, "PATCH", "", { ...act(kepala, "kunci-ortu").body, [KU("703", ta6, "lvW")]: { olehUid: kepala.uid, ts: SV, alasan: "Level dikunci setelah izin diberikan waka" } }, "izin");
+await uji("izin ortu: waka TIDAK mencabut izinnya SENDIRI saat level terkunci", waka, "PATCH", "", cabutBody(waka, "703", ta6, "lvW"), "tolak");
+await uji("izin ortu: kepala membuka kunci (ta6)", kepala, "PATCH", "", { ...act(kepala, "buka-kunci-ortu").body, [KU("703", ta6, "lvW")]: null }, "izin");
+await uji("izin ortu: waka mencabut izinnya sendiri setelah kunci dibuka diterima", waka, "PATCH", "", cabutBody(waka, "703", ta6, "lvW"), "izin");
 
 // ---- MIGRASI data lama (khusus kepala, §5.4)
 seksi("MIGRASI v2.5 — pembinaan/{nis}/{id} lama -> pembinaan/{pj}/{nis}/{id}; pembinaanStatus dihapus");
