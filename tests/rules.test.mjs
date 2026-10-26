@@ -2686,6 +2686,91 @@ await izin("Dispensasi diterima oleh kepala", kepala, "PATCH", "", { [`izin/${HT
 await izin("Dispensasi diterima oleh admin", admin, "PUT", `izin/${HT}/999`, "Dispensasi");
 await tolak("nilai ket tak dikenal ('Cuti') ditolak", waka, "PUT", `izin/${HT}/777`, "Cuti");
 
+// ================================================================ v2.5.1 — HAPUS AKUN (tanda), aksi log baru, tanpa hak baca baru
+seksi("HAPUS AKUN v2.5.1 — hapusAkun (hanya admin menandai), hapusAkunRiwayat (hanya skrip), aksi log baru");
+const hStaf = (u, nama, role) => ({ email: u.email ?? `${nama}@uji.test`, nama, role, dibuat: 1 });
+const hBk = await buatUser("hbk@uji.test"), hWali = await buatUser("hwali@uji.test"), hWaka = await buatUser("hwaka@uji.test"), hPiket = await buatUser("hpiket@uji.test");
+const hKepAktif = await buatUser("hkepaktif@uji.test"), hTanpaStaf = await buatUser("htanpastaf@uji.test"), hAktifBk = await buatUser("haktifbk@uji.test");
+const hDua = await buatUser("hdua@uji.test"), hTiga = await buatUser("htiga@uji.test");
+const emailH = (n) => `${n}@uji.test`;
+const stH = (nama, role, extra = {}) => ({ email: emailH(nama), nama, role, dibuat: 1, ...extra });
+await http("PATCH", "", { owner: true, body: {
+  [`staff/${hBk.uid}`]: stH("hbk", "bk"), [`staff/${hWali.uid}`]: stH("hwali", "wali", { kelasUtama: "X" }), [`staff/${hWaka.uid}`]: stH("hwaka", "waka"), [`staff/${hPiket.uid}`]: stH("hpiket", "piket"),
+  [`staff/${hKepAktif.uid}`]: stH("hkepaktif", "kepala"), [`roles/${hKepAktif.uid}`]: "kepala",
+  [`staff/${hAktifBk.uid}`]: stH("haktifbk", "bk"), [`roles/${hAktifBk.uid}`]: "bk",
+  [`staff/${hDua.uid}`]: stH("hdua", "bk"), [`staff/${hTiga.uid}`]: stH("htiga", "bk"),
+} });
+for (const u of [hKepAktif]) PERAN.set(u.uid, "kepala");
+const tandaH = (uid, nama, peran, o = {}) => ({ email: emailH(nama), nama, peran, alasan: "Guru sudah pindah tugas ke sekolah lain", olehUid: admin.uid, ts: SV, ...o });
+const markBody = (u, uid, nama, peran, o = {}) => ({
+  ...(o.act?.tanpa ? {} : act(u, o.aksi ?? "tandai-hapus-akun", o.act ?? {}).body),
+  [`hapusAkun/${uid}`]: tandaH(uid, nama, peran, o.data ?? {}),
+  ...(o.tambah ?? {}),
+});
+const mark = (nama, who, uid, n, peran, harap, o) => uji(nama, who, "PATCH", "", markBody(who, uid, n, peran, o), harap);
+await mark("hapus akun: admin menandai BK yang sudah dicabut", admin, hBk.uid, "hbk", "bk", "izin");
+await mark("hapus akun: admin menandai wali yang sudah dicabut", admin, hWali.uid, "hwali", "wali", "izin");
+await mark("hapus akun: admin menandai waka yang sudah dicabut", admin, hWaka.uid, "hwaka", "waka", "izin");
+await mark("hapus akun: admin menandai piket yang sudah dicabut", admin, hPiket.uid, "hpiket", "piket", "izin");
+await cek("hapus akun: tanda terbaca admin", admin, `hapusAkun/${hBk.uid}`, (j) => j?.peran === "bk" && j.olehUid === admin.uid && j.alasan.length >= 10);
+// -- akun masih punya role (aktif) ditolak; cabut + tandai dalam SATU update diterima
+await mark("hapus akun: akun BK yang MASIH AKTIF (roles ada) ditolak", admin, hAktifBk.uid, "haktifbk", "bk", "tolak");
+await uji("hapus akun: kepala AKTIF dicabut + ditandai dalam SATU update diterima", admin, "PATCH", "", { ...markBody(admin, hKepAktif.uid, "hkepaktif", "kepala"), [`roles/${hKepAktif.uid}`]: null, [`staff/${hKepAktif.uid}`]: null }, "izin");
+await cek("hapus akun: staff & roles kepala itu hilang, tanda tersimpan", admin, `hapusAkun/${hKepAktif.uid}`, (j) => j?.email === emailH("hkepaktif"));
+await mark("hapus akun: admin lain (role admin) ditolak", admin, admin2.uid, "admin2", "waka", "tolak");
+await mark("hapus akun: uid tanpa staff (peran tak dapat diverifikasi) ditolak", admin, hTanpaStaf.uid, "htanpastaf", "bk", "tolak");
+await mark("hapus akun: akun alat (role device) ditolak", admin, dev.uid, "alat", "bk", "tolak");
+await mark("hapus akun: peran pada tanda BERBEDA dari staff.role ditolak", admin, hDua.uid, "hdua", "wali", "tolak");
+await mark("hapus akun: peran 'admin' pada tanda ditolak", admin, hDua.uid, "hdua", "admin", "tolak");
+await mark("hapus akun: email pada tanda BERBEDA dari staff ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { email: "lain@uji.test" } });
+await mark("hapus akun: nama pada tanda BERBEDA dari staff ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { nama: "Nama Lain" } });
+await mark("hapus akun: alasan < 10 karakter ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { alasan: "pindah" } });
+await mark("hapus akun: alasan > 300 karakter ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { alasan: "x".repeat(301) } });
+await mark("hapus akun: olehUid palsu ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { olehUid: admin2.uid } });
+await mark("hapus akun: ts bukan waktu server ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { ts: 5 } });
+await mark("hapus akun: field asing ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { data: { x: 1 } });
+await mark("hapus akun: TANPA log aktivitas ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { act: { tanpa: true } });
+await mark("hapus akun: log aksi salah ('atur-bk') ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { aksi: "atur-bk" });
+await mark("hapus akun: penanda log tanpa ENTRI ditolak", admin, hDua.uid, "hdua", "bk", "tolak", { act: { tanpaEntri: true } });
+await mark("hapus akun: menandai ulang akun yang sudah ditandai ditolak (tidak menimpa)", admin, hBk.uid, "hbk", "bk", "tolak");
+await tolak("hapus akun: PUT langsung tanpa log ditolak", admin, "PUT", `hapusAkun/${hTiga.uid}`, tandaH(hTiga.uid, "htiga", "bk", { ts: 5 }));
+// -- siapa lain
+for (const [n, who] of [["waka", waka], ["kepala", kepala], ["wali A", waliA], ["BK A", bkA], ["piket", piket], ["ortu", ortu1], ["alat", dev]]) {
+  await mark(`hapus akun: ${n} TIDAK menandai`, who, hTiga.uid, "htiga", "bk", "tolak");
+  await tolak(`hapus akun: ${n} TIDAK membaca hapusAkun`, who, "GET", "hapusAkun");
+  await tolak(`hapus akun: ${n} TIDAK membaca hapusAkunRiwayat`, who, "GET", "hapusAkunRiwayat");
+}
+await tolak("hapus akun: anonim TIDAK membaca", null, "GET", "hapusAkun");
+await izin("hapus akun: admin membaca hapusAkun", admin, "GET", "hapusAkun");
+await izin("hapus akun: admin membaca hapusAkunRiwayat", admin, "GET", "hapusAkunRiwayat");
+await tolak("hapus akun: admin TIDAK menulis hapusAkunRiwayat (hanya skrip Admin SDK)", admin, "PUT", `hapusAkunRiwayat/${hBk.uid}`, { email: "x@uji.test", nama: "x", peran: "bk", alasan: "Guru sudah pindah", olehUid: admin.uid, ditandaiTs: 1, dihapusTs: 2 });
+// -- batal
+const batalBody = (u, uid, o = {}) => ({ ...(o.act?.tanpa ? {} : act(u, o.aksi ?? "batal-hapus-akun", o.act ?? {}).body), [`hapusAkun/${uid}`]: null });
+await uji("hapus akun: batal TANPA log ditolak", admin, "PATCH", "", batalBody(admin, hWaka.uid, { act: { tanpa: true } }), "tolak");
+await uji("hapus akun: batal dengan log aksi salah ditolak", admin, "PATCH", "", batalBody(admin, hWaka.uid, { aksi: "tandai-hapus-akun" }), "tolak");
+for (const [n, who] of [["waka", waka], ["kepala", kepala], ["BK A", bkA]]) await uji(`hapus akun: ${n} TIDAK membatalkan tanda`, who, "PATCH", "", batalBody(who, hWaka.uid), "tolak");
+await uji("hapus akun: admin membatalkan tanda (dengan log) diterima", admin, "PATCH", "", batalBody(admin, hWaka.uid), "izin");
+await cek("hapus akun: tanda hilang setelah dibatalkan", admin, `hapusAkun/${hWaka.uid}`, (j) => j === null);
+await uji("hapus akun: admin menandai ulang setelah batal diterima", admin, "PATCH", "", markBody(admin, hWaka.uid, "hwaka", "waka"), "izin");
+
+// -- aksi log baru: ekspor-laporan (wali/BK), hapus-akun-permanen (entri skrip), aksi acak tetap ditolak
+const logSaja = (u, aksi, detail, o = {}) => act(u, aksi, { entri: { detail }, ...o }).body;
+await uji("log: wali A menulis aksi 'ekspor-laporan' (tanpa NIS/nama) diterima", waliA, "PATCH", "", logSaja(waliA, "ekspor-laporan", "CSV laporan wali, kelas X, 2026-10-01 s.d. 2026-10-31, 32 siswa"), "izin");
+await uji("log: BK A menulis aksi 'ekspor-laporan' diterima", bkA, "PATCH", "", logSaja(bkA, "ekspor-laporan", "Cetak laporan bk, kelas semua, 2026-10-01 s.d. 2026-10-31, 480 siswa"), "izin");
+await uji("log: admin menulis aksi 'hapus-akun-permanen' (bentuk entri skrip) diterima", admin, "PATCH", "", logSaja(admin, "hapus-akun-permanen", "Hapus permanen bk x@uji.test - Guru pindah", { entri: { detail: "Hapus permanen bk x@uji.test - Guru pindah", deviceId: "skrip-lokal", deviceLabel: "Skrip lokal hapus_akun.py" } }), "izin");
+await uji("log: aksi acak 'hapus-akun' (tidak terdaftar) ditolak", waliA, "PATCH", "", logSaja(waliA, "hapus-akun", "x"), "tolak");
+await uji("log: aksi 'ekspor-laporan' dengan peran lain dipalsukan ditolak (peran harus = roles)", waliA, "PATCH", "", logSaja(waliA, "ekspor-laporan", "x", { entri: { peran: "admin" } }), "tolak");
+// -- TIDAK ada hak baca baru: wali/BK tetap tidak membaca data yang dilarang
+for (const [n, who] of [["wali A", waliA], ["BK A", bkA]]) {
+  for (const p of ["izin", "validasi", "lessons", "config/students", "parents", "log", "staff", "roles", "hapusAkun"]) await tolak(`laporan: ${n} TETAP tidak membaca ${p}`, who, "GET", p);
+}
+await izin("laporan: wali A membaca attendance siswa binaan 701 dengan query rentang tanggal", waliA, "GET", `attendance/701?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"2026-10-01"')}&endAt=${encodeURIComponent('"2026-10-31"')}`);
+await tolak("laporan: wali A TIDAK membaca attendance siswa kelas lain (703)", waliA, "GET", `attendance/703?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"2026-10-01"')}&endAt=${encodeURIComponent('"2026-10-31"')}`);
+await izin("laporan: BK A membaca lessonsByStudent siswa mana pun (902) dengan query rentang", bkA, "GET", `lessonsByStudent/902?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"2026-10-01"')}&endAt=${encodeURIComponent('"2026-10-31"')}`);
+await izin("laporan: BK A membaca validasiByStudent siswa mana pun (902)", bkA, "GET", "validasiByStudent/902");
+await izin("laporan: BK A membaca manualTapByStudent siswa mana pun (902)", bkA, "GET", "manualTapByStudent/902");
+await izin("laporan: wali A membaca kalenderEfektif (hari efektif)", waliA, "GET", `kalenderEfektif?orderBy=${encodeURIComponent('"$key"')}&startAt=${encodeURIComponent('"2026-10-01"')}&endAt=${encodeURIComponent('"2026-10-31"')}`);
+
 // ---------------------------------------------------------------- ringkasan
 console.log(`\n${hasil.lolos} lolos, ${hasil.gagal.length} gagal`);
 if (hasil.gagal.length) {

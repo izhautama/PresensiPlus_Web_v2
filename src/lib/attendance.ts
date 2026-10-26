@@ -59,10 +59,17 @@ export function persenWarna(p: number | null): "good" | "warn" | "bad" | "none" 
   return "bad";
 }
 
-export function downloadCSV(nama: string, header: string[], rows: (string | number | null | undefined)[][]) {
+/**
+ * Teks CSV: tiap nilai dibungkus tanda kutip (tanda kutip ganda di dalamnya digandakan), sehingga pemisah, kutip, dan baris baru di dalam nilai aman.
+ * `pemisah` bawaan "," (laporan lama tidak berubah); laporan wali/BK memakai ";" agar langsung rapi di Excel berlocale Indonesia. BOM + CRLF.
+ */
+export function formatCSV(header: string[], rows: (string | number | null | undefined)[][], pemisah: "," | ";" = ","): string {
   const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const isi = "﻿" + [header, ...rows].map((r) => r.map(q).join(",")).join("\r\n"); // BOM: Excel baca UTF-8
-  const url = URL.createObjectURL(new Blob([isi], { type: "text/csv;charset=utf-8" }));
+  return "\uFEFF" + [header, ...rows].map((r) => r.map(q).join(pemisah)).join("\r\n"); // BOM: Excel baca UTF-8
+}
+
+export function downloadCSV(nama: string, header: string[], rows: (string | number | null | undefined)[][], pemisah: "," | ";" = ",") {
+  const url = URL.createObjectURL(new Blob([formatCSV(header, rows, pemisah)], { type: "text/csv;charset=utf-8" }));
   const a = Object.assign(document.createElement("a"), { href: url, download: nama });
   document.body.appendChild(a);
   a.click();

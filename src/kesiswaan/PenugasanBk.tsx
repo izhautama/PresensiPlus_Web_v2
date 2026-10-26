@@ -3,14 +3,13 @@ import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import { useToast } from "../admin/AdminLayout";
-import { labelTa, taKey } from "../lib/discipline";
-import { daftarPerluDibina, idPembinaan, type ItemDibina, type KlaimBk, type Pembinaan } from "../lib/pembinaan";
+import { labelTa } from "../lib/discipline";
+import { idPembinaan, type ItemDibina, type KlaimBk } from "../lib/pembinaan";
 import { useLive } from "../services/db";
 import type { BkAkun } from "../services/bk";
 import { tunjukBk } from "../services/pembinaanLanjut";
-import { useActor, useDiscipline } from "./useDiscipline";
-
-type PerNis<T> = Record<string, Record<string, T>>;
+import { usePembinaanData } from "./PembinaanData";
+import { useActor } from "./useDiscipline";
 
 /**
  * Penugasan BK (waka dan kepala): siswa yang mencapai ambang BK beserta status klaim. Tunjuk BK untuk siswa yang belum diklaim; Pindahkan klaim
@@ -19,20 +18,13 @@ type PerNis<T> = Record<string, Record<string, T>>;
 export default function PenugasanBk() {
   const actor = useActor();
   const notify = useToast();
-  const { students, today } = useAdminData();
-  const d = useDiscipline();
-  const ta = taKey(today);
-  const klaimLive = useLive<PerNis<KlaimBk>>("klaimBK");
-  const pbBk = useLive<PerNis<Pembinaan>>("pembinaan/bk");
+  const { students } = useAdminData();
+  const { ta, itemsBk: items, klaim, memuat: dataMemuat } = usePembinaanData(); // data bersama (satu langganan) dengan lencana menu
   const akun = useLive<Record<string, BkAkun>>("bkAkun");
   const [aksi, setAksi] = useState<{ item: ItemDibina; klaim: KlaimBk | null } | null>(null);
   const siswa = useMemo(() => new Map(students.map((s) => [s.nis, s])), [students]);
-  const items = useMemo(
-    () => daftarPerluDibina(students.map((s) => ({ nis: s.nis, recs: d.records[s.nis], meta: d.meta[s.nis], pembinaan: pbBk.data?.[s.nis] })), d.levels, ta, "bk"),
-    [students, d.records, d.meta, d.levels, pbBk.data, ta],
-  );
   const aktif = useMemo(() => Object.entries(akun.data ?? {}).filter(([, a]) => a.aktif).sort((a, b) => a[1].nama.localeCompare(b[1].nama)), [akun.data]);
-  const memuat = d.loading || klaimLive.loading || pbBk.loading || akun.loading;
+  const memuat = dataMemuat || akun.loading;
 
   return (
     <section className="data-page" data-testid="penugasan-bk">
@@ -44,7 +36,7 @@ export default function PenugasanBk() {
           <div className="simple-list" data-testid="daftar-penugasan">
             {items.map((it) => {
               const s = siswa.get(it.nis);
-              const k = klaimLive.data?.[it.nis]?.[idPembinaan(ta, it.levelId)] ?? null;
+              const k = klaim[it.nis]?.[idPembinaan(ta, it.levelId)] ?? null;
               return (
                 <div key={`${it.nis}-${it.levelId}`} data-nis={it.nis} data-level={it.levelId}>
                   <span><b>{s?.nama ?? it.nis}</b><small>{s?.kelas} · NIS {it.nis}</small></span>

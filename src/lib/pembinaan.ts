@@ -154,3 +154,28 @@ export function validasiUsul(a: { remisi: Remisi | undefined; alasan: string; pu
 /** Usulan yang masih menunggu, terlama dulu (antrean keputusan waka/kepala). */
 export const antreanUsul = (usul: Record<string, UsulRemisi> | null | undefined) =>
   Object.entries(usul ?? {}).filter(([, u]) => u.status === "menunggu").sort((a, b) => a[1].ts - b[1].ts);
+
+// ---------------------------------------------------------------- lencana & klaim aktif (v2.5.1)
+/** Lencana menu Pembinaan Kepala: pembinaan ambang Kepala yang belum selesai (perlu dibina + dijadwalkan). */
+export const lencanaKepala = (items: ItemDibina[]): number => items.length;
+
+/** Lencana menu Penugasan BK (waka/kepala): siswa pada ambang BK yang belum selesai dibina DAN belum punya klaim. */
+export function lencanaPenugasanBk(items: ItemDibina[], klaim: Record<string, Record<string, KlaimBk>> | null | undefined, ta: string): number {
+  return items.filter((it) => !klaim?.[it.nis]?.[idPembinaan(ta, it.levelId)]).length;
+}
+
+export type KlaimAktif = { nis: string; kunci: string; levelId: string; ta: string };
+/**
+ * Klaim AKTIF per akun BK: klaim yang pembinaan jalur bk-nya (nis, kunci) belum 'selesai' (belum ada record, atau dijadwalkan).
+ * Klaim yang pembinaannya sudah selesai tidak dihitung (tidak menghalangi pencabutan/penghapusan akun).
+ */
+export function klaimAktifPerBk(klaim: Record<string, Record<string, KlaimBk>> | null | undefined, pembinaanBk: Record<string, Record<string, Pick<Pembinaan, "status">>> | null | undefined): Record<string, KlaimAktif[]> {
+  const out: Record<string, KlaimAktif[]> = {};
+  for (const [nis, per] of Object.entries(klaim ?? {})) {
+    for (const [kunci, k] of Object.entries(per ?? {})) {
+      if (pembinaanBk?.[nis]?.[kunci]?.status === "selesai") continue;
+      (out[k.bkUid] ??= []).push({ nis, kunci, levelId: k.levelId, ta: k.ta });
+    }
+  }
+  return out;
+}

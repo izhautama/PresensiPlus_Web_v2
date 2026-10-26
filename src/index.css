@@ -768,3 +768,15 @@ button.kode:disabled { cursor: default; }
 .turunan-label { display: block; color: #a64a3a; font-weight: 700; font-size: 11px; }
 button.kode { position: relative; }
 .dot-piket { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: #d9722b; }
+
+/* Laporan wali/BK (v2.5.1) */
+.laporan-scroll { overflow-x: auto; }
+.laporan-tabel { border-collapse: collapse; font-size: 12.5px; min-width: 100%; white-space: nowrap; }
+.laporan-tabel th, .laporan-tabel td { border-bottom: 1px solid #e3ece7; padding: 7px 9px; text-align: left; }
+.laporan-tabel th { background: #f3f8f5; font-weight: 700; position: sticky; top: 0; }
+@media print {
+  .laporan-scroll { overflow: visible; }
+  .laporan-tabel { font-size: 8.5px; white-space: normal; }
+  .laporan-tabel th, .laporan-tabel td { padding: 3px 4px; border: 1px solid #999; }
+  .print-head { display: block !important; }
+}

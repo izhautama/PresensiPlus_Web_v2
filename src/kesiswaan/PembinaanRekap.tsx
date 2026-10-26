@@ -10,7 +10,8 @@ import { PJ_LABEL, bolehKoreksi, kelompokPj, type Pembinaan } from "../lib/pembi
 import { formatTanggal } from "../lib/time";
 import { useLive } from "../services/db";
 import FormPembinaan from "./FormPembinaan";
-import { useActor, useDiscipline } from "./useDiscipline";
+import { usePembinaanData } from "./PembinaanData";
+import { useActor } from "./useDiscipline";
 
 type PerNis = Record<string, Record<string, Pembinaan>>;
 
@@ -24,15 +25,14 @@ export default function PembinaanRekap() {
   const bisaTulis = peran === "kepala";
   const actor = useActor();
   const { students, today } = useAdminData();
-  const d = useDiscipline();
+  const pd = usePembinaanData(); // data bersama waka/kepala (levels, jalur bk/kepala, daftar Perlu dibina kepala)
+  const d = { levels: pd.levels };
   const pbWali = useLive<PerNis>("pembinaan/wali");
-  const pbBk = useLive<PerNis>("pembinaan/bk");
-  const pbKepala = useLive<PerNis>(peran === "kepala" ? "pembinaan/kepala" : null);
   const live = useMemo(() => {
     const data: PerNis = {};
-    for (const g of [pbWali.data, pbBk.data, pbKepala.data]) for (const [nis, per] of Object.entries(g ?? {})) data[nis] = { ...data[nis], ...per };
-    return { data, loading: pbWali.loading || pbBk.loading || pbKepala.loading, error: pbWali.error ?? pbBk.error ?? pbKepala.error };
-  }, [pbWali.data, pbBk.data, pbKepala.data, pbWali.loading, pbBk.loading, pbKepala.loading, pbWali.error, pbBk.error, pbKepala.error]);
+    for (const g of [pbWali.data, pd.pbBk, peran === "kepala" ? pd.pbKepala : null]) for (const [nis, per] of Object.entries(g ?? {})) data[nis] = { ...data[nis], ...per };
+    return { data, loading: pbWali.loading || pd.memuat, error: pbWali.error ?? pd.galat[0] };
+  }, [pbWali.data, pbWali.loading, pbWali.error, pd.pbBk, pd.pbKepala, pd.memuat, pd.galat, peran]);
   const taNow = taKey(today);
   const [ta, setTa] = useState(taNow);
   const [status, setStatus] = useState("");
@@ -73,6 +73,29 @@ export default function PembinaanRekap() {
         <select className="text-input auto" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="">Semua status</option><option value="selesai">Selesai</option><option value="dijadwalkan">Dijadwalkan</option></select>
         <select className="text-input auto" value={kelas} onChange={(e) => setKelas(e.target.value)} aria-label="Kelas"><option value="">Semua kelas</option>{kelasList.map((k) => <option key={k}>{k}</option>)}</select>
       </div>
+      {peran === "kepala" && (
+        <article className="panel master-group" data-testid="perlu-dibina-kepala">
+          <div className="panel-header"><div><p className="panel-title">Perlu dibina (Kepala) <span className="badge badge-lemah" data-testid="jumlah-perlu-dibina-kepala">{pd.itemsKepala.length}</span></p><span>Siswa yang saldonya mencapai ambang Kepala (lv03 dan seterusnya) dan belum selesai dibina. Saldo yang sudah turun tetap tampil sampai dibina.</span></div></div>
+          {pd.memuat ? <div className="page-loader"><Spinner dark /></div> : pd.itemsKepala.length === 0 ? <p className="modal-note">Tidak ada siswa yang perlu dibina Kepala.</p> : (
+            <div className="simple-list" data-testid="daftar-perlu-dibina-kepala">
+              {pd.itemsKepala.map((it) => {
+                const s = siswa.get(it.nis);
+                return (
+                  <div key={`${it.nis}-${it.levelId}`} data-nis={it.nis} data-level={it.levelId}>
+                    <span><b>{s?.nama ?? it.nis}</b><small>{s?.kelas} · NIS {it.nis}</small></span>
+                    <span>
+                      <small>Ambang {it.level.poin} poin · saldo {it.saldo}</small>
+                      {it.saldoTurun && <small className="badge badge-lemah" data-testid="saldo-turun">saldo sudah turun</small>}
+                      {it.status === "dijadwalkan" && <small className="badge badge-izin">Dijadwalkan {it.pembinaan ? formatTanggal(it.pembinaan.tanggal) : ""}</small>}
+                    </span>
+                    <span className="row-actions"><button className="primary-button sm" onClick={() => setForm({ nis: it.nis, levelId: it.levelId, ada: it.pembinaan ?? null })} data-testid="catat-pembinaan-kepala">{it.status === "dijadwalkan" ? "Lanjutkan pembinaan" : "Catat pembinaan"}</button></span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </article>
+      )}
       <article className="panel master-group">
         {live.error ? <Empty icon="alert" title="Gagal memuat" text={live.error} /> : live.loading ? <div className="page-loader"><Spinner dark /></div> : baris.length === 0 ? <Empty icon="file" title="Belum ada pembinaan" text="Pembinaan yang dicatat wali kelas atau pejabat tampil di sini." /> : (
           <div className="simple-list" data-testid="baris-pembinaan">

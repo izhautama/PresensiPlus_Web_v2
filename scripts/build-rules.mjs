@@ -52,7 +52,7 @@ const hariIni = "((now + 25200000) / 86400000)";
 const mundurN = "(root.child('discipline').child('settings').child('piketMundurHari').val() != null ? root.child('discipline').child('settings').child('piketMundurHari').val() : 2)";
 /** hariKe sah: bilangan bulat dalam [hariIni - N, hariIni + batasDepan]. hariIni dihitung desimal (>= lantai), sehingga batas bawah efektif tepat N hari. */
 const hariKeSah = (ex, depan) => `${ex}.isNumber() && ${ex}.val() % 1 === 0 && ${ex}.val() >= ${hariIni} - ${mundurN} - 1 && ${ex}.val() <= ${hariIni} + ${depan}`;
-const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|alfa-jam|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|catat-konseling|ubah-konseling|atur-bk|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci|koreksi-pembinaan|klaim-bk|lepas-klaim-bk|tunjuk-bk|pindah-bk|izin-ortu|cabut-izin-ortu|kunci-ortu|buka-kunci-ortu|migrasi-pembinaan)$/)";
+const AKSI_AKTIVITAS = "newData.isString() && newData.val().matches(/^(login|logout|pilih-petugas|izin-harian|izin-jam|hapus-izin|pelanggaran|hapus-pelanggaran|remisi|ubah-pelanggaran|pulihkan-pelanggaran|presensi-jam|presensi-manual|hapus-manual|atur-wali|alfa-jam|perbaiki-indeks|atur-penanggung-jawab|catat-pembinaan|usul-remisi|batal-usul|putuskan-usul|catat-konseling|ubah-konseling|atur-bk|atur-kalender|hapus-kalender|hitung-kalender|normal-kalender|ambang-kalender|migrasi-kalender|validasi-alfa|batal-alfa|saran-setuju|saran-abaikan|kunci-akun|buka-kunci|koreksi-pembinaan|klaim-bk|lepas-klaim-bk|tunjuk-bk|pindah-bk|izin-ortu|cabut-izin-ortu|kunci-ortu|buka-kunci-ortu|migrasi-pembinaan|ekspor-laporan|tandai-hapus-akun|batal-hapus-akun|hapus-akun-permanen)$/)";
 const KET_IZIN = "(newData.val() === 'Izin' || newData.val() === 'Sakit' || newData.val() === 'Dispensasi')";
 const nisRe = "/^[0-9]{1,20}$/";
 const KODE_JAM = "newData.val() === 'S' || newData.val() === 'I' || newData.val() === 'D' || newData.val() === 'A'";
@@ -932,6 +932,26 @@ export function buildRules() {
         $other: { ".validate": false },
       },
     },
+    // ---- HAPUS AKUN PERMANEN (v2.5.1): admin MENANDAI; penghapusan Auth + node dilakukan skrip lokal (Admin SDK, scripts/hapus_akun.py).
+    // Tanda sah hanya untuk akun staf yang SUDAH DICABUT (roles/$uid tidak ada pada keadaan baru; staff/$uid lama masih memuat peran/email/nama),
+    // bukan akun sendiri, wajib alasan 10-300 karakter + log aktivitas pada update yang sama. Admin SDK melewati rules, sehingga tidak ada aturan tulis
+    // untuk hapusAkunRiwayat (hanya skrip yang menulisnya); baca hanya admin.
+    hapusAkun: {
+      ".read": adminSaja,
+      $uid: {
+        ".write": `auth != null && ${isAdmin} && $uid !== auth.uid && ((newData.exists() && !data.exists() && !${nav(2)}.child('roles').child($uid).exists() && (${["kepala", "waka", "piket", "wali", "bk"].map((x) => `root.child('staff').child($uid).child('role').val() === '${x}'`).join(" || ")}) && ${actOk(2, ["tandai-hapus-akun"])}) || (!newData.exists() && data.exists() && ${actOk(2, ["batal-hapus-akun"])}))`,
+        ".validate": `newData.hasChildren(['email', 'nama', 'peran', 'alasan', 'olehUid', 'ts']) && newData.child('peran').val() === root.child('staff').child($uid).child('role').val() && newData.child('email').val() === root.child('staff').child($uid).child('email').val() && newData.child('nama').val() === root.child('staff').child($uid).child('nama').val() && newData.child('olehUid').val() === auth.uid && newData.child('ts').val() === now`,
+        email: { ".validate": str(120) },
+        nama: { ".validate": str(60) },
+        peran: { ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'" },
+        alasan: { ".validate": str(300, 10) },
+        olehUid: { ".validate": "newData.isString()" },
+        ts: { ".validate": "newData.isNumber()" },
+        $other: { ".validate": false },
+      },
+    },
+    // Riwayat penghapusan permanen: ditulis HANYA oleh skrip lokal (Admin SDK); admin membaca.
+    hapusAkunRiwayat: { ".read": adminSaja },
     // Cermin akun piket untuk waka (waka tidak boleh membaca staff/roles). Admin membuat/menghapus; waka hanya mengubah `terkunci`.
     // Otoritas penguncian tetap roles/{uid}; `terkunci` hanya penanda tampilan.
     piketAkun: {

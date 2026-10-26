@@ -5,7 +5,7 @@ import { todayWIB } from "../lib/time";
 import type { ScheduleRow, StudentRow } from "../lib/types";
 import { useLive, useNow, useServerClock } from "../services/db";
 
-type Profil = { nama: string; kelas: string };
+type Profil = { nama: string; kelas: string; aktifSejak?: string };
 
 /**
  * Sumber data panel BK (akun per guru, LINTAS SEMUA KELAS): menyediakan konteks AdminData yang sama agar halaman bersama dapat dipakai ulang.
@@ -26,7 +26,8 @@ export function BkDataProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => a.kelas.localeCompare(b.kelas, "id", { numeric: true }) || a.nama.localeCompare(b.nama));
     return {
       ready: jamSiap && !peta.loading && !prof.loading && !scheduleLive.loading,
-      selisihJamMs: offset, jamSiap, buktiSiap: true, aktifSejak: {},
+      selisihJamMs: offset, jamSiap, buktiSiap: true,
+      aktifSejak: Object.fromEntries(students.filter((s) => prof.data?.[s.nis]?.aktifSejak).map((s) => [s.nis, prof.data![s.nis].aktifSejak as string])),
       today, now, students, studentMap: {}, schedule: Object.values(scheduleLive.data ?? {}),
       log: {}, izinToday: {} as never, manualToday: {}, byNis: {}, device: null, online: false, serverNow: () => Date.now() + offset,
       kelasList: [...new Set(students.map((s) => s.kelas))].sort((a, b) => a.localeCompare(b, "id", { numeric: true })),

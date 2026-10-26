@@ -9,6 +9,7 @@ import { AdminDataProvider, useAdminData } from "./AdminData";
 import PetugasBar from "../piket/PetugasBar";
 import KelasBar from "../wali/KelasBar";
 import { useDisiplinKelasOpsional } from "../wali/DisiplinKelas";
+import { usePembinaanDataOpsional } from "../kesiswaan/PembinaanData";
 import { antreanUsul, type UsulRemisi } from "../lib/pembinaan";
 import { jamPerangkatBeda, pesanJamBeda } from "../lib/waktu";
 
@@ -111,6 +112,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/wali/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
       { to: "/wali/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
       { to: "/wali/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
+      { to: "/wali/laporan", label: "Laporan", icon: "download", title: "Laporan kelas binaan" },
       { to: "/wali/panduan", label: "Panduan", icon: "file", title: "Panduan wali kelas" },
     ],
   },
@@ -121,6 +123,7 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       { to: "/bk/siswa", label: "Siswa", icon: "users", title: "Siswa (semua kelas)" },
       { to: "/bk/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
       { to: "/bk/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
+      { to: "/bk/laporan", label: "Laporan", icon: "download", title: "Laporan siswa (semua kelas)" },
       { to: "/bk/konseling", label: "Konseling", icon: "eye", title: "Catatan konseling (rahasia)" },
       { to: "/bk/panduan", label: "Panduan", icon: "file", title: "Panduan BK" },
     ],
@@ -200,8 +203,12 @@ export function Shell({ mode, children }: { mode: PanelMode; children: ReactNode
   // lencana menu: usulan remisi yang menunggu (admin/kepala/waka) atau siswa yang perlu dibina (wali)
   const usul = useLive<Record<string, UsulRemisi>>(mode === "admin" || mode === "kepala" || mode === "waka" ? "usulRemisi" : null);
   const dibina = useDisiplinKelasOpsional();
+  const pembinaanData = usePembinaanDataOpsional();
   const lencana: Record<string, number> = {
     [`${P.base}/usulan-remisi`]: antreanUsul(usul.data).length,
+    // waka/kepala (v2.5.1): lencana dari provider bersama (langganan hanya dipasang di panel waka/kepala)
+    [`${P.base}/pembinaan`]: pembinaanData ? pembinaanData.lencanaPembinaan : 0,
+    [`${P.base}/penugasan-bk`]: pembinaanData ? pembinaanData.lencanaPenugasan : 0,
     "/wali/pembinaan": dibina && !dibina.memuat ? dibina.items.length : 0,
     // BK: Belum ditangani + Tangani saya (yang ditangani BK lain tidak dihitung)
     "/bk/pembinaan": dibina && !dibina.memuat && session?.role === "bk"

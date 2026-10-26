@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { AdminDataProvider } from "../admin/AdminData";
 import { Shell } from "../admin/AdminLayout";
+import { PembinaanDataProvider } from "../kesiswaan/PembinaanData";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const Pengaturan = lazy(() => import("../kepala/Pengaturan"));
@@ -28,6 +29,7 @@ const LogAktivitas = lazy(() => import("../kesiswaan/LogAktivitas"));
 export default function WakaLayout() {
   return (
     <AdminDataProvider>
+      <PembinaanDataProvider>
       <Shell mode="waka">
         <Routes>
           <Route index element={<Dashboard />} />
@@ -53,6 +55,7 @@ export default function WakaLayout() {
           <Route path="*" element={<Navigate to="/waka" replace />} />
         </Routes>
       </Shell>
+      </PembinaanDataProvider>
     </AdminDataProvider>
   );
 }

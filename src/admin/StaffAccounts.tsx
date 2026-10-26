@@ -8,6 +8,8 @@ import {
   MAKS_STAF, PERAN_STAF, PERAN_STAF_UMUM, PeranGagal, buatAkunStaf, cabutAkunStaf, kirimResetPassword, kunciAkunPiket, pasangPeranStaf, useLive,
   type PeranStaf, type Staff,
 } from "../services/db";
+import type { PeranHapus } from "../services/hapusAkun";
+import { DaftarMenungguHapus, TandaiHapusDialog } from "./HapusAkun";
 import { useToast } from "./AdminLayout";
 
 const tgl = (ms: number) => formatTanggal(new Date(ms + 7 * 3600_000).toISOString().slice(0, 10));
@@ -18,6 +20,7 @@ export default function StaffAccounts() {
   const notify = useToast();
   const [tambah, setTambah] = useState(false);
   const [cabut, setCabut] = useState<{ uid: string; s: Staff } | null>(null);
+  const [hapus, setHapus] = useState<{ uid: string; s: Staff } | null>(null);
   const [reset, setReset] = useState("");
   // wali kelas punya panel sendiri (Wali kelas) karena butuh pemetaan kelas; tidak dihitung dalam batas akun pimpinan/staf
   const daftar = Object.entries(staff.data ?? {}).filter(([, s]) => s.role !== "wali" && s.role !== "bk").sort((a, b) => a[1].dibuat - b[1].dibuat);
@@ -39,6 +42,7 @@ export default function StaffAccounts() {
   };
 
   return (
+    <>
     <article className="panel kepala-panel">
       <div className="panel-header">
         <div><p className="panel-title">Akun Pimpinan &amp; Staf</p><span>Kepala Madrasah dan Waka Kesiswaan · maks. {MAKS_STAF} akun</span></div>
@@ -57,6 +61,7 @@ export default function StaffAccounts() {
                   : <button title="Kunci darurat akun piket (langsung keluar)" aria-label={`Kunci ${s.nama}`} className="danger" disabled={kunciBusy === uid} onClick={() => kunci(uid, s, true)}><Icon name="lock" size={16} /></button>)}
                 <button title="Kirim email reset password" aria-label={`Reset password ${s.nama}`} disabled={reset === s.email} onClick={() => kirimReset(s.email)}><Icon name="key" size={16} /></button>
                 <button title="Cabut akses" aria-label={`Cabut akses ${s.nama}`} className="danger" onClick={() => setCabut({ uid, s })}><Icon name="trash" size={16} /></button>
+                <button title="Cabut akses dan tandai hapus permanen" aria-label={`Tandai hapus permanen ${s.nama}`} className="danger" onClick={() => setHapus({ uid, s })} data-testid="tandai-hapus"><Icon name="x" size={16} /></button>
               </span>
             </div>
           ))}
@@ -64,7 +69,10 @@ export default function StaffAccounts() {
       )}
       {tambah && <TambahDialog onClose={() => setTambah(false)} />}
       {cabut && <CabutDialog uid={cabut.uid} s={cabut.s} onClose={() => setCabut(null)} />}
+      {hapus && <TandaiHapusDialog uid={hapus.uid} nama={hapus.s.nama} email={hapus.s.email} peran={hapus.s.role as PeranHapus} sekalianCabut onClose={() => setHapus(null)} />}
     </article>
+    <DaftarMenungguHapus />
+    </>
   );
 }
 

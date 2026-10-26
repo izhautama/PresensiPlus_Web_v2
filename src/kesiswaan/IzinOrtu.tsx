@@ -10,7 +10,8 @@ import { MODE_ORTU_LABEL, bolehBeriIzin, bolehCabutIzin, kelompokPj, type IzinOr
 import { formatTanggal } from "../lib/time";
 import { useLive } from "../services/db";
 import { aturKunciOrtu, beriIzinOrtu, cabutIzinOrtu } from "../services/pembinaanLanjut";
-import { useActor, useDiscipline } from "./useDiscipline";
+import { usePembinaanData } from "./PembinaanData";
+import { useActor } from "./useDiscipline";
 
 type PerNis<T> = Record<string, Record<string, T>>;
 type Tiga<T> = Record<string, Record<string, Record<string, T>>>;
@@ -25,12 +26,11 @@ export default function IzinOrtu() {
   const actor = useActor();
   const notify = useToast();
   const { students, today } = useAdminData();
-  const d = useDiscipline();
+  const pd = usePembinaanData(); // levels + jalur bk/kepala dari provider bersama (tanpa langganan ganda)
+  const d = { levels: pd.levels };
   const taNow = taKey(today);
   const [ta, setTa] = useState(taNow);
   const pbWali = useLive<PerNis<Pembinaan>>("pembinaan/wali");
-  const pbBk = useLive<PerNis<Pembinaan>>("pembinaan/bk");
-  const pbKepala = useLive<PerNis<Pembinaan>>(peran === "kepala" ? "pembinaan/kepala" : null);
   const izinLive = useLive<Tiga<Izin>>("izinOrtu");
   const kunciLive = useLive<Tiga<KunciOrtu>>("kunciOrtu");
   const [baru, setBaru] = useState(false);
@@ -45,13 +45,13 @@ export default function IzinOrtu() {
       if (!peta.has(key)) peta.set(key, { key, nis, ta: taK, levelId: lv, pj: kelompokPj(d.levels[lv]?.penanggungJawab), izin: izinLive.data?.[nis]?.[taK]?.[lv] ?? null, kunci: kunciLive.data?.[nis]?.[taK]?.[lv] ?? null, record: null });
       return peta.get(key)!;
     };
-    for (const g of [pbWali.data, pbBk.data, pbKepala.data]) for (const [nis, per] of Object.entries(g ?? {})) for (const pb of Object.values(per)) { const b = tambah(nis, pb.ta, pb.levelId); b.record = pb; if (pb.pj) b.pj = pb.pj; }
+    for (const g of [pbWali.data, pd.pbBk, peran === "kepala" ? pd.pbKepala : null]) for (const [nis, per] of Object.entries(g ?? {})) for (const pb of Object.values(per)) { const b = tambah(nis, pb.ta, pb.levelId); b.record = pb; if (pb.pj) b.pj = pb.pj; }
     for (const [nis, per] of Object.entries(izinLive.data ?? {})) for (const [t, lvs] of Object.entries(per)) for (const lv of Object.keys(lvs)) tambah(nis, t, lv);
     for (const [nis, per] of Object.entries(kunciLive.data ?? {})) for (const [t, lvs] of Object.entries(per)) for (const lv of Object.keys(lvs)) tambah(nis, t, lv);
     return [...peta.values()].filter((b) => b.ta === ta).sort((a, b) => (siswa.get(a.nis)?.nama ?? a.nis).localeCompare(siswa.get(b.nis)?.nama ?? b.nis) || a.levelId.localeCompare(b.levelId));
-  }, [pbWali.data, pbBk.data, pbKepala.data, izinLive.data, kunciLive.data, d.levels, ta, siswa]);
+  }, [pbWali.data, pd.pbBk, pd.pbKepala, peran, izinLive.data, kunciLive.data, d.levels, ta, siswa]);
   const taOpsi = useMemo(() => [...new Set([taNow, ...baris.map((b) => b.ta)])].sort().reverse(), [baris, taNow]);
-  const memuat = pbWali.loading || pbBk.loading || pbKepala.loading || izinLive.loading || kunciLive.loading;
+  const memuat = pbWali.loading || pd.memuat || izinLive.loading || kunciLive.loading;
 
   const jalankan = async (b: Baris, kerja: () => Promise<unknown>, ok: string) => {
     setSibuk(b.key);
@@ -103,7 +103,7 @@ export default function IzinOrtu() {
         setBaru(false);
         const pj = kelompokPj(d.levels[levelId]?.penanggungJawab);
         if (!bolehBeriIzin(peran, pj, !!kunciLive.data?.[nis]?.[taNow]?.[levelId])) { notify("Level ini tidak dapat Anda izinkan (terkunci atau penanggung jawab kepala).", "err"); return; }
-        const rec = [pbWali.data, pbBk.data, pbKepala.data].map((g) => g?.[nis]?.[`${taNow}_${levelId}`]).find(Boolean) ?? null;
+        const rec = [pbWali.data, pd.pbBk, peran === "kepala" ? pd.pbKepala : null].map((g) => g?.[nis]?.[`${taNow}_${levelId}`]).find(Boolean) ?? null;
         beriIzinOrtu({ nis, ta: taNow, levelId, mode, peran, record: rec, nama: siswa.get(nis)?.nama ?? nis }, actor).then(() => notify("Izin diberikan"), (ex) => notify((ex as Error).message, "err"));
       }} />}
       {cabut && <CabutKepala baris={cabut} nama={siswa.get(cabut.nis)?.nama ?? cabut.nis} onClose={() => setCabut(null)} aksi={(alasan) => cabutIzinOrtu({ nis: cabut.nis, ta: cabut.ta, levelId: cabut.levelId, nama: siswa.get(cabut.nis)?.nama ?? cabut.nis, kunciAlasan: alasan }, actor)} />}

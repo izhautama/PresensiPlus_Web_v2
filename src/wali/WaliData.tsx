@@ -13,7 +13,7 @@ type KelasCtx = { kelas: string[]; aktif: string | null; setAktif: (k: string) =
 const WaliKelasCtx = createContext<KelasCtx>({ kelas: [], aktif: null, setAktif: () => {}, memuat: true });
 export const useKelasWali = () => useContext(WaliKelasCtx);
 
-type Profil = { nama: string; kelas: string };
+type Profil = { nama: string; kelas: string; aktifSejak?: string };
 
 /**
  * Sumber data panel wali: menyediakan konteks AdminData yang SAMA agar halaman piket/waka dapat dipakai ulang, tetapi hanya berisi
@@ -89,7 +89,7 @@ export function WaliDataProvider({ children }: { children: ReactNode }) {
       selisihJamMs: offset,
       jamSiap,
       buktiSiap: siap,
-      aktifSejak: {},
+      aktifSejak: Object.fromEntries(students.filter((s) => profil[s.nis]?.aktifSejak).map((s) => [s.nis, profil[s.nis].aktifSejak as string])),
       today, now, students, studentMap: {}, schedule: Object.values(scheduleLive.data ?? {}),
       log: {}, izinToday, manualToday: {}, byNis, device: null, online: false, serverNow: () => Date.now() + offset,
       kelasList: kelas.map(decodeKelas).sort(),

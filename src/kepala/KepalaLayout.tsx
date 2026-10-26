@@ -4,6 +4,8 @@ import { AdminDataProvider } from "../admin/AdminData";
 import { Shell } from "../admin/AdminLayout";
 
 // Halaman bersama dengan admin membaca mode lewat usePanelMode() (read-only untuk kepala)
+import { PembinaanDataProvider } from "../kesiswaan/PembinaanData";
+
 const Dashboard = lazy(() => import("../admin/Dashboard"));
 const Students = lazy(() => import("../admin/Students"));
 const Reports = lazy(() => import("../admin/Reports"));
@@ -29,6 +31,7 @@ const MigrasiPembinaan = lazy(() => import("./MigrasiPembinaan"));
 export default function KepalaLayout() {
   return (
     <AdminDataProvider>
+      <PembinaanDataProvider>
       <Shell mode="kepala">
         <Routes>
           <Route index element={<Dashboard />} />
@@ -54,6 +57,7 @@ export default function KepalaLayout() {
           <Route path="*" element={<Navigate to="/kepala" replace />} />
         </Routes>
       </Shell>
+      </PembinaanDataProvider>
     </AdminDataProvider>
   );
 }

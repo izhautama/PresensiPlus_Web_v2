@@ -6,6 +6,7 @@ import KartuIndeks from "./KartuIndeks";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { ORTU_DOMAIN } from "../lib/firebase";
 import { decodeKelas, encodeKelas, waliPemegangKelas } from "../lib/wali";
+import { TandaiHapusDialog } from "../admin/HapusAkun";
 import { PeranGagal, kirimResetPassword, useLive } from "../services/db";
 import {
   buatAkunWali, cabutWali, pasangAkunWali, pasangKembaliWali, simpanWaliMassal, ubahKelasWali,
@@ -27,6 +28,7 @@ export default function WaliKelas() {
   const [tambah, setTambah] = useState(false);
   const [ubah, setUbah] = useState<[string, WaliAkun] | null>(null);
   const [busy, setBusy] = useState("");
+  const [hapus, setHapus] = useState<[string, WaliAkun] | null>(null);
   const kunciKelas = useMemo(() => kelasList.map((k) => ({ nama: k, kunci: encodeKelas(k) })), [kelasList]);
 
   const aksi = async (uid: string, w: WaliAkun, apa: "cabut" | "pasang" | "reset") => {
@@ -59,6 +61,7 @@ export default function WaliKelas() {
                   {w.aktif
                     ? <button className="ghost-button" aria-label={`Cabut ${w.nama}`} disabled={busy === `cabut-${uid}`} onClick={() => aksi(uid, w, "cabut")}>Cabut</button>
                     : <button className="ghost-button" aria-label={`Pasang kembali ${w.nama}`} disabled={busy === `pasang-${uid}`} onClick={() => aksi(uid, w, "pasang")}>Pasang kembali</button>}
+                  {admin && !w.aktif && <button className="ghost-button danger" aria-label={`Tandai hapus permanen ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Tandai hapus permanen</button>}
                   {admin && <button className="ghost-button" aria-label={`Reset password ${w.nama}`} disabled={busy === `reset-${uid}`} onClick={() => aksi(uid, w, "reset")}>Reset password</button>}
                 </span>
               </div>
@@ -67,6 +70,7 @@ export default function WaliKelas() {
         )}
       </article>
 
+      {hapus && <TandaiHapusDialog uid={hapus[0]} nama={hapus[1].nama} email={hapus[1].email} peran="wali" onClose={() => setHapus(null)} />}
       {admin && <PerTA daftar={daftar} kelas={kunciKelas} onOk={notify} />}
       {admin && <KartuIndeks />}
 

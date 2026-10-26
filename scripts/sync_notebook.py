@@ -6,6 +6,7 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NB = os.path.join(ROOT, "Setup_Migrasi_Firebase.ipynb")
 PY = os.path.join(ROOT, "scripts", "migrasi_firebase.py")
+PY_HAPUS = os.path.join(ROOT, "scripts", "hapus_akun.py")   # sumber kedua (v2.5.1): sel "Hapus akun permanen"
 
 
 def baris(teks: str):
@@ -93,12 +94,38 @@ CATATAN = '''
 '''
 
 
+HAPUS_MD = '''## Hapus akun staf permanen (v2.5.1)
+Admin menandai akun yang sudah dicabut di web (Pengaturan, "Menunggu dihapus permanen"). Sel di bawah yang benar-benar menghapus akun Authentication dan node akunnya.
+- **DRY-RUN bawaan**: hanya menampilkan daftar tanda, hasil pemeriksaan ulang (akun sudah dicabut, bukan admin/alat, BK tanpa klaim aktif), dan jalur yang akan dihapus.
+- Penghapusan baru berjalan bila `DRY_RUN_HAPUS = False` **dan** Anda mengetik `HAPUS`. **Tidak bisa dibatalkan**; email menjadi bebas dipakai ulang.
+- Jejak audit (log aktivitas, pembinaan, konseling, catatan disiplin) tetap ada. Skrip aman diulang.'''
+
+HAPUS_JALAN = '''# 7) Hapus akun permanen  (DRY_RUN_HAPUS=True: hanya periksa & tampilkan)
+import hapus_akun as H
+H.init_hapus("/content/sa.json", DB_URL)
+DRY_RUN_HAPUS = True
+KONF = "" if DRY_RUN_HAPUS else input("Ketik HAPUS untuk menghapus akun yang LAYAK secara permanen (tidak bisa dibatalkan): ").strip()
+HASIL_HAPUS = H.hapus_akun_permanen(dry_run=DRY_RUN_HAPUS, konfirmasi=KONF)'''
+
+
+def _sel(cells, cocok, tipe, teks):
+    """Perbarui sel berpenanda `cocok` atau tambahkan di akhir (idempoten)."""
+    for c in cells:
+        if c["cell_type"] == tipe and cocok in "".join(c["source"]):
+            c["source"] = baris(teks)
+            return
+    base = {"cell_type": tipe, "metadata": {}, "source": baris(teks)}
+    if tipe == "code":
+        base.update({"outputs": [], "execution_count": None})
+    cells.append(base)
+
+
 def main():
     with open(NB, encoding="utf-8") as f:
         nb = json.load(f)
     kode = open(PY, encoding="utf-8").read()
     cells = nb["cells"]
-    assert len(cells) == 8, "struktur notebook tidak dikenali"
+    assert len(cells) >= 8, "struktur notebook tidak dikenali"
     md = "".join(cells[0]["source"])
     if "### Keamanan data" not in md:
         cells[0]["source"] = baris(md.rstrip("\n") + "\n" + CATATAN)
@@ -110,6 +137,10 @@ def main():
     cells[3]["source"] = baris("%%writefile /content/migrasi.py\n" + kode.rstrip("\n"))
     cells[5]["source"] = baris(JALAN.rstrip("\n"))
     cells[6]["source"] = baris(UNDUH.rstrip("\n"))
+    kode_hapus = open(PY_HAPUS, encoding="utf-8").read()
+    _sel(cells, "## Hapus akun staf permanen", "markdown", HAPUS_MD)
+    _sel(cells, "%%writefile /content/hapus_akun.py", "code", "%%writefile /content/hapus_akun.py\n" + kode_hapus.rstrip("\n"))
+    _sel(cells, "H.hapus_akun_permanen", "code", HAPUS_JALAN)
     for c in cells:
         if c["cell_type"] == "code":
             c["outputs"] = []

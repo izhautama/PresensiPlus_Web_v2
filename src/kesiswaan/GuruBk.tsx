@@ -3,7 +3,12 @@ import Icon from "../components/Icon";
 import { Empty, Field, Modal, Spinner } from "../components/ui";
 import { usePanelMode, useToast } from "../admin/AdminLayout";
 import { ORTU_DOMAIN } from "../lib/firebase";
+import { Link } from "react-router";
+import { TandaiHapusDialog } from "../admin/HapusAkun";
+import { useAdminData } from "../admin/AdminData";
+import { klaimAktifPerBk, type KlaimAktif } from "../lib/pembinaan";
 import { PeranGagal, kirimResetPassword, useLive } from "../services/db";
+import { usePembinaanDataOpsional } from "./PembinaanData";
 import { buatAkunBk, cabutBk, pasangAkunBk, pasangKembaliBk, type BkAkun, type Pengelola } from "../services/bk";
 
 /**
@@ -18,6 +23,16 @@ export default function GuruBk() {
   const daftar = useMemo(() => Object.entries(live.data ?? {}).sort((a, b) => a[1].nama.localeCompare(b[1].nama)), [live.data]);
   const [tambah, setTambah] = useState(false);
   const [busy, setBusy] = useState("");
+  const [hapus, setHapus] = useState<[string, BkAkun] | null>(null);
+  const [konfirmasi, setKonfirmasi] = useState<[string, BkAkun, KlaimAktif[]] | null>(null);
+  const { students } = useAdminData();
+  // Klaim aktif per akun BK: hanya waka/kepala yang boleh membaca klaimBK + pembinaan/bk (admin tidak mendapat akses baca baru).
+  const pd = usePembinaanDataOpsional();
+  const klaimAktif = useMemo(() => (pd ? klaimAktifPerBk(pd.klaim, pd.pbBk) : null), [pd]);
+  const mintaCabut = (uid: string, w: BkAkun) => {
+    const k = klaimAktif?.[uid] ?? [];
+    if (k.length) setKonfirmasi([uid, w, k]); else void aksi(uid, w, "cabut");
+  };
 
   const aksi = async (uid: string, w: BkAkun, apa: "cabut" | "pasang" | "reset") => {
     setBusy(`${apa}-${uid}`);
@@ -43,11 +58,12 @@ export default function GuruBk() {
             {daftar.map(([uid, w]) => (
               <div key={uid} data-uid={uid} className={w.aktif ? "" : "petugas-nonaktif"}>
                 <span><b>{w.nama}</b><small>{w.email}</small></span>
-                <span><small className={`badge ${w.aktif ? "badge-aman" : "badge-lemah"}`}>{w.aktif ? "Aktif" : "Dicabut"}</small></span>
+                <span><small className={`badge ${w.aktif ? "badge-aman" : "badge-lemah"}`}>{w.aktif ? "Aktif" : "Dicabut"}</small>{klaimAktif && <small className={`badge ${(klaimAktif[uid]?.length ?? 0) ? "badge-izin" : "badge-lemah"}`} data-testid="klaim-aktif">Klaim aktif: {klaimAktif[uid]?.length ?? 0}</small>}</span>
                 <span className="row-actions">
                   {w.aktif
-                    ? <button className="ghost-button" aria-label={`Cabut ${w.nama}`} disabled={busy === `cabut-${uid}`} onClick={() => aksi(uid, w, "cabut")}>Cabut</button>
+                    ? <button className="ghost-button" aria-label={`Cabut ${w.nama}`} disabled={busy === `cabut-${uid}`} onClick={() => mintaCabut(uid, w)}>Cabut</button>
                     : <button className="ghost-button" aria-label={`Pasang kembali ${w.nama}`} disabled={busy === `pasang-${uid}`} onClick={() => aksi(uid, w, "pasang")}>Pasang kembali</button>}
+                  {oleh === "admin" && !w.aktif && <button className="ghost-button danger" aria-label={`Tandai hapus permanen ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Tandai hapus permanen</button>}
                   {oleh === "admin" && <button className="ghost-button" aria-label={`Reset password ${w.nama}`} disabled={busy === `reset-${uid}`} onClick={() => aksi(uid, w, "reset")}>Reset password</button>}
                 </span>
               </div>
@@ -56,6 +72,20 @@ export default function GuruBk() {
         )}
       </article>
       {tambah && <FormBk oleh={oleh} onClose={() => setTambah(false)} />}
+      {hapus && <TandaiHapusDialog uid={hapus[0]} nama={hapus[1].nama} email={hapus[1].email} peran="bk" onClose={() => setHapus(null)} />}
+      {konfirmasi && (
+        <Modal title="Masih ada klaim aktif" subtitle={`${konfirmasi[1].nama} · ${konfirmasi[2].length} siswa`} onClose={() => setKonfirmasi(null)} width={500}>
+          <div className="modal-form" data-testid="konfirmasi-cabut-bk">
+            <p className="modal-note">Akun ini masih memegang klaim pembinaan yang belum selesai. Setelah dicabut, siswa-siswa berikut tidak ada yang menangani sampai dipindahkan.</p>
+            <div className="simple-list">{konfirmasi[2].map((x) => <div key={`${x.nis}-${x.kunci}`}><span><b>{students.find((s) => s.nis === x.nis)?.nama ?? x.nis}</b><small>NIS {x.nis} · {x.kunci}</small></span></div>)}</div>
+            <div className="modal-actions">
+              <button className="secondary-button" onClick={() => setKonfirmasi(null)}>Batal</button>
+              <Link className="secondary-button" to={`/${mode}/penugasan-bk`} onClick={() => setKonfirmasi(null)} data-testid="ke-penugasan-bk">Buka Penugasan BK</Link>
+              <button className="primary-button danger" onClick={() => { const [u, w] = konfirmasi; setKonfirmasi(null); void aksi(u, w, "cabut"); }} data-testid="tetap-cabut">Tetap cabut</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }

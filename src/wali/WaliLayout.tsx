@@ -13,6 +13,7 @@ const SiswaKelas = lazy(() => import("./SiswaKelas"));
 const DetailSiswa = lazy(() => import("./DetailSiswa"));
 const Pembinaan = lazy(() => import("./Pembinaan"));
 const UsulanRemisi = lazy(() => import("./UsulanRemisi"));
+const Laporan = lazy(() => import("./Laporan"));
 const Panduan = lazy(() => import("../pages/Panduan"));
 
 function TanpaKelas() {
@@ -35,6 +36,7 @@ export default function WaliLayout() {
             <Route path="siswa/:nis" element={<DetailSiswa />} />
             <Route path="pelanggaran" element={<Pelanggaran />} />
             <Route path="pembinaan" element={<Pembinaan />} />
+            <Route path="laporan" element={<Laporan />} />
             <Route path="usulan" element={<UsulanRemisi />} />
             <Route path="panduan" element={<Panduan peran="wali" />} />
             <Route path="pengaturan" element={<Pengaturan />} />

@@ -11,7 +11,7 @@ export type AksiLog =
   | "login" | "logout" | "pilih-petugas" | "izin-harian" | "izin-jam" | "hapus-izin" | "pelanggaran" | "hapus-pelanggaran"
   | "remisi" | "ubah-pelanggaran" | "pulihkan-pelanggaran" | "presensi-jam" | "presensi-manual" | "hapus-manual" | "atur-wali" | "alfa-jam" | "perbaiki-indeks" | "atur-penanggung-jawab" | "catat-pembinaan" | "usul-remisi" | "batal-usul" | "putuskan-usul" | "atur-kalender" | "hapus-kalender" | "hitung-kalender" | "normal-kalender" | "ambang-kalender" | "migrasi-kalender" | "validasi-alfa" | "batal-alfa" | "saran-setuju" | "saran-abaikan"
   | "kunci-akun" | "buka-kunci" | "catat-konseling" | "ubah-konseling" | "atur-bk"
-  | "koreksi-pembinaan" | "klaim-bk" | "lepas-klaim-bk" | "tunjuk-bk" | "pindah-bk" | "izin-ortu" | "cabut-izin-ortu" | "kunci-ortu" | "buka-kunci-ortu" | "migrasi-pembinaan";
+  | "koreksi-pembinaan" | "ekspor-laporan" | "tandai-hapus-akun" | "batal-hapus-akun" | "hapus-akun-permanen" | "klaim-bk" | "lepas-klaim-bk" | "tunjuk-bk" | "pindah-bk" | "izin-ortu" | "cabut-izin-ortu" | "kunci-ortu" | "buka-kunci-ortu" | "migrasi-pembinaan";
 type Konteks = { uid: string; peran: PeranLog; email: string };
 type Updates = Record<string, unknown>;
 
