@@ -50,7 +50,7 @@ export default function StudentPage({ embedded = false, ekstra }: { embedded?: b
         get(r(`lessonsByStudent/${nis}`)).catch(() => null), get(r(`validasiByStudent/${nis}`)).catch(() => null),
         get(r(`manualTapByStudent/${nis}`)).catch(() => null),
         get(query(r("kalenderEfektif"), orderByKey(), startAt(mulaiTa), endAt(todayWIB(new Date(waktuServer()))))).catch(() => null),
-        get(r(`pembinaanOrtu/${nis}`)).catch(() => null), // v2.5: hanya yang DIIZINKAN waka/kepala (bawaan: tersembunyi)
+        embedded ? Promise.resolve(null) : get(r(`pembinaanOrtu/${nis}`)).catch(() => null), // v2.5: hanya yang DIIZINKAN waka/kepala (bawaan: tersembunyi); panel staf (embedded) memakai halaman Pembinaan sendiri dan tidak berhak membaca proyeksi ini
       ]));
       if (!p.exists()) { setErr("Data siswa tidak ditemukan. Hubungi TU sekolah."); return; }
       setData({
@@ -65,7 +65,7 @@ export default function StudentPage({ embedded = false, ekstra }: { embedded?: b
       const code = `${(e as { code?: string }).code ?? ""} ${(e as Error).message ?? ""}`.toLowerCase();
       setErr(code.includes("permission") ? "Akses ditolak. PIN mungkin telah diganti — silakan login ulang." : "Gagal memuat data. Periksa koneksi internet.");
     }
-  }, [nis]);
+  }, [nis, embedded]);
 
   useEffect(() => {
     muat();

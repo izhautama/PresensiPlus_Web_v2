@@ -58,7 +58,14 @@ async function siapkan(page, waktu = SEKARANG, opsi = {}) {
   // Aplikasi menangani penolakan lewat callback, jadi SDK TIDAK menulis ke Console. Detektor yang andal: frame WebSocket RTDB.
   page.on("websocket", (ws) => {
     if (/\/\.ws\?/.test(ws.url())) laporan.sockets.push(ws); // hanya WebSocket Realtime Database (bukan HMR Vite)
-    ws.on("framereceived", (f) => { if (/permission_denied/i.test(String(f.payload))) laporan.permission.push(`WebSocket: ${String(f.payload).slice(0, 200)}`); });
+    // peta permintaan -> path (untuk diagnosis: jalur mana yang ditolak rules)
+    const jalur = new Map();
+    ws.on("framesent", (f) => { try { const j = JSON.parse(String(f.payload)); if (j?.d?.r != null && j.d.b?.p) jalur.set(j.d.r, j.d.b.p); } catch { /* bukan JSON */ } });
+    ws.on("framereceived", (f) => {
+      if (!/permission_denied/i.test(String(f.payload))) return;
+      let p = ""; try { p = jalur.get(JSON.parse(String(f.payload))?.d?.r) ?? ""; } catch { /* abaikan */ }
+      laporan.permission.push(`WebSocket: ${String(f.payload).slice(0, 200)}${p ? ` [jalur ${p}]` : ""}`);
+    });
   });
   return laporan;
 }
