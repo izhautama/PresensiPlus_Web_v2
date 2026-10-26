@@ -926,7 +926,7 @@ const mutasi = [
     const a = r.discipline.records.$nis.$recId; a[".write"] = `(${a[".write"]}) || (auth != null && ${BK_T})`;
     a[".validate"] = ganti(a[".validate"], "(newData.child('sumber').val() !== 'bk' || data.exists())", "true");
     const m = r.discipline.recordMeta.$nis.$recId; m[".write"] = `(${m[".write"]}) || (auth != null && ${BK_T})`; } },
-  { nama: "kritis: BK dapat membaca parents (PIN orang tua)", ubah: (r) => { r.parents[".read"] = `(${r.parents[".read"]}) || (auth != null && ${BK_T})`; } },
+  { nama: "kritis: BK dapat membaca parents (PIN orang tua)", ubah: (r) => { r.parents.$nis[".read"] += ` || (auth != null && ${BK_T})`; } },
 ];
 
 /** Ganti teks hanya pada BAGIAN BK sebuah aturan: bagian dimulai pada penanda `awal` (bawaan: kemunculan terakhir dari "(BK && root.child('siswaKelas')"). */
