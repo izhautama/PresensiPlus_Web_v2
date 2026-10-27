@@ -16,7 +16,7 @@ export default function BannerTapRendah() {
   const { daftar } = useRendahTerbaru(today);
   const aktif = daftar.filter(([, x]) => tertahan(x));
   if (aktif.length === 0) return null;
-  const bisaKonfirmasi = mode === "waka" || mode === "admin";
+  const bisaKonfirmasi = mode === "waka" || mode === "kepala"; // v2.5.2: admin (TU) hanya melihat
   return (
     <div data-testid="banner-tap-rendah">
       {aktif.map(([tgl, x]) => (

@@ -26,13 +26,24 @@ assert.match(teks("waka"), /Pemetaan saran/); assert.match(teks("waka"), /Kunci 
 assert.match(teks("admin"), /Backup/); assert.match(teks("admin"), /Ekspor JSON/);
 assert.match(teks("kepala"), /Tata tertib/);
 // hari efektif berbasis bukti & kalender
-assert.match(teks("admin"), /Kalender/); assert.match(teks("admin"), /Hitung ulang/); assert.match(teks("admin"), /dry-run/); assert.match(teks("admin"), /Ambang/);
+// v2.5.2: kalender (override, ambang, hitung ulang, migrasi) adalah tugas Waka/Kepala; TU hanya melihat dan mengingatkan lewat Kontrol kalender
+assert.match(teks("admin"), /Kalender/); assert.match(teks("admin"), /Kontrol kalender/); assert.match(teks("admin"), /hanya dapat Anda lihat/);
+assert.doesNotMatch(teks("admin"), /Simpan override|Hitung ulang|Terapkan migrasi/);
+assert.match(teks("waka"), /Hitung ulang/); assert.match(teks("waka"), /dry-run/); assert.match(teks("waka"), /Ambang/); assert.match(teks("waka"), /Kontrol kalender/);
 assert.match(teks("waka"), /Tap rendah/); assert.match(teks("waka"), /Konfirmasi hari ini normal/); assert.match(teks("waka"), /bukan hari efektif/);
 assert.match(teks("kepala"), /Kalender/); assert.match(teks("ortu"), /Hari efektif ke-N/); assert.match(teks("ortu"), /tidak ada kegiatan presensi/);
 assert.match(teks("sop"), /bukan hari efektif/); assert.match(teks("piket"), /hari efektif/);
 // wali kelas: topik wajib (pembinaan, usulan remisi, wewenang terbatas)
 assert.match(teks("wali"), /Perlu dibina/); assert.match(teks("wali"), /Catat pembinaan/); assert.match(teks("wali"), /Usulan remisi/);
 assert.match(teks("wali"), /Dispensasi/); assert.match(teks("wali"), /kelas binaan/); assert.match(teks("wali"), /tidak dapat dihapus/);
+// v2.5.2 satu tugas satu pengisi: wali memantau saja (Kehadiran kelas), tidak mencatat izin/pelanggaran
+assert.match(teks("wali"), /Kehadiran kelas/); assert.match(teks("wali"), /tidak mencatat Izin, Sakit, Dispensasi, atau pelanggaran/);
+assert.doesNotMatch(teks("wali"), /Izin & kehadiran|Catatan saya|tombol Izin dan Sakit/);
+assert.match(teks("piket"), /Kabar izin dari orang tua atau wali kelas disampaikan ke piket/); assert.match(teks("ortu"), /Kabari piket sekolah/);
+assert.match(teks("kepala"), /cadangan/);
+// SOP: satu baris per peran (TU, Piket, Wakasis, Wali kelas, Guru BK, Kepala Madrasah)
+for (const baris of [/^1\. TU \(admin\):/m, /^2\. Piket:/m, /^3\. Wakasis:/m, /^4\. Wali kelas:/m, /^5\. Guru BK:/m, /^6\. Kepala Madrasah:/m]) assert.match(teks("sop"), baris, `SOP harus memuat baris peran ${baris}`);
+assert.match(teks("sop"), /Pembagian tugas: satu tugas satu pengisi/); assert.match(teks("sop"), /T1/); assert.match(teks("sop"), /T2/); assert.match(teks("sop"), /SP3/);
 assert.match(teks("admin"), /Wali kelas/); assert.match(teks("admin"), /Indeks siswa-kelas/); assert.match(teks("waka"), /Wali kelas/);
 // tidak ada rahasia/URL nyata di panduan
 for (const k of URUTAN_PANDUAN) assert.doesNotMatch(teks(k), /AIza|firebaseio|password-uji|@gmail/i);

@@ -416,7 +416,8 @@ await izin("admin kirim perintah alat", admin, "PUT", "device/inbox/command", { 
 await izin("admin baca unknown", admin, "GET", "unknown");
 await izin("admin baca device", admin, "GET", "device");
 await izin("admin baca attendance", admin, "GET", "attendance");
-await izin("admin tulis izin", admin, "PUT", `izin/${TGL}/111`, "Izin");
+await tolak("v2.5.2: admin TIDAK menulis izin (TU tidak mengisi izin)", admin, "PUT", `izin/${TGL}/111`, "Izin");
+await izin("waka menulis izin (kontrol positif)", waka, "PUT", `izin/${TGL}/111`, "Izin");
 
 // ================================================================ ORANG TUA
 seksi("ORANG TUA");
@@ -604,7 +605,7 @@ await cek("kunci: log _M tap pertama utuh", waka, `log/${KT}/EEEE5555_M`, (j) =>
 await izin("kunci: siswa LAIN pada hari yang sama tidak terpengaruh", dev, "PATCH", "", tapMasuk("347", "AAAA7777", "07:20:00", "Terlambat"));
 await izin("kunci: siswa yang sama pada hari BERIKUTNYA tidak terpengaruh", dev, "PATCH", "", tapMasuk("346", "EEEE5555", "07:05:00", "Hadir", KT2));
 await izin("kunci: kartu LAIN (entri log baru) untuk siswa yang sama pada hari yang sama DITERIMA", dev, "PUT", `log/${KT}/CCCC8888_M`, { jam: "07:50:00", nis: "346", status: "Terlambat" });
-await izin("kunci: admin tetap dapat mengoreksi attendance/masuk", admin, "PUT", `attendance/346/${KT}/masuk`, "06:56:00");
+await tolak("v2.5.2 kunci: admin TIDAK mengoreksi attendance/masuk (admin keluar dari attendance)", admin, "PUT", `attendance/346/${KT}/masuk`, "06:56:00");
 await tolak("kunci: waka TIDAK dapat menulis attendance/masuk (tetap hanya alat/admin)", waka, "PUT", `attendance/347/${KT}/masuk`, "06:00:00");
 await izin("fw: PUT unknown/{tgl}/{uid}", dev, "PUT", `unknown/${FW}/ZZZZ0001`, { jam: "07:10:00" });
 await izin("fw: PUT device/status (utuh)", dev, "PUT", "device/status", { lastSeen: SV, firmware: "v12", rssi: -60, heap: 120000, antrian: 0 });
@@ -1354,8 +1355,9 @@ const keBody = (u, t, o = {}, a = {}) => ({ ...(PERAN.get(u.uid) === "piket" ? a
 
 // ---- override kalender (waka & admin)
 await izin("kalender: waka mengatur libur", waka, "PUT", "kalender/2026-11-02", OV(waka));
-await izin("kalender: admin mengatur efektif", admin, "PUT", "kalender/2026-11-03", OV(admin, { status: "efektif", alasan: "Masuk menggantikan Sabtu" }));
-for (const [nama, who] of [["kepala", kepala], ["piket", piket], ["ortu", ortu1], ["alat", dev], ["orang tanpa peran", orang]]) await tolak(`kalender: ${nama} TIDAK bisa mengatur override`, who, "PUT", "kalender/2026-11-04", OV(who));
+await izin("kalender: kepala (cadangan Wakasis) mengatur efektif", kepala, "PUT", "kalender/2026-11-03", OV(kepala, { status: "efektif", alasan: "Masuk menggantikan Sabtu" }));
+await tolak("v2.5.2 kalender: admin TIDAK mengatur override", admin, "PUT", "kalender/2026-11-03", OV(admin, { status: "efektif", alasan: "Masuk menggantikan Sabtu" }));
+for (const [nama, who] of [["admin", admin], ["piket", piket], ["ortu", ortu1], ["alat", dev], ["orang tanpa peran", orang]]) await tolak(`kalender: ${nama} TIDAK bisa mengatur override`, who, "PUT", "kalender/2026-11-04", OV(who));
 await tolak("kalender: anonim TIDAK bisa mengatur override", null, "PUT", "kalender/2026-11-04", OV(waka));
 const kbad = (nama, o, t = "2026-11-04") => tolak(`kalender: ${nama} ditolak`, waka, "PUT", `kalender/${t}`, OV(waka, o));
 await kbad("status tak dikenal", { status: "cuti" });
@@ -1370,12 +1372,13 @@ await izin("kalender: semua pengguna login membaca (ortu)", ortu1, "GET", "kalen
 await izin("kalender: kepala membaca", kepala, "GET", "kalender/2026-11-02");
 await izin("kalender: piket membaca", piket, "GET", "kalender/2026-11-02");
 await tolak("kalender: anonim TIDAK bisa membaca", null, "GET", "kalender");
-await tolak("kalender: kepala TIDAK bisa menghapus override", kepala, "DELETE", "kalender/2026-11-03");
-await izin("kalender: admin menghapus override (11-03)", admin, "DELETE", "kalender/2026-11-03");
+await tolak("kalender: admin TIDAK bisa menghapus override", admin, "DELETE", "kalender/2026-11-03");
+await izin("kalender: kepala menghapus override (11-03)", kepala, "DELETE", "kalender/2026-11-03");
 
 // ---- kalenderEfektif: siapa boleh menulis
 await izin("kalenderEfektif: waka menulis ringkasan otomatis", waka, "PUT", "kalenderEfektif/2026-11-05", KE());
-await izin("kalenderEfektif: admin menulis", admin, "PUT", "kalenderEfektif/2026-11-06", KE());
+await tolak("v2.5.2 kalenderEfektif: admin TIDAK menulis", admin, "PUT", "kalenderEfektif/2026-11-06", KE());
+await izin("kalenderEfektif: waka menulis 11-06", waka, "PUT", "kalenderEfektif/2026-11-06", KE());
 await izin("kalenderEfektif: kepala menulis", kepala, "PUT", "kalenderEfektif/2026-11-09", KE({ tap: 40 }));
 for (const [nama, who] of [["ortu", ortu1], ["alat", dev], ["orang tanpa peran", orang]]) await tolak(`kalenderEfektif: ${nama} TIDAK bisa menulis`, who, "PUT", "kalenderEfektif/2026-11-10", KE());
 await tolak("kalenderEfektif: anonim TIDAK bisa menulis", null, "PUT", "kalenderEfektif/2026-11-10", KE());
@@ -1411,12 +1414,12 @@ await izin("ambang: piket membaca", piket, "GET", "sistem/ambangHariEfektif");
 await izin("ambang: kepala membaca", kepala, "GET", "sistem/ambangHariEfektif");
 await tolak("ambang: ortu TIDAK bisa membaca", ortu1, "GET", "sistem/ambangHariEfektif");
 await tolak("ambang: waka TIDAK bisa membaca node sistem lain (backup)", waka, "GET", "sistem");
-for (const [nama, who] of [["kepala", kepala], ["piket", piket], ["ortu", ortu1], ["alat", dev]]) await tolak(`ambang: ${nama} TIDAK bisa mengubah`, who, "PUT", "sistem/ambangHariEfektif", 3);
+for (const [nama, who] of [["admin", admin], ["piket", piket], ["ortu", ortu1], ["alat", dev]]) await tolak(`ambang: ${nama} TIDAK bisa mengubah`, who, "PUT", "sistem/ambangHariEfektif", 3);
 for (const v of [0, 501, 2.5, "5", -1]) await tolak(`ambang: nilai ${JSON.stringify(v)} ditolak`, waka, "PUT", "sistem/ambangHariEfektif", v);
 await tolak("ambang: waka TIDAK bisa menulis backupTerakhir (hanya admin)", waka, "PUT", "sistem/backupTerakhir", SV);
 await kebad("ambang 5: efektif dengan 4 bukti (3 tap + 1 manual)", { tap: 3, manual: 1 }, "2026-11-17");
 await izin("ambang 5: efektif dengan 5 bukti (3 tap + 2 manual)", waka, "PUT", "kalenderEfektif/2026-11-17", KE({ tap: 3, manual: 2 }));
-await izin("ambang: admin mengembalikan ke 1", admin, "PUT", "sistem/ambangHariEfektif", 1);
+await izin("ambang: kepala mengembalikan ke 1", kepala, "PUT", "sistem/ambangHariEfektif", 1);
 await izin("ambang 1: 1 bukti sudah cukup", waka, "PUT", "kalenderEfektif/2026-11-18", KE({ tap: 1 }));
 
 // ---- override menang atas hitungan otomatis
@@ -1433,8 +1436,9 @@ await izin("kalenderEfektif: pembaruan per-field (tap & dihitung)", waka, "PATCH
 
 // ---- konfirmasi "hari ini normal"
 await izin("normal: waka menandai", waka, "PUT", "kalenderEfektif/2026-11-16/normal", true);
-await izin("normal: admin menandai", admin, "PUT", "kalenderEfektif/2026-11-05/normal", true);
-await tolak("normal: kepala TIDAK bisa menandai", kepala, "PUT", "kalenderEfektif/2026-11-09/normal", true);
+await tolak("v2.5.2 normal: admin TIDAK bisa menandai", admin, "PUT", "kalenderEfektif/2026-11-05/normal", true);
+await izin("normal: kepala menandai", kepala, "PUT", "kalenderEfektif/2026-11-05/normal", true);
+await izin("normal: kepala menandai 11-09", kepala, "PUT", "kalenderEfektif/2026-11-09/normal", true);
 await uji("normal: piket (dengan log) TIDAK bisa menandai", piket, "PATCH", "", { ...act(piket, "hitung-kalender").body, "kalenderEfektif/2026-11-10/normal": true }, "tolak");
 await tolak("normal: nilai false ditolak", waka, "PUT", "kalenderEfektif/2026-11-14/normal", false);
 
@@ -1446,6 +1450,37 @@ await tolak("aktifSejak: waka TIDAK bisa menulis", waka, "PUT", "profiles/111/ak
 await tolak("aktifSejak: ortu TIDAK bisa menulis", ortu1, "PUT", "profiles/111/aktifSejak", "2026-01-01");
 await cek("aktifSejak: ortu membaca profil anak sendiri berikut aktifSejak", ortu1, "profiles/111", (j) => j?.aktifSejak === "2026-10-14" && j.nama);
 await tolak("aktifSejak: ortu TIDAK bisa membaca profil anak lain", ortu1, "GET", "profiles/222/aktifSejak");
+
+// ---- v2.5.2: aktifSejak oleh waka/kepala (migrasi) = SEKALI tulis + log 'migrasi-kalender' pada update yang sama
+const asBody = (u, nis, tgl, o = {}) => ({ ...(o.tanpaLog ? {} : act(u, o.aksi ?? "migrasi-kalender").body), [`profiles/${nis}/aktifSejak`]: tgl });
+await uji("aktifSejak: waka TANPA log ditolak", waka, "PATCH", "", asBody(waka, "222", "2026-07-01", { tanpaLog: true }), "tolak");
+await uji("aktifSejak: waka dengan log aksi salah ('hitung-kalender') ditolak", waka, "PATCH", "", asBody(waka, "222", "2026-07-01", { aksi: "hitung-kalender" }), "tolak");
+await uji("aktifSejak: waka tanggal tidak valid ditolak", waka, "PATCH", "", asBody(waka, "222", "01-07-2026"), "tolak");
+await uji("aktifSejak: piket + log migrasi ditolak", piket, "PATCH", "", asBody(piket, "222", "2026-07-01"), "tolak");
+await uji("aktifSejak: ortu + log migrasi ditolak", ortu1, "PATCH", "", asBody(ortu1, "222", "2026-07-01"), "tolak");
+await uji("aktifSejak: waka + log migrasi pada profil yang belum terisi DITERIMA", waka, "PATCH", "", asBody(waka, "222", "2026-07-01"), "izin");
+await uji("aktifSejak: kepala + log migrasi pada profil yang belum terisi DITERIMA", kepala, "PATCH", "", asBody(kepala, "333", "2026-07-01"), "izin");
+await uji("aktifSejak: waka TIDAK menimpa yang sudah terisi (sekali tulis)", waka, "PATCH", "", asBody(waka, "222", "2026-08-01"), "tolak");
+await uji("aktifSejak: kepala TIDAK menimpa yang sudah terisi (sekali tulis)", kepala, "PATCH", "", asBody(kepala, "111", "2026-08-01"), "tolak");
+await uji("aktifSejak: waka TIDAK menghapus", waka, "PATCH", "", { ...act(waka, "migrasi-kalender").body, "profiles/222/aktifSejak": null }, "tolak");
+await cek("aktifSejak: nilai hasil migrasi waka tersimpan", waka, "profiles/222/aktifSejak", (j) => j === "2026-07-01");
+
+// ---- v2.5.2: penanda sistem/migrasiKalender = sekali tulis (waka/kepala) + log 'migrasi-kalender'
+const pmBody = (u, o = {}, v = {}) => ({ ...(o.tanpaLog ? {} : act(u, o.aksi ?? "migrasi-kalender").body), "sistem/migrasiKalender": { oleh: u.uid, ts: SV, dari: "2026-07-01", sampai: "2026-10-26", ...v } });
+await uji("penanda migrasi: admin + log ditolak", admin, "PATCH", "", pmBody(admin), "tolak");
+await uji("penanda migrasi: piket + log ditolak", piket, "PATCH", "", pmBody(piket), "tolak");
+await uji("penanda migrasi: waka TANPA log ditolak", waka, "PATCH", "", pmBody(waka, { tanpaLog: true }), "tolak");
+await uji("penanda migrasi: waka log aksi salah ditolak", waka, "PATCH", "", pmBody(waka, { aksi: "hitung-kalender" }), "tolak");
+await uji("penanda migrasi: 'oleh' bukan pengguna ditolak", waka, "PATCH", "", pmBody(waka, {}, { oleh: kepala.uid }), "tolak");
+await uji("penanda migrasi: ts basi ditolak", waka, "PATCH", "", pmBody(waka, {}, { ts: 1000 }), "tolak");
+await uji("penanda migrasi: tanggal 'dari' tidak valid ditolak", waka, "PATCH", "", pmBody(waka, {}, { dari: "1/7/2026" }), "tolak");
+await uji("penanda migrasi: field asing ditolak", waka, "PATCH", "", pmBody(waka, {}, { rahasia: 1 }), "tolak");
+await uji("penanda migrasi: waka + log DITERIMA (pertama kali)", waka, "PATCH", "", pmBody(waka), "izin");
+await uji("penanda migrasi: kepala TIDAK menimpa (sekali tulis)", kepala, "PATCH", "", pmBody(kepala), "tolak");
+await uji("penanda migrasi: waka TIDAK menimpa (sekali tulis)", waka, "PATCH", "", pmBody(waka, {}, { sampai: "2026-10-27" }), "tolak");
+await uji("penanda migrasi: waka TIDAK menghapus", waka, "PATCH", "", { ...act(waka, "migrasi-kalender").body, "sistem/migrasiKalender": null }, "tolak");
+for (const [nama, who] of [["admin", admin], ["waka", waka], ["kepala", kepala]]) await izin(`penanda migrasi: ${nama} membaca`, who, "GET", "sistem/migrasiKalender");
+for (const [nama, who] of [["piket", piket], ["ortu", ortu1], ["alat", dev]]) await tolak(`penanda migrasi: ${nama} TIDAK membaca`, who, "GET", "sistem/migrasiKalender");
 
 seksi("WALI KELAS — pemetaan kelas, wewenang hanya untuk siswa binaan");
 const waliA = await buatUser("walia@uji.test"); // kelas utama X
@@ -1519,18 +1554,18 @@ await tolak("siswaKelas: nilai bukan teks ditolak", admin, "PUT", "siswaKelas/70
 await tolak("siswaKelas: nilai 46 karakter ditolak", admin, "PUT", "siswaKelas/706", "K".repeat(46));
 await tolak("siswaKelas: NIS bukan angka ditolak", admin, "PUT", "siswaKelas/abc", "X");
 
-// ---- WRITE izin harian (Izin/Sakit; BUKAN Dispensasi; hanya siswa binaan)
+// ---- v2.5.2: wali TIDAK lagi mencatat izin harian (semua jalur DITOLAK); kabar izin disampaikan ke piket
 const hW = (nama, who, n, ket, mo, harap, o) => harian(nama, who, HT, n, ket, mo, harap, o);
-await hW("wali A: Sakit untuk siswa binaan (701) + izinMeta + log", waliA, "701", "Sakit", {}, "izin");
-await hW("wali A: Izin untuk siswa binaan (701, hari lain)", waliA, "701", "Izin", {}, "izin");
-await harian("wali A: Izin dengan hariKe 2 hari lalu (batas jendela) DITERIMA", waliA, "2026-10-21", "701", "Izin", { hariKe: HK - 2 }, (HK - 2 + 4) % 7 === 0 ? "izin" : "izin");
+await hW("wali A: Sakit untuk siswa binaan (701) + izinMeta + log DITOLAK", waliA, "701", "Sakit", {}, "tolak");
+await hW("wali A: Izin untuk siswa binaan (701) DITOLAK", waliA, "701", "Izin", {}, "tolak");
+await harian("wali A: Izin dengan hariKe 2 hari lalu DITOLAK", waliA, "2026-10-21", "701", "Izin", { hariKe: HK - 2 }, "tolak");
 await harian("wali A: hariKe 3 hari lalu DITOLAK", waliA, "2026-10-21", "701", "Izin", { hariKe: HK - 3 }, "tolak");
 await hW("wali A: Dispensasi DITOLAK (hanya Izin/Sakit)", waliA, "701", "Dispensasi", {}, "tolak");
 await hW("wali A: izin berlabel meta 'Dispensasi' DITOLAK", waliA, "701", "Izin", { ket: "Dispensasi" }, "tolak");
 await hW("wali A: siswa kelas XI (703) DITOLAK", waliA, "703", "Sakit", {}, "tolak");
 await hW("wali A: siswa kelas XII (704) DITOLAK", waliA, "704", "Sakit", {}, "tolak");
 await hW("wali A: siswa tanpa indeks (111) DITOLAK", waliA, "111", "Sakit", {}, "tolak");
-await hW("wali B: siswa kelas tambahan (704) DITERIMA", waliB, "704", "Sakit", {}, "izin");
+await hW("wali B: siswa kelas tambahan (704) DITOLAK", waliB, "704", "Sakit", {}, "tolak");
 await hW("wali B: siswa kelas X (701) DITOLAK", waliB, "701", "Sakit", {}, "tolak");
 await hW("wali TANPA log aktivitas DITOLAK", waliA, "701", "Sakit", {}, "tolak", { act: { tanpa: true }, metaKey: "tanpaLog_H" });
 await hW("wali log aksi salah ('izin-jam') DITOLAK", waliA, "701", "Sakit", {}, "tolak", { aksi: "izin-jam" });
@@ -1542,7 +1577,11 @@ await hW("wali izinMeta ts basi DITOLAK", waliA, "701", "Sakit", { ts: 1000 }, "
 await hW("wali izinMeta berkunci bukan awalan id log DITOLAK", waliA, "701", "Sakit", {}, "tolak", { metaKey: "bebas_H" });
 await hW("wali izinMeta lingkup 'jam' DITOLAK", waliA, "701", "Sakit", { lingkup: "jam", jam: { 0: 3 } }, "tolak");
 await hW("wali DITOLAK bila Alfa sudah divalidasi waka (702)", waliA, "702", "Sakit", {}, "tolak");
-await uji("wali: hapus keterangan miliknya + log 'hapus-izin' DITERIMA", waliA, "PATCH", "", { ...act(waliA, "hapus-izin").body, [`izin/${HT}/701`]: null, [`attendance/701/${HT}/ket`]: null, [`attendance/701/${HT}/catatan`]: null }, "izin");
+await uji("wali: hapus keterangan + log 'hapus-izin' DITOLAK", waliA, "PATCH", "", { ...act(waliA, "hapus-izin").body, [`izin/${HT}/701`]: null, [`attendance/701/${HT}/ket`]: null, [`attendance/701/${HT}/catatan`]: null }, "tolak");
+await tolak("wali TIDAK menulis izin/ langsung", waliA, "PUT", `izin/${HT}/701`, "Sakit");
+await tolak("wali TIDAK menulis izinMeta langsung", waliA, "PUT", `izinMeta/${HT}/701`, { ket: "Sakit", oleh: waliA.uid, ts: SV });
+await tolak("wali TIDAK menulis attendance ket", waliA, "PUT", `attendance/701/${HT}/ket`, "Sakit");
+await tolak("wali TIDAK menulis attendance catatan", waliA, "PUT", `attendance/701/${HT}/catatan`, "Sakit demam");
 await uji("wali: hapus keterangan TANPA log DITOLAK", waliA, "PATCH", "", { [`izin/${HT}/704`]: null, [`attendance/704/${HT}/ket`]: null }, "tolak");
 await uji("wali: hapus keterangan siswa kelas lain DITOLAK", waliA, "PATCH", "", { ...act(waliA, "hapus-izin").body, [`izin/${HT}/704`]: null }, "tolak");
 await uji("wali: hapus HANYA izin/ dengan log aksi salah DITOLAK", waliA, "PATCH", "", { ...act(waliA, "izin-harian").body, [`izin/${HT}/704`]: null }, "tolak");
@@ -1570,17 +1609,21 @@ await tolak("wali TIDAK menulis piketRoster", waliA, "PUT", "piketRoster/pX", { 
 await tolak("wali TIDAK menulis parents/profiles/config", waliA, "PUT", "profiles/701/nama", "UBAH");
 await tolak("wali TIDAK menulis piketPerangkat", waliA, "PUT", "piketPerangkat/dev-wali-0001", { uid: waliA.uid, pertama: SV, label: "x" });
 
-// ---- WRITE pelanggaran RINGAN / bertakziran (sumber 'wali'); remisi & Sedang/Berat ditolak
+// ---- v2.5.2: wali TIDAK lagi mencatat pelanggaran (semua jalur DITOLAK). Catatan lama bersumber 'wali' disemai owner: tetap terbaca & utuh.
 const waliPel = (u, n, id, ro = {}, mo = {}, o = {}) => ({
   ...(o.act?.tanpa ? {} : act(u, o.aksi ?? "pelanggaran", o.act ?? {}).body),
   [P(n, id)]: rec({ sumber: "wali", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5, ...ro }),
   [M(n, id)]: meta(u, { dibuatNama: "Bu Wali", hariKe: HK, ...mo }),
 });
 const pw = (nama, who, n, id, ro, mo, harap, o) => uji(nama, who, "PATCH", "", waliPel(who, n, id, ro, mo, o), harap);
-await pw("wali A: pelanggaran Ringan siswa binaan (701)", waliA, "701", "wp1", {}, {}, "izin");
-await pw("wali A: pelanggaran bertakziran (Sedang + takziran)", waliA, "702", "wp2", { refId: "rT", kategori: "Sedang", nama: "Sedang bertakziran", poin: 50, takziran: "Bersihkan lorong" }, {}, "izin");
-await pw("wali B: pelanggaran siswa kelas tambahan (704)", waliB, "704", "wp3", {}, {}, "izin");
-await cek("wali: catatan terbaca waka dengan sumber 'wali' dan meta pencatat", waka, M("701", "wp1"), (j) => j?.dibuatOleh === waliA.uid && j.hariKe === HK);
+await http("PATCH", "", { owner: true, body: {
+  [P("701", "wp1")]: rec({ sumber: "wali", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5 }), [M("701", "wp1")]: meta(waliA, { dibuatNama: "Bu Wali", hariKe: HK }),
+  [P("701", "wp4")]: rec({ sumber: "wali", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5 }), [M("701", "wp4")]: meta(waliA, { dibuatNama: "Bu Wali", hariKe: HK }),
+} });
+await pw("wali A: pelanggaran Ringan siswa binaan (701) DITOLAK", waliA, "701", "wp1n", {}, {}, "tolak");
+await pw("wali A: pelanggaran bertakziran (Sedang + takziran) DITOLAK", waliA, "702", "wp2", { refId: "rT", kategori: "Sedang", nama: "Sedang bertakziran", poin: 50, takziran: "Bersihkan lorong" }, {}, "tolak");
+await pw("wali B: pelanggaran siswa kelas tambahan (704) DITOLAK", waliB, "704", "wp3", {}, {}, "tolak");
+await cek("wali: catatan LAMA bersumber 'wali' tetap terbaca waka dengan meta pencatat", waka, M("701", "wp1"), (j) => j?.dibuatOleh === waliA.uid && j.hariKe === HK);
 await pw("wali A: siswa kelas XI (703) DITOLAK", waliA, "703", "wpx1", {}, {}, "tolak");
 await pw("wali A: siswa tanpa indeks (111) DITOLAK", waliA, "111", "wpx2", {}, {}, "tolak");
 await pw("wali B: siswa kelas X (701) DITOLAK", waliB, "701", "wpx3", {}, {}, "tolak");
@@ -1602,7 +1645,7 @@ await pw("wali: penanda log tanpa ENTRI DITOLAK", waliA, "701", "wpx17", {}, {},
 await pw("wali: meta TANPA hariKe DITOLAK", waliA, "701", "wpx18", {}, { hariKe: undefined }, "tolak");
 await pw("wali: hariKe BESOK DITOLAK (tanpa masa depan)", waliA, "701", "wpx19", {}, { hariKe: HK + 1 }, "tolak");
 await pw("wali: hariKe 3 hari lalu DITOLAK (jendela)", waliA, "701", "wpx20", {}, { hariKe: HK - 3 }, "tolak");
-await pw("wali: hariKe tepat 2 hari lalu DITERIMA", waliA, "701", "wp4", {}, { hariKe: HK - 2 }, "izin");
+await pw("wali: hariKe tepat 2 hari lalu DITOLAK", waliA, "701", "wp5", {}, { hariKe: HK - 2 }, "tolak");
 await pw("wali: meta dibuatOleh bukan pengguna DITOLAK", waliA, "701", "wpx21", {}, { dibuatOleh: waka.uid }, "tolak");
 await uji("wali: HANYA record tanpa meta DITOLAK", waliA, "PATCH", "", { ...act(waliA, "pelanggaran").body, [P("701", "wpx22")]: rec({ sumber: "wali", refId: "r1", kategori: "Ringan", nama: "Contoh", poin: 5 }) }, "tolak");
 await uji("wali: TIDAK mengubah record yang sudah ada (edit poin)", waliA, "PATCH", "", { ...act(waliA, "ubah-pelanggaran").body, [`${P("701", "wp1")}/poin`]: 1 }, "tolak");
@@ -1619,9 +1662,11 @@ await uji("wali A: hapus catatan wali TANPA log DITOLAK", waliA, "PATCH", "", wa
 await uji("wali A: hapus catatan wali dengan log aksi salah DITOLAK", waliA, "PATCH", "", waliHapus(waliA, "701", "wp4", { aksi: "pelanggaran" }), "tolak");
 await uji("wali A: hapus catatan WAKA (recW) DITOLAK", waliA, "PATCH", "", waliHapus(waliA, "701", "recW"), "tolak");
 await uji("wali A: hapus catatan bersumber 'manual' walau dibuatOleh dirinya DITOLAK", waliA, "PATCH", "", waliHapus(waliA, "701", "recMan"), "tolak");
-await uji("wali A: hapus catatan sendiri (soft delete) DITERIMA", waliA, "PATCH", "", waliHapus(waliA, "701", "wp4"), "izin");
+await uji("wali A: hapus catatan lama sendiri (soft delete) DITOLAK", waliA, "PATCH", "", waliHapus(waliA, "701", "wp4"), "tolak");
+await uji("waka tetap dapat menghapus lunak catatan lama bersumber wali", waka, "PATCH", "", waliHapus(waka, "701", "wp4"), "izin");
 await tolak("wali TIDAK menghapus fisik recordMeta", waliA, "DELETE", M("701", "wp1"));
-await cek("wali: hasil soft delete: record hilang, meta menyimpan alasan", waka, M("701", "wp4"), (j) => j?.dihapus === true && j.alasanHapus === "salah siswa");
+await cek("catatan lama wali: hasil hapus lunak waka: meta menyimpan alasan", waka, M("701", "wp4"), (j) => j?.dihapus === true && j.alasanHapus === "salah siswa");
+await cek("catatan lama wali wp1 tidak berubah (utuh)", waka, P("701", "wp1"), (j) => j?.sumber === "wali" && j.poin === 5);
 
 // ---- activity: wali menulis log sendiri
 await izin("wali menulis log 'login' (tanpa petugas)", waliA, "PUT", `activity/${TGLN}/${idAct()}`, entriAct(waliA, "login"));
@@ -1719,6 +1764,9 @@ await uji("waliAkun: waka mengubah HANYA kelasUtama cermin menjadi beda dari sta
 await uji("waliAkun: waka menyamakan kelasUtama cermin dengan staff pada update yang sama DITERIMA", waka, "PATCH", "", { [`staff/${wBaru3.uid}/kelasUtama`]: "X", [`waliAkun/${wBaru3.uid}/kelasUtama`]: "X" }, "izin");
 await uji("waliAkun: waka menulis cermin akun KEPALA DITOLAK", waka, "PATCH", "", { ...cermin(kepala.uid, "kepalax", "X") }, "tolak");
 await uji("waliAkun: waka menulis cermin akun tanpa staff DITOLAK", waka, "PATCH", "", { ...cermin(orang.uid, "orangx", "X") }, "tolak");
+const bukanWali = await buatUser("bukanwali@uji.test");
+await http("PUT", `staff/${bukanWali.uid}`, { owner: true, body: { email: "bukanwali@uji.test", nama: "bukanwali", role: "piket", kelasUtama: "X" } });
+await uji("waliAkun: waka menulis cermin akun yang staff.role-nya BUKAN wali DITOLAK", waka, "PATCH", "", { ...cermin(bukanWali.uid, "bukanwali", "X") }, "tolak");
 await tolak("waliAkun: waka TIDAK menulis node utuh", waka, "PUT", `waliAkun/${wBaru3.uid}`, { email: "a@b", nama: "x", kelasUtama: "XI", aktif: true });
 await tolak("waliAkun: waka TIDAK menulis kelasTambahan", waka, "PUT", `waliAkun/${wBaru3.uid}/kelasTambahan/XII`, true);
 await izin("waliAkun: waka menandai nonaktif (cabut)", waka, "PUT", `waliAkun/${wBaru3.uid}/aktif`, false);
@@ -2695,7 +2743,7 @@ await tolak("alat TIDAK bisa membaca izinMeta", dev, "GET", "izinMeta");
 await tolak("anonim TIDAK bisa membaca piketRoster", null, "GET", "piketRoster");
 await izin("Dispensasi diterima oleh waka (izin/ + attendance ket)", waka, "PATCH", "", { [`izin/${HT}/777`]: "Dispensasi", [`attendance/777/${HT}/ket`]: "Dispensasi" });
 await izin("Dispensasi diterima oleh kepala", kepala, "PATCH", "", { [`izin/${HT}/888`]: "Dispensasi", [`attendance/888/${HT}/ket`]: "Dispensasi" });
-await izin("Dispensasi diterima oleh admin", admin, "PUT", `izin/${HT}/999`, "Dispensasi");
+await tolak("v2.5.2: Dispensasi DITOLAK untuk admin", admin, "PUT", `izin/${HT}/999`, "Dispensasi");
 await tolak("nilai ket tak dikenal ('Cuti') ditolak", waka, "PUT", `izin/${HT}/777`, "Cuti");
 
 // ================================================================ v2.5.1 — HAPUS AKUN (tanda), aksi log baru, tanpa hak baca baru

@@ -174,7 +174,8 @@ await kirim("admin menulis profiles/{nis}", adminW, "PATCH", "", multi(hasilMigr
 await kirim("admin menulis parents/{nis}", adminW, "PATCH", "", multi(hasilMigrasi.parents, (k) => `parents/${k}`));
 const izinPaths = {};
 for (const [tgl, per] of Object.entries(hasilMigrasi.izin ?? {})) for (const [nis, v] of Object.entries(per)) izinPaths[`izin/${tgl}/${nis}`] = v;
-await kirim("admin menulis izin/{tgl}/{nis}", adminW, "PATCH", "", izinPaths);
+// v2.5.2: izin harian bukan lagi hak admin (TU); data hasil migrasi diputar ulang oleh Waka (pemilik tugas izin) agar tetap lolos rules
+await kirim("waka menulis izin/{tgl}/{nis}", wakaW, "PATCH", "", izinPaths);
 const logPaths = {};
 for (const [tgl, per] of Object.entries(hasilMigrasi.log ?? {})) for (const [key, v] of Object.entries(per)) logPaths[`log/${tgl}/${key}`] = v;
 await kirim("alat menulis log/{tgl}/{UID}_{M|P}", alatW, "PATCH", "", logPaths);

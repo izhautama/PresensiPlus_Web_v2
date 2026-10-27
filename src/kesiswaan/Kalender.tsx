@@ -4,6 +4,7 @@ import Icon from "../components/Icon";
 import { Field, Spinner } from "../components/ui";
 import { usePanelBase, usePanelMode, useToast } from "../admin/AdminLayout";
 import { useAdminData } from "../admin/AdminData";
+import { useLive } from "../services/db";
 import { AMBANG_MAKS, AMBANG_MIN, tertahan, type OverrideKalender, type RingkasanHari } from "../lib/hariEfektif";
 import { BULAN, addDays, formatTanggal, lastDayOfMonth, monthKey, namaHari, weekday } from "../lib/time";
 import { hapusOverride, hitungUlang, konfirmasiNormal, migrasiKalender, simpanAmbang, simpanOverride, type HasilMigrasi } from "../services/kalender";
@@ -25,13 +26,13 @@ function jenisHari(d: string, today: string, info: RingkasanHari | undefined, ov
   return info.efektif ? "efektif" : "libur";
 }
 
-/** Kalender Akademik: hari efektif berbasis bukti + override. Admin & waka mengatur; kepala hanya melihat. */
+/** Kalender Akademik: hari efektif berbasis bukti + override. Waka mengisi, kepala cadangan; TU (admin) hanya melihat. */
 export default function Kalender() {
   const mode = usePanelMode();
   const base = usePanelBase();
   const notify = useToast();
   const { today } = useAdminData();
-  const bisaAtur = mode === "admin" || mode === "waka";
+  const bisaAtur = mode === "waka" || mode === "kepala"; // v2.5.2: Wakasis mengisi, Kamad cadangan, TU (admin) hanya membaca
   const [bulan, setBulan] = useState(monthKey(today));
   const [dipilih, setDipilih] = useState(today);
   const awal = `${bulan}-01`, akhir = lastDayOfMonth(bulan);
@@ -105,15 +106,15 @@ export default function Kalender() {
               </span>
             </div>
           )}
-          {info?.rendah && info.normal && <p className="modal-note">Tap rendah sudah dikonfirmasi normal oleh waka/admin.</p>}
+          {info?.rendah && info.normal && <p className="modal-note">Tap rendah sudah dikonfirmasi normal oleh waka/kepala.</p>}
           {weekday(dipilih) === 0 && !ov && <p className="modal-note">Hari Minggu = libur otomatis, kecuali Anda menetapkan override “efektif”.</p>}
-          {bisaAtur ? <FormOverride key={dipilih} tanggal={dipilih} ov={ov} info={info} onOk={notify} /> : <p className="modal-note">Hanya admin dan waka yang dapat mengatur override.</p>}
+          {bisaAtur ? <FormOverride key={dipilih} tanggal={dipilih} ov={ov} info={info} onOk={notify} /> : <p className="modal-note" data-testid="kal-hanya-baca">Kalender hanya dapat diisi Waka Kesiswaan (cadangan: Kepala Madrasah). Anda hanya melihat; ingatkan Waka Kesiswaan bila ada tanggal merah atau kegiatan yang belum ditandai.</p>}
         </article>
       </div>
 
       {bisaAtur && <PengaturanAmbang ambang={ambang} onOk={notify} />}
       {bisaAtur && <HitungUlang today={today} onOk={notify} />}
-      {mode === "admin" && <Migrasi today={today} onOk={notify} />}
+      {bisaAtur && <Migrasi today={today} onOk={notify} />}
     </section>
   );
 }
@@ -221,6 +222,8 @@ function HitungUlang({ today, onOk }: { today: string; onOk: (m: string, k?: "ok
 }
 
 function Migrasi({ today, onOk }: { today: string; onOk: (m: string, k?: "ok" | "err") => void }) {
+  const penanda = useLive<{ oleh: string; ts: number; dari: string; sampai: string }>("sistem/migrasiKalender");
+  const sudahJalan = Boolean(penanda.data);
   const [busy, setBusy] = useState(false);
   const [ringkas, setRingkas] = useState<HasilMigrasi | null>(null);
   const [sudahDry, setSudahDry] = useState(false);
@@ -235,10 +238,11 @@ function Migrasi({ today, onOk }: { today: string; onOk: (m: string, k?: "ok" | 
   };
   return (
     <article className="panel master-group" data-testid="migrasi-kalender">
-      <div className="panel-header"><div><p className="panel-title">Migrasi sekali jalan (admin)</p><span>Menghitung ringkasan hari efektif untuk seluruh tahun ajaran berjalan dari data yang ada, dan mengisi “aktif sejak” siswa lama dengan tanggal efektif pertama. Periksa dulu (dry-run); baru terapkan.</span></div></div>
+      <div className="panel-header"><div><p className="panel-title">Migrasi sekali jalan (Waka/Kepala)</p><span>Menghitung ringkasan hari efektif untuk seluruh tahun ajaran berjalan dari data yang ada, dan mengisi “aktif sejak” siswa lama dengan tanggal efektif pertama. Periksa dulu (dry-run); baru terapkan.</span></div></div>
+      {sudahJalan && <div className="notice" role="status" data-testid="migrasi-sudah"><Icon name="check" size={17} /><span>Migrasi sudah dijalankan ({penanda.data!.dari} s.d. {penanda.data!.sampai}). Tombol dinonaktifkan; perubahan berikutnya cukup lewat Hitung ulang.</span></div>}
       <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-        <button className="secondary-button" disabled={busy} onClick={() => jalan(true)}>{busy ? <Spinner /> : null}Periksa (dry-run)</button>
-        <button className="danger-button" disabled={busy || !sudahDry} onClick={() => jalan(false)} title={sudahDry ? undefined : "Jalankan pemeriksaan (dry-run) terlebih dahulu"}>Terapkan migrasi</button>
+        <button className="secondary-button" disabled={busy || sudahJalan} onClick={() => jalan(true)}>{busy ? <Spinner /> : null}Periksa (dry-run)</button>
+        <button className="danger-button" disabled={busy || !sudahDry || sudahJalan} onClick={() => jalan(false)} title={sudahJalan ? "Migrasi sudah dijalankan" : sudahDry ? undefined : "Jalankan pemeriksaan (dry-run) terlebih dahulu"}>Terapkan migrasi</button>
       </div>
       {ringkas && (
         <p className="modal-note" data-testid="migrasi-ringkasan">

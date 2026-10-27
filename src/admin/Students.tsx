@@ -5,7 +5,7 @@ import { Empty, Field, Modal, Spinner, StatusBadge } from "../components/ui";
 import { batasJam, initials, maskUid, toneOf } from "../lib/attendance";
 import { namaHari, nowHM } from "../lib/time";
 import type { KetHarian, StudentRow } from "../lib/types";
-import { aturIzin, buatPin, hapusSiswa, normalisasiSiswa, resetPin, tambahSiswa, ubahSiswa, validasiPin } from "../services/db";
+import { buatPin, hapusSiswa, normalisasiSiswa, resetPin, tambahSiswa, ubahSiswa, validasiPin } from "../services/db";
 import { useStatusHari } from "../kesiswaan/useKalender";
 import { statusHariIni, useAdminData } from "./AdminData";
 import { usePanelMode, useToast } from "./AdminLayout";
@@ -13,7 +13,6 @@ import { usePanelMode, useToast } from "./AdminLayout";
 type Dialog =
   | { type: "form"; student?: StudentRow; presetUid?: string }
   | { type: "pin"; student: StudentRow }
-  | { type: "izin"; student: StudentRow }
   | { type: "hapus"; student: StudentRow }
   | { type: "pinBaru"; student: { nama: string; nis: string }; pin: string }
   | null;
@@ -70,7 +69,6 @@ export default function Students() {
             <span>{s.e?.pulang?.jam.slice(0, 5) ?? "—"}</span>
             <span><StatusBadge status={s.st} /></span>
             <span className="row-actions">
-              <button title="Izin / sakit" aria-label={`Izin atau sakit ${s.nama}`} onClick={() => setDialog({ type: "izin", student: s })}><Icon name="file" size={16} /></button>
               {!kepala && <>
                 <button title="Reset PIN orang tua" aria-label={`Reset PIN ${s.nama}`} onClick={() => setDialog({ type: "pin", student: s })}><Icon name="key" size={16} /></button>
                 <button title="Edit" aria-label={`Edit ${s.nama}`} onClick={() => setDialog({ type: "form", student: s })}><Icon name="edit" size={16} /></button>
@@ -83,7 +81,6 @@ export default function Students() {
 
       {!kepala && dialog?.type === "form" && <StudentForm student={dialog.student} presetUid={dialog.presetUid} onClose={close} onCreated={(st, pin) => setDialog({ type: "pinBaru", student: st, pin })} />}
       {!kepala && dialog?.type === "pin" && <PinForm student={dialog.student} onClose={close} onDone={(pin) => setDialog({ type: "pinBaru", student: dialog.student, pin })} />}
-      {dialog?.type === "izin" && <IzinForm student={dialog.student} onClose={close} />}
       {!kepala && dialog?.type === "hapus" && <HapusDialog student={dialog.student} onClose={close} />}
       {!kepala && dialog?.type === "pinBaru" && <PinResult nama={dialog.student.nama} nis={dialog.student.nis} pin={dialog.pin} onClose={close} />}
     </section>
@@ -243,45 +240,6 @@ function PinResult({ nama, nis, pin, onClose }: { nama: string; nis: string; pin
         <button className="secondary-button" onClick={() => navigator.clipboard.writeText(teks).then(() => notify("Disalin ke clipboard"))}>Salin</button>
         <button className="primary-button" onClick={onClose}>Selesai</button>
       </div>
-    </Modal>
-  );
-}
-
-function IzinForm({ student, onClose }: { student: StudentRow; onClose: () => void }) {
-  const { today } = useAdminData();
-  const notify = useToast();
-  const [tanggal, setTanggal] = useState(today);
-  const [ket, setKet] = useState<KetHarian | "">("Sakit");
-  const [catatan, setCatatan] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await aturIzin(student.nis, tanggal, ket || null, catatan);
-      notify(ket ? `${student.nama}: ${ket} tercatat` : "Keterangan dihapus");
-      onClose();
-    } catch (ex) { setErr((ex as Error).message); setBusy(false); }
-  };
-  return (
-    <Modal title="Keterangan izin / sakit" subtitle={`${student.nama} · ${student.kelas}`} onClose={onClose}>
-      <form className="modal-form" onSubmit={submit}>
-        <div className="form-grid">
-          <Field label="Tanggal"><input className="text-input" type="date" value={tanggal} max={today} onChange={(e) => setTanggal(e.target.value)} required /></Field>
-          <Field label="Keterangan">
-            <select className="text-input" value={ket} onChange={(e) => setKet(e.target.value as typeof ket)}>
-              <option value="Sakit">Sakit</option><option value="Izin">Izin</option><option value="Dispensasi">Dispensasi (mewakili sekolah)</option><option value="">Hapus keterangan</option>
-            </select>
-          </Field>
-        </div>
-        {ket && <Field label="Catatan (opsional)"><input className="text-input" value={catatan} maxLength={200} onChange={(e) => setCatatan(e.target.value)} placeholder="contoh: surat dokter" /></Field>}
-        {err && <div className="login-error-box" role="alert"><Icon name="warning" size={17} /><div><span>{err}</span></div></div>}
-        <div className="modal-actions">
-          <button type="button" className="secondary-button" onClick={onClose}>Batal</button>
-          <button className="primary-button" disabled={busy}>{busy ? <Spinner /> : null}Simpan</button>
-        </div>
-      </form>
     </Modal>
   );
 }

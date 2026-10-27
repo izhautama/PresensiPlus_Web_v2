@@ -13,7 +13,7 @@ Untuk: Guru piket (akun bersama meja piket)
 
 ## Siswa tidak masuk: Izin, Sakit, Dispensasi
 
-1. Beranda menampilkan siswa yang belum tap hari ini.
+1. Beranda menampilkan siswa yang belum tap hari ini. Kabar izin dari orang tua atau wali kelas disampaikan ke piket; Anda yang mencatatnya.
 2. Pada nama siswa tekan Izin, Sakit, atau Dispensasi (siswa mewakili sekolah, dihitung hadir).
 3. Isi keterangan (wajib, min. 3 huruf) dan centang Surat fisik diterima bila ada. Simpan arsip surat di map dokumen.
 4. Tanggal lain atau izin terencana: tombol Izin tanggal lain / terencana (maksimal 7 hari ke depan; hanya Izin atau Dispensasi).

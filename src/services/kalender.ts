@@ -69,7 +69,8 @@ async function tulisPerBatch(u: Updates, aksi: "hitung-kalender" | "migrasi-kale
   const items = Object.entries(u);
   for (let i = 0; i < items.length; i += BATCH) {
     const bagian: Updates = Object.fromEntries(items.slice(i, i + BATCH));
-    if (i === 0) sisipkanAktivitas(bagian, { aksi, detail });
+    // migrasi: SETIAP update memuat log (rules mewajibkan log untuk penulisan profiles/{nis}/aktifSejak dan penanda migrasi); hitung biasa: log di update pertama
+    if (i === 0 || aksi === "migrasi-kalender") sisipkanAktivitas(bagian, { aksi, detail });
     await kirimUpdate(bagian);
   }
 }
@@ -179,7 +180,7 @@ export async function simpanAmbang(n: number) {
   await kirimUpdate(u);
 }
 
-// ---------------------------------------------------------------------------------------------- migrasi sekali jalan (admin)
+// ---------------------------------------------------------------------------------------------- migrasi sekali jalan (waka/kepala)
 export type HasilMigrasi = { dari: string; sampai: string; hari: number; efektif: number; rendah: number; diperbarui: number; aktifSejakDiisi: number; aktifSejak: string | null };
 
 /**
@@ -210,6 +211,9 @@ export async function migrasiKalender(hariIni: string, dry = true): Promise<Hasi
   const belumAktif = pertama ? Object.entries(profil).filter(([, p]) => !p?.aktifSejak).map(([nis]) => nis) : [];
   if (!dry) {
     for (const nis of belumAktif) ditulis[`profiles/${nis}/aktifSejak`] = pertama;
+    // penanda "sudah dijalankan" (sekali tulis; di batch TERAKHIR agar hanya ada bila semua batch sebelumnya berhasil)
+    const uid = fb().auth.currentUser?.uid;
+    if (uid) ditulis["sistem/migrasiKalender"] = { oleh: uid, ts: serverTimestamp(), dari, sampai };
     if (Object.keys(ditulis).length) await tulisPerBatch(ditulis, "migrasi-kalender", `Migrasi kalender ${dari}..${sampai}: ${diperbarui} tanggal, aktifSejak ${belumAktif.length} siswa`);
   }
   return { dari, sampai, hari: semuaTgl.length, efektif: tanggalEfektif.length, rendah: semuaTgl.filter((t) => peta[t]?.rendah).length, diperbarui, aktifSejakDiisi: belumAktif.length, aktifSejak: pertama };

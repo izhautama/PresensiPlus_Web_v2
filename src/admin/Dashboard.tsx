@@ -6,6 +6,7 @@ import { batasJam, initials, toneOf } from "../lib/attendance";
 import { namaHari, nowHM, relatif, salam, weekday } from "../lib/time";
 import { useAdminData } from "./AdminData";
 import BannerTapRendah from "../kesiswaan/BannerTapRendah";
+import KontrolKalender from "../kesiswaan/KontrolKalender";
 import KartuIndeks from "../kesiswaan/KartuIndeks";
 import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { usePanelBase, usePanelMode } from "./AdminLayout";
@@ -50,6 +51,7 @@ export default function Dashboard() {
   return (
     <>
       <BannerTapRendah />
+      <KontrolKalender />
       {!kepala && <KartuIndeks />} {/* admin: pemeriksa konsistensi indeks siswa-kelas & cermin wali, otomatis saat dibuka */}
       <section className="welcome">
         <div>

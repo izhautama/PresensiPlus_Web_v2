@@ -5,19 +5,14 @@ Untuk: Wali kelas (akun per guru)
 ## Masuk dan menu
 
 1. Buka alamat aplikasi, pilih tab Admin, isi email dan password akun wali kelas dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).
-2. Menu: Dashboard, Izin & kehadiran, Siswa kelas, Pelanggaran, Pembinaan, Usulan remisi, Laporan, Panduan, Pengaturan (ganti password), dan Keluar.
+2. Menu: Dashboard, Kehadiran kelas, Siswa kelas, Pembinaan, Usulan remisi, Laporan, Panduan, Pengaturan (ganti password), dan Keluar.
 3. Bila memegang lebih dari satu kelas, pilih kelas di bagian atas halaman. Anda hanya melihat siswa kelas binaan; siswa kelas lain tidak tampil.
 
-## Izin dan sakit
+## Memantau kehadiran
 
-1. Menu Izin & kehadiran: siswa yang belum tap tampil dengan tombol Izin dan Sakit (Dispensasi dan Hadir manual tidak tersedia untuk wali).
-2. Isi keterangan (wajib) dan centang bila surat fisik diterima. Tanggal mundur dibatasi sama seperti piket.
-3. Siswa yang Alfa-nya sudah dikonfirmasi Waka tidak dapat diubah menjadi Izin atau Sakit.
-
-## Pelanggaran ringan
-
-1. Menu Pelanggaran: pilih siswa kelas binaan dan pelanggaran Ringan atau yang bertakziran dari daftar tata tertib. Poin dan takziran tetap dari daftar resmi.
-2. Catatan Anda tampil di Catatan saya dan dapat dihapus dengan alasan. Pelanggaran Sedang/Berat dicatat oleh Waka.
+1. Menu Kehadiran kelas: status hari ini siswa kelas binaan (hanya melihat).
+2. Wali kelas tidak mencatat Izin, Sakit, Dispensasi, atau pelanggaran. Bila orang tua memberi kabar izin atau ada pelanggaran, teruskan ke Guru Piket atau Waka.
+3. Catatan wali yang lama tetap tersimpan dan tetap dihitung.
 
 ## Laporan
 
