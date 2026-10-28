@@ -181,6 +181,19 @@ export async function simpanAmbang(n: number) {
 }
 
 // ---------------------------------------------------------------------------------------------- migrasi sekali jalan (waka/kepala)
+/**
+ * Tandai migrasi sebagai SUDAH dijalankan tanpa menghitung apa pun (data produksi yang dimigrasi sebelum penanda ada).
+ * Sekali tulis (rules menolak penimpaan) + log `migrasi-kalender` pada update yang sama.
+ */
+export async function tandaiSudahDimigrasi(hariIni: string): Promise<void> {
+  const uid = fb().auth.currentUser?.uid;
+  if (!uid) throw new Error("Belum masuk.");
+  const dari = `${tahunAjaran(hariIni)}-07-01`, sampai = sebelum(hariIni, 1);
+  const u: Updates = { "sistem/migrasiKalender": { oleh: uid, ts: serverTimestamp(), dari, sampai } };
+  sisipkanAktivitas(u, { aksi: "migrasi-kalender", detail: "Ditandai sudah dimigrasi (tanpa menghitung ulang)" });
+  await kirimUpdate(u);
+}
+
 export type HasilMigrasi = { dari: string; sampai: string; hari: number; efektif: number; rendah: number; diperbarui: number; aktifSejakDiisi: number; aktifSejak: string | null };
 
 /**

@@ -5,9 +5,11 @@ import { Field, Spinner } from "../components/ui";
 import { usePanelBase, usePanelMode, useToast } from "../admin/AdminLayout";
 import { useAdminData } from "../admin/AdminData";
 import { useLive } from "../services/db";
+import { limitToFirst, query } from "firebase/database";
+import { statusMigrasi } from "../lib/statusMigrasi";
 import { AMBANG_MAKS, AMBANG_MIN, tertahan, type OverrideKalender, type RingkasanHari } from "../lib/hariEfektif";
 import { BULAN, addDays, formatTanggal, lastDayOfMonth, monthKey, namaHari, weekday } from "../lib/time";
-import { hapusOverride, hitungUlang, konfirmasiNormal, migrasiKalender, simpanAmbang, simpanOverride, type HasilMigrasi } from "../services/kalender";
+import { hapusOverride, hitungUlang, konfirmasiNormal, migrasiKalender, simpanAmbang, simpanOverride, tandaiSudahDimigrasi, type HasilMigrasi } from "../services/kalender";
 import { useAmbang, useKalenderRentang } from "./useKalender";
 
 type Jenis = "efektif" | "libur" | "ovr-libur" | "ovr-efektif" | "berjalan" | "rendah" | "belum" | "mendatang";
@@ -223,7 +225,12 @@ function HitungUlang({ today, onOk }: { today: string; onOk: (m: string, k?: "ok
 
 function Migrasi({ today, onOk }: { today: string; onOk: (m: string, k?: "ok" | "err") => void }) {
   const penanda = useLive<{ oleh: string; ts: number; dari: string; sampai: string }>("sistem/migrasiKalender");
-  const sudahJalan = Boolean(penanda.data);
+  // deteksi dari data: migrasi produksi sebelum penanda ada (semua profil punya aktifSejak + kalenderEfektif berisi)
+  const profil = useLive<Record<string, { aktifSejak?: string }>>("profiles");
+  const ada = useLive<Record<string, unknown>>("kalenderEfektif", (ref) => query(ref, limitToFirst(1)));
+  const muat = penanda.loading || profil.loading || ada.loading;
+  const status = statusMigrasi({ penanda: penanda.data, profil: profil.data, jumlahRingkasan: Object.keys(ada.data ?? {}).length });
+  const sudahJalan = status !== "belum" || muat; // selama memuat: tombol tetap nonaktif (hindari kilasan tombol aktif)
   const [busy, setBusy] = useState(false);
   const [ringkas, setRingkas] = useState<HasilMigrasi | null>(null);
   const [sudahDry, setSudahDry] = useState(false);
@@ -236,13 +243,21 @@ function Migrasi({ today, onOk }: { today: string; onOk: (m: string, k?: "ok" | 
     } catch (e) { onOk((e as Error).message, "err"); }
     finally { setBusy(false); }
   };
+  const tandai = async () => {
+    setBusy(true);
+    try { await tandaiSudahDimigrasi(today); onOk("Migrasi ditandai sudah dijalankan"); }
+    catch (e) { onOk((e as Error).message, "err"); }
+    finally { setBusy(false); }
+  };
   return (
     <article className="panel master-group" data-testid="migrasi-kalender">
       <div className="panel-header"><div><p className="panel-title">Migrasi sekali jalan (Waka/Kepala)</p><span>Menghitung ringkasan hari efektif untuk seluruh tahun ajaran berjalan dari data yang ada, dan mengisi “aktif sejak” siswa lama dengan tanggal efektif pertama. Periksa dulu (dry-run); baru terapkan.</span></div></div>
-      {sudahJalan && <div className="notice" role="status" data-testid="migrasi-sudah"><Icon name="check" size={17} /><span>Migrasi sudah dijalankan ({penanda.data!.dari} s.d. {penanda.data!.sampai}). Tombol dinonaktifkan; perubahan berikutnya cukup lewat Hitung ulang.</span></div>}
-      <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
+      {status === "penanda" && <div className="notice" role="status" data-testid="migrasi-sudah"><Icon name="check" size={17} /><span>Migrasi sudah dijalankan ({(penanda.data as { dari: string; sampai: string }).dari} s.d. {(penanda.data as { dari: string; sampai: string }).sampai}). Tombol dinonaktifkan; perubahan berikutnya cukup lewat Hitung ulang.</span></div>}
+      {status === "terdeteksi" && <div className="notice" role="status" data-testid="migrasi-terdeteksi"><Icon name="check" size={17} /><span>Migrasi sudah dijalankan (terdeteksi dari data). Tombol dinonaktifkan; perubahan berikutnya cukup lewat Hitung ulang.</span></div>}
+      <div className="modal-actions" style={{ justifyContent: "flex-start", flexWrap: "wrap" }}>
         <button className="secondary-button" disabled={busy || sudahJalan} onClick={() => jalan(true)}>{busy ? <Spinner /> : null}Periksa (dry-run)</button>
         <button className="danger-button" disabled={busy || !sudahDry || sudahJalan} onClick={() => jalan(false)} title={sudahJalan ? "Migrasi sudah dijalankan" : sudahDry ? undefined : "Jalankan pemeriksaan (dry-run) terlebih dahulu"}>Terapkan migrasi</button>
+        {status === "terdeteksi" && <button className="secondary-button" disabled={busy} onClick={tandai} data-testid="migrasi-tandai">Tandai sudah dimigrasi</button>}
       </div>
       {ringkas && (
         <p className="modal-note" data-testid="migrasi-ringkasan">

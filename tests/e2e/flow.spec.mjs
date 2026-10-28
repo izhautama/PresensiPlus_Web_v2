@@ -2603,3 +2603,48 @@ test("v2.5.2 hitung kalender otomatis menurut PERAN: kepala menghitung hari ini;
   bersih(lapK, "kepala (hitung otomatis, tanpa error permission)");
   await kK.close();
 });
+
+test("v2.5.2 deteksi migrasi dari data: tanpa penanda tetapi semua profil punya aktifSejak dan kalenderEfektif berisi -> terdeteksi; Waka dapat menandai sekali", async ({ page }) => {
+  const profil = (await dbGet("profiles")) ?? {};
+  const nisList = Object.keys(profil);
+  expect(nisList.length, "ada profil uji").toBeGreaterThan(0);
+  const asli = Object.fromEntries(nisList.map((n) => [n, profil[n].aktifSejak ?? null]));
+  expect(Object.keys((await dbGet("kalenderEfektif")) ?? {}).length, "kalenderEfektif sudah berisi (hasil uji sebelumnya)").toBeGreaterThan(0);
+  // keadaan produksi sebelum penanda ada: tanpa penanda, semua profil punya aktifSejak
+  await dbPut("sistem/migrasiKalender", null);
+  for (const n of nisList) await dbPut(`profiles/${n}/aktifSejak`, T.kemarin);
+
+  const lap = await siapkan(page);
+  await loginStaf(page, "waka");
+  await menu(page, "Kalender");
+  const panel = page.getByTestId("migrasi-kalender");
+  await expect(page.getByTestId("migrasi-terdeteksi")).toContainText("Migrasi sudah dijalankan (terdeteksi dari data)");
+  await expect(page.getByTestId("migrasi-sudah")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Periksa (dry-run)" })).toBeDisabled();
+  await expect(panel.getByRole("button", { name: "Terapkan migrasi" })).toBeDisabled();
+  expect(await dbGet("sistem/migrasiKalender"), "deteksi tidak menulis apa pun").toBeNull();
+
+  // opsional: Waka menandai (sekali tulis + log)
+  await panel.getByTestId("migrasi-tandai").click();
+  await expect(page.getByTestId("migrasi-sudah")).toContainText("Migrasi sudah dijalankan");
+  await expect(page.getByTestId("migrasi-terdeteksi")).toHaveCount(0);
+  await expect(panel.getByTestId("migrasi-tandai")).toHaveCount(0);
+  const penanda = await dbGet("sistem/migrasiKalender");
+  expect(penanda).toMatchObject({ dari: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), sampai: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+  const log = Object.values((await dbGet(`activity/${T.hariIni}`)) ?? {});
+  expect(log.some((e) => e.aksi === "migrasi-kalender" && e.akunEmail === emailStaf("waka") && /Ditandai sudah dimigrasi/.test(e.detail ?? "")), "log migrasi-kalender oleh Waka").toBe(true);
+  for (const n of nisList) expect((await dbGet(`profiles/${n}`)).nama, "profil lain tidak berubah").toBe(profil[n].nama);
+  bersih(lap, "waka (deteksi migrasi + tandai)");
+
+  // keadaan 'belum': satu profil tanpa aktifSejak dan tanpa penanda -> tombol migrasi aktif kembali (dry-run)
+  await dbPut("sistem/migrasiKalender", null);
+  await dbPut(`profiles/${nisList[0]}/aktifSejak`, null);
+  await page.reload();
+  await menu(page, "Kalender");
+  await expect(page.getByTestId("migrasi-terdeteksi")).toHaveCount(0);
+  await expect(page.getByTestId("migrasi-sudah")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Periksa (dry-run)" })).toBeEnabled();
+
+  // pulihkan keadaan semula
+  for (const n of nisList) await dbPut(`profiles/${n}/aktifSejak`, asli[n]);
+});
