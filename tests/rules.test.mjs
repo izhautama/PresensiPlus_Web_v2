@@ -1448,6 +1448,20 @@ await tolak("aktifSejak: format salah ditolak", admin, "PUT", "profiles/111/akti
 await tolak("aktifSejak: bukan teks ditolak", admin, "PUT", "profiles/111/aktifSejak", 20261014);
 await tolak("aktifSejak: waka TIDAK bisa menulis", waka, "PUT", "profiles/111/aktifSejak", "2026-10-14");
 await tolak("aktifSejak: ortu TIDAK bisa menulis", ortu1, "PUT", "profiles/111/aktifSejak", "2026-01-01");
+// v2.5.2: tambah siswa di aplikasi = SATU update gabungan (config/students + profiles lengkap dengan aktifSejak + siswaKelas + parents + version)
+const tambahBody = (nis, uid, o = {}) => ({
+  [`config/students/${uid}`]: { nis, nama: "SISWA BARU", kelas: "X IPA" },
+  [`profiles/${nis}`]: { nama: "SISWA BARU", kelas: "X IPA", ...(o.tanpaAktif ? {} : { aktifSejak: "2026-10-28" }) },
+  [`siswaKelas/${nis}`]: "X IPA",
+  [`parents/${nis}`]: { ver: 1, uid: `ortu-${nis}` },
+  "config/version": 1730000000000,
+});
+await izin("tambah siswa: admin, update gabungan dengan aktifSejak hari ini", admin, "PATCH", "", tambahBody("8801", "ABCD8801"));
+await cek("tambah siswa: profil baru menyimpan aktifSejak", admin, "profiles/8801", (j) => j?.aktifSejak === "2026-10-28" && j.nama === "SISWA BARU");
+await tolak("tambah siswa: aktifSejak format salah ditolak", admin, "PATCH", "", { ...tambahBody("8802", "ABCD8802"), "profiles/8802": { nama: "X", kelas: "X IPA", aktifSejak: "28-10-2026" } });
+await tolak("tambah siswa: waka TIDAK bisa menambah siswa", waka, "PATCH", "", tambahBody("8803", "ABCD8803"));
+await tolak("tambah siswa: kepala TIDAK bisa menambah siswa", kepala, "PATCH", "", tambahBody("8804", "ABCD8804"));
+await tolak("tambah siswa: ortu TIDAK bisa menambah siswa", ortu1, "PATCH", "", tambahBody("8805", "ABCD8805"));
 await cek("aktifSejak: ortu membaca profil anak sendiri berikut aktifSejak", ortu1, "profiles/111", (j) => j?.aktifSejak === "2026-10-14" && j.nama);
 await tolak("aktifSejak: ortu TIDAK bisa membaca profil anak lain", ortu1, "GET", "profiles/222/aktifSejak");
 

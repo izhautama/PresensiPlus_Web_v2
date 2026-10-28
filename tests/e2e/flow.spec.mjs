@@ -2648,3 +2648,25 @@ test("v2.5.2 deteksi migrasi dari data: tanpa penanda tetapi semua profil punya 
   // pulihkan keadaan semula
   for (const n of nisList) await dbPut(`profiles/${n}/aktifSejak`, asli[n]);
 });
+
+test("v2.5.2 tambah siswa lewat form (TU): profil baru memuat aktifSejak = hari ini pada update yang sama; hari sebelum terdaftar tidak menjadi Alpha", async ({ page }) => {
+  const nis = "8899", uid = "ABCD889900";
+  const lap = await siapkan(page);
+  await loginStaf(page, "admin");
+  await menu(page, "Data siswa");
+  await page.getByRole("button", { name: "Tambah siswa" }).click();
+  const form = page.locator(".modal-form");
+  const isi = form.locator("input.text-input");
+  await isi.nth(0).fill(uid);
+  await isi.nth(1).fill(nis);
+  await isi.nth(2).fill("X IPA");
+  await isi.nth(3).fill("SISWA BARU E2E");
+  await form.getByRole("button", { name: "Daftarkan" }).click();
+  await expect.poll(async () => (await dbGet(`profiles/${nis}`))?.aktifSejak ?? null, { timeout: 20_000 }).toBe(T.hariIni);
+  expect(await dbGet(`profiles/${nis}`)).toMatchObject({ nama: "SISWA BARU E2E", kelas: "X IPA", aktifSejak: T.hariIni });
+  expect(await dbGet(`config/students/${uid}`)).toMatchObject({ nis, kelas: "X IPA" });
+  expect(await dbGet(`siswaKelas/${nis}`)).toBe("X IPA");
+  bersih(lap, "admin (tambah siswa dengan aktifSejak)");
+  // bersihkan data uji (akun Auth ortu di emulator dibiarkan)
+  for (const p of [`config/students/${uid}`, `profiles/${nis}`, `siswaKelas/${nis}`, `parents/${nis}`]) await dbPut(p, null);
+});
