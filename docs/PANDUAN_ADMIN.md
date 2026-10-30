@@ -19,7 +19,7 @@ Untuk: Administrator / TU sekolah
 
 1. Menu Siswa: Tambah siswa, isi nama, kelas, NIS, dan UID kartu.
 2. Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru; PIN tampil sekali, catat dan berikan ke orang tua.
-3. Ikon dokumen = catat Izin, Sakit, atau Dispensasi untuk siswa itu.
+3. Izin, Sakit, Dispensasi, dan presensi manual dicatat piket atau Waka, bukan admin.
 4. Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas atau hari khusus mengalahkan "Semua"; Minggu libur).
 
 ## Laporan
@@ -35,13 +35,11 @@ Untuk: Administrator / TU sekolah
 3. Ikon key = kirim email reset password; ikon sampah = cabut akses.
 4. Ganti password admin di kartu "Ganti password admin".
 
-## Kalender akademik dan hari efektif
+## Kalender akademik (hanya lihat)
 
-1. Hari efektif ditentukan oleh BUKTI: tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti bukan hari efektif dan siswa tidak dihitung Alpha.
-2. Menu Kalender: klik tanggal, pilih Libur atau Efektif, isi alasan, lalu Simpan override. Override menang atas hitungan otomatis.
-3. Override Efektif tanpa bukti membuat semua siswa tanpa data Alpha: isi presensi manual dulu, lalu centang pernyataan.
-4. Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang lampau, lalu Hitung ulang.
-5. Migrasi sekali jalan: Periksa (dry-run), baca ringkasan, lalu Terapkan migrasi.
+1. Hari efektif ditentukan oleh BUKTI: tap kartu atau presensi manual. Hari tanpa bukti bukan hari efektif dan siswa tidak dihitung Alpha.
+2. Menu Kalender hanya dapat Anda lihat. Tanggal merah dan kegiatan diisi Waka Kesiswaan (cadangan: Kepala Madrasah).
+3. Kartu Kontrol kalender di Dashboard menandai hari kerja tanpa tap dan tanpa presensi manual yang belum ditandai: ingatkan Waka agar menandainya di menu Kalender.
 
 ## Guru BK
 

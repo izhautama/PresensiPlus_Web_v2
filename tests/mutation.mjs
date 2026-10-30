@@ -467,7 +467,28 @@ const mutasi = [
   { nama: "autoMap: kunci 'lupaKtm' tidak diizinkan", ubah: (r) => { delete r.discipline.autoMap.lupaKtm; } },
   { nama: "autoMap: kunci asing diterima", ubah: (r) => { delete r.discipline.autoMap.$other; } },
   // ---------------------------------------------------------------- KALENDER HARI EFEKTIF
-  { nama: "kalender: kepala boleh mengatur override", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${KEPALA})`; } },
+  // ---- v2.5.2 "satu tugas satu pengisi": hak wali (izin/pelanggaran) dan admin (izin/attendance) DICABUT; mutan yang memulihkannya harus tertangkap
+  { nama: "wali izin: wali kelas binaan boleh menulis izin/ (hak dicabut v2.5.2)", ubah: (r) => { const n = r.izin.$date.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${waliDariT("$nis")})`; } },
+  { nama: "wali izin: wali kelas binaan boleh menulis/menghapus izin + ket + catatan sekaligus (hak dicabut v2.5.2)", ubah: (r) => {
+    const w = `(auth != null && ${waliDariT("$nis")})`;
+    for (const n of [r.izin.$date.$nis, r.attendance.$nis.$date.ket, r.attendance.$nis.$date.catatan]) n[".write"] = `(${n[".write"]}) || ${w}`;
+  } },
+  { nama: "wali pelanggaran: wali boleh mencatat pelanggaran baru (record + meta; hak dicabut v2.5.2)", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId, m = r.discipline.recordMeta.$nis.$recId;
+    n[".write"] = `(${n[".write"]}) || (auth != null && newData.exists() && !data.exists() && ${waliDariT("$nis")})`;
+    n[".validate"] = ganti(n[".validate"], " && (newData.child('sumber').val() !== 'wali' || data.exists())", "");
+    m[".write"] = `(${m[".write"]}) || (auth != null && newData.exists() && ${waliDariT("$nis")})`;
+  } },
+  { nama: "wali hapus: wali boleh menghapus lunak catatan lama bersumber wali (hak dicabut v2.5.2)", ubah: (r) => {
+    const n = r.discipline.records.$nis.$recId, m = r.discipline.recordMeta.$nis.$recId;
+    n[".write"] = `(${n[".write"]}) || (auth != null && ${WALI} && data.child('sumber').val() === 'wali')`;
+    m[".write"] = `(${m[".write"]}) || (auth != null && newData.exists() && ${WALI})`;
+  } },
+  { nama: "izin: admin (TU) boleh menulis izin harian (hak dicabut v2.5.2)", ubah: (r) => { const n = r.izin.$date.$nis; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  { nama: "izin: kepala TIDAK lagi boleh menulis izin (cadangan hilang)", ubah: (r) => { const n = r.izin.$date.$nis; n[".write"] = ganti(n[".write"], `${KEPALA} || `, ""); } },
+  { nama: "izin: admin (TU) boleh mengoreksi attendance (hak dicabut v2.5.2)", ubah: (r) => { const n = r.attendance.$nis.$date; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  { nama: "kalender: admin (TU) boleh mengatur override", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  { nama: "kalender: kepala TIDAK lagi boleh mengatur override (cadangan Wakasis hilang)", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = ganti(n[".write"], ` || ${KEPALA}`, ""); } },
   { nama: "kalender: piket boleh mengatur override", ubah: (r) => { const n = r.kalender.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${PIKET})`; } },
   { nama: "kalender: siapa pun yang login boleh mengatur override", ubah: (r) => { r.kalender.$tgl[".write"] = "auth != null"; } },
   { nama: "kalender: status override bebas", ubah: (r) => { r.kalender.$tgl.status[".validate"] = "newData.isString()"; } },
@@ -518,12 +539,27 @@ const mutasi = [
   { nama: "kalenderEfektif: 'normal' bernilai false diterima", ubah: (r) => { r.kalenderEfektif.$tgl.normal[".validate"] = ganti(r.kalenderEfektif.$tgl.normal[".validate"], "newData.val() === true && ", ""); } },
   { nama: "kalenderEfektif: field asing diterima", ubah: (r) => { delete r.kalenderEfektif.$tgl.$other; } },
   { nama: "kalenderEfektif: anonim boleh membaca", ubah: (r) => { r.kalenderEfektif[".read"] = "true"; } },
-  { nama: "ambang: kepala boleh mengubah", ubah: (r) => { const n = r.sistem.ambangHariEfektif; n[".write"] = `(${n[".write"]}) || (auth != null && ${KEPALA})`; } },
+  { nama: "ambang: admin (TU) boleh mengubah", ubah: (r) => { const n = r.sistem.ambangHariEfektif; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  { nama: "ambang: kepala TIDAK lagi boleh mengubah (cadangan Wakasis hilang)", ubah: (r) => { const n = r.sistem.ambangHariEfektif; n[".write"] = ganti(n[".write"], ` || ${KEPALA}`, ""); } },
   { nama: "ambang: nilai bebas (tidak 1..500 bulat)", ubah: (r) => { r.sistem.ambangHariEfektif[".validate"] = "newData.isNumber()"; } },
   { nama: "ambang: ortu boleh membaca", ubah: (r) => { r.sistem.ambangHariEfektif[".read"] = "auth != null"; } },
   { nama: "sistem: waka boleh membaca seluruh node sistem", ubah: (r) => { r.sistem[".read"] = `(${r.sistem[".read"]}) || (auth != null && ${WAKA})`; } },
   { nama: "sistem: waka boleh menulis backupTerakhir", ubah: (r) => { const n = r.sistem.backupTerakhir; n[".write"] = `(${n[".write"]}) || (auth != null && ${WAKA})`; } },
   { nama: "profiles: aktifSejak format bebas", ubah: (r) => { r.profiles.$nis.aktifSejak[".validate"] = "newData.isString()"; } },
+  { nama: "profiles: aktifSejak waka/kepala tanpa log aktivitas 'migrasi-kalender'", ubah: (r) => { const n = r.profiles.$nis.aktifSejak; n[".write"] = ganti(n[".write"], ` && ${actOk(3, ["migrasi-kalender"])}`, ""); } },
+  { nama: "profiles: aktifSejak waka/kepala dapat menimpa nilai yang sudah ada", ubah: (r) => { const n = r.profiles.$nis.aktifSejak; n[".write"] = ganti(n[".write"], " && !data.exists()", ""); } },
+  { nama: "profiles: aktifSejak dapat ditulis piket (dengan log migrasi)", ubah: (r) => { const n = r.profiles.$nis.aktifSejak; n[".write"] = ganti(n[".write"], ` (${WAKA} || ${KEPALA})`, ` (${WAKA} || ${KEPALA} || ${PIKET})`); } },
+  { nama: "sistem: penanda migrasiKalender dapat ditimpa (sekali tulis dibuang)", ubah: (r) => { const n = r.sistem.migrasiKalender; n[".write"] = ganti(n[".write"], " && !data.exists()", ""); } },
+  { nama: "sistem: penanda migrasiKalender tanpa log aktivitas", ubah: (r) => { const n = r.sistem.migrasiKalender; n[".write"] = ganti(n[".write"], ` && ${actOk(2, ["migrasi-kalender"])}`, ""); } },
+  { nama: "sistem: penanda migrasiKalender dapat ditulis admin", ubah: (r) => { const n = r.sistem.migrasiKalender; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN} && newData.exists())`; } },
+  { nama: "sistem: penanda migrasiKalender 'oleh' dapat dipalsukan", ubah: (r) => { const n = r.sistem.migrasiKalender; n[".validate"] = ganti(n[".validate"], " && newData.child('oleh').val() === auth.uid", ""); } },
+  { nama: "sistem: penanda migrasiKalender ts bukan waktu server", ubah: (r) => { const n = r.sistem.migrasiKalender; n[".validate"] = ganti(n[".validate"], " && newData.child('ts').val() === now", ""); } },
+  { nama: "sistem: penanda migrasiKalender tanggal bebas", ubah: (r) => { r.sistem.migrasiKalender.dari[".validate"] = "newData.isString()"; } },
+  { nama: "sistem: penanda migrasiKalender field asing diterima", ubah: (r) => { delete r.sistem.migrasiKalender.$other; } },
+  { nama: "sistem: penanda migrasiKalender dapat dibaca siapa pun yang login", ubah: (r) => { r.sistem.migrasiKalender[".read"] = "auth != null"; } },
+  { nama: "kalenderEfektif: admin (TU) boleh menulis ringkasan", ubah: (r) => { const n = r.kalenderEfektif.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; } },
+  { nama: "kalenderEfektif: 'normal' dapat dikonfirmasi admin (TU)", ubah: (r) => { const n = r.kalenderEfektif.$tgl; n[".write"] = `(${n[".write"]}) || (auth != null && ${ADMIN})`; n.normal[".validate"] = "newData.val() === true"; } },
+  { nama: "kalenderEfektif: 'normal' tidak dapat dikonfirmasi kepala (cadangan hilang)", ubah: (r) => { const n = r.kalenderEfektif.$tgl.normal; n[".validate"] = ganti(n[".validate"], ` || ${KEPALA}`, ""); } },
   // ---------------------------------------------------------------- WALI KELAS (grup "wali")
   // Salinan helper rules (harus identik dengan scripts/build-rules.mjs) untuk menyusun teks yang dirusak mutasi.
   { nama: "wali: indeks siswaKelas tidak diperiksa ada (null === null membuka siswa tanpa indeks)", ubah: (r) => ubahJson(r, "root.child('siswaKelas').child($nis).exists() && ", "") },
@@ -554,7 +590,7 @@ const mutasi = [
       lok[".write"] = ganti(lok[".write"], t, t.replace(` && ${metaBaruPiket(n, tgl, "$nis", "'H'")}`, ""));
     }
   } },
-  { nama: "wali izin: izinMeta berlingkup 'jam' diterima", ubah: (r) => { const m = r.izinMeta.$tgl.$nis.$metaId; m[".validate"] = ganti(m[".validate"], "(!(" + WALI + ") || (newData.child('lingkup').val() === 'harian' && ", "(!(" + WALI + ") || (true && "); } },
+  { nama: "wali izin: izinMeta berlingkup 'jam' diterima", ekuivalen: true, ubah: (r) => { const m = r.izinMeta.$tgl.$nis.$metaId; m[".validate"] = ganti(m[".validate"], "(!(" + WALI + ") || (newData.child('lingkup').val() === 'harian' && ", "(!(" + WALI + ") || (true && "); } },
   { nama: "wali pelanggaran: kelas binaan tidak diperiksa", ubah: (r) => {
     const n = r.discipline.records.$nis.$recId; n[".write"] = ganti(n[".write"], `(newData.exists() ? (!data.exists() && ${waliDariT("$nis")} && `, "(newData.exists() ? (!data.exists() && true && ");
     n[".write"] = ganti(n[".write"], `: (${waliDariT("$nis")} && data.child('sumber').val() === 'wali'`, ": (true && data.child('sumber').val() === 'wali'");

@@ -109,6 +109,17 @@ assert.equal(rm.hari[0].manualAlasan, "Lupa KTM"); assert.equal(rm.hari[1].manua
 const rb = rs({ hariEfektif: efektif("2026-10-12", "2026-10-13", "2026-10-14"), attendance: {}, aktifSejak: "2026-10-14", awal: "2026-10-12", akhir: "2026-10-14" });
 assert.deepEqual({ A: rb.Alpha, E: rb.Efektif, S: rb.HariSekolah }, { A: 1, E: 1, S: 3 }, "sebelum aktifSejak tidak dihitung untuk siswa; hari sekolah tetap 3");
 assert.equal(rb.hari[0].kategori, "TidakEfektif");
+// TANPA aktifSejak (data lama atau impor di luar aplikasi): semua hari efektif sejak awal rentang dihitung, jadi hari sebelum siswa terdaftar menjadi Alpha.
+// Karena itu penambahan siswa WAJIB mengisi aktifSejak (pagar statis di bawah).
+const rtanpa = rs({ hariEfektif: efektif("2026-10-12", "2026-10-13", "2026-10-14"), attendance: {}, awal: "2026-10-12", akhir: "2026-10-14" });
+assert.deepEqual({ A: rtanpa.Alpha, E: rtanpa.Efektif }, { A: 3, E: 3 }, "tanpa aktifSejak: 3 hari efektif tanpa bukti = 3 Alpha");
+{
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../src/services/db.ts", import.meta.url), "utf8");
+  const badan = (nama) => { const a = src.indexOf(`export async function ${nama}(`); const b = src.indexOf("\nexport ", a + 1); return src.slice(a, b < 0 ? undefined : b); };
+  assert.match(badan("tambahSiswa"), /\[`profiles\/\$\{s\.nis\}`\]: \{[^}]*aktifSejak: todayWIB\(new Date\(waktuServer\(\)\)\)/, "tambahSiswa mengisi profiles/{nis}/aktifSejak = hari ini (waktu SERVER) pada update yang sama");
+  assert.doesNotMatch(badan("ubahSiswa"), /profiles\/\$\{s\.nis\}`\]:/, "ubahSiswa menulis per-field dan tidak menimpa node profil (aktifSejak aman)");
+}
 
 // HARI INI berjalan
 const PAGI = new Date("2026-10-14T01:00:00Z"); // 08:00 WIB

@@ -24,7 +24,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       { judul: "Mengelola siswa dan orang tua", langkah: [
         "Menu Siswa: Tambah siswa, isi nama, kelas, NIS, dan UID kartu.",
         "Reset PIN (ikon kunci) pada baris siswa membuat PIN orang tua baru; PIN tampil sekali, catat dan berikan ke orang tua.",
-        "Ikon dokumen = catat Izin, Sakit, atau Dispensasi untuk siswa itu.",
+        "Izin, Sakit, Dispensasi, dan presensi manual dicatat piket atau Waka, bukan admin.",
         "Menu Jadwal: atur jam Masuk, Terlambat, dan Pulang (baris kelas atau hari khusus mengalahkan \"Semua\"; Minggu libur).",
       ] },
       { judul: "Laporan", langkah: [
@@ -38,12 +38,10 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Ikon key = kirim email reset password; ikon sampah = cabut akses.",
         "Ganti password admin di kartu \"Ganti password admin\".",
       ] },
-      { judul: "Kalender akademik dan hari efektif", langkah: [
-        "Hari efektif ditentukan oleh BUKTI: tap kartu atau presensi manual (ambang bawaan 1 siswa). Hari tanpa bukti bukan hari efektif dan siswa tidak dihitung Alpha.",
-        "Menu Kalender: klik tanggal, pilih Libur atau Efektif, isi alasan, lalu Simpan override. Override menang atas hitungan otomatis.",
-        "Override Efektif tanpa bukti membuat semua siswa tanpa data Alpha: isi presensi manual dulu, lalu centang pernyataan.",
-        "Kartu Ambang hari efektif: ubah angka (1 sampai 500). Kartu Hitung ulang: pilih rentang lampau, lalu Hitung ulang.",
-        "Migrasi sekali jalan: Periksa (dry-run), baca ringkasan, lalu Terapkan migrasi.",
+      { judul: "Kalender akademik (hanya lihat)", langkah: [
+        "Hari efektif ditentukan oleh BUKTI: tap kartu atau presensi manual. Hari tanpa bukti bukan hari efektif dan siswa tidak dihitung Alpha.",
+        "Menu Kalender hanya dapat Anda lihat. Tanggal merah dan kegiatan diisi Waka Kesiswaan (cadangan: Kepala Madrasah).",
+        "Kartu Kontrol kalender di Dashboard menandai hari kerja tanpa tap dan tanpa presensi manual yang belum ditandai: ingatkan Waka agar menandainya di menu Kalender.",
       ] },
       { judul: "Guru BK", langkah: [
         "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.",
@@ -92,7 +90,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Kalender akademik", langkah: [
         "Menu Kalender: lihat hari efektif tiap tanggal (otomatis dari bukti tap/presensi manual atau override libur/efektif).",
-        "Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Kepala hanya melihat; waka dan admin yang mengatur.",
+        "Tanggal berwarna merah muda = tap rendah (alat mungkin bermasalah sebagian hari). Waka yang mengisi kalender; Anda cadangan dan dapat mengatur Libur atau Efektif bila Waka berhalangan. Admin hanya melihat.",
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
         "Menu Pembinaan: bagian Perlu dibina (Kepala) memuat siswa pada ambang Kepala (lv03 dan seterusnya) dengan tombol Catat pembinaan; lencana menu = yang belum selesai. Rekap semua kelompok dapat disaring dan diunduh CSV. Anda dapat mengoreksi pembinaan Selesai di bawahnya (alasan wajib).",
@@ -126,17 +124,18 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Bukti masuk PALING AWAL yang dipakai. Jam dimundurkan lebih dari 15 menit muncul di kartu Dashboard.",
       ] },
       { judul: "Presensi per jam dan saran", langkah: [
-        "Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Waka dapat menimpa atau menghapus sel apa pun, termasuk A dari piket (titik oranye), kapan saja dalam tahun ajaran.",
-        "Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan dari status harian, tidak disimpan, dan hilang bila ada tap atau manual.",
-        "Kartu A dari piket hari ini di Dashboard: tekan Tinjau di grid.",
-        "Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM). Alfa seharian bukan pelanggaran otomatis; catat manual bila perlu.",
+        "Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Anda dapat menimpa atau menghapus sel apa pun, termasuk A dari piket (titik oranye).",
+        "Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan, tidak disimpan.",
+        "Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM).",
         "Centang saran lalu Setujui terpilih atau Abaikan. Tidak ada poin tanpa persetujuan Anda.",
         "Saran yang belum dipetakan ke aturan diberi peringatan; atur di Tata tertib, tab Pemetaan saran.",
       ] },
       { judul: "Kalender dan tap rendah", langkah: [
-        "Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; ambang dan Hitung ulang ada di halaman ini.",
+        "Menu Kalender adalah tugas Anda (Kepala cadangan; TU hanya melihat). Tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan.",
+        "Kartu Kontrol kalender di Dashboard mencantumkan hari kerja tanpa tap dan tanpa presensi manual yang belum Anda tandai; tandai lewat Buka Kalender.",
+        "Ambang dan Hitung ulang ada di halaman Kalender. Migrasi sekali jalan: Periksa (dry-run) dulu, lalu Terapkan; setelahnya tombol nonaktif.",
         "Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.",
-        "Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.",
+        "Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi.",
       ] },
       { judul: "Guru BK", langkah: [
         "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Konseling hanya terbaca BK.",
@@ -145,9 +144,9 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).",
         "Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.",
-      ], catatan: "Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log." },
+      ], catatan: "Wali hanya memantau siswa kelasnya (kehadiran, pembinaan, usulan remisi); izin dan pelanggaran dicatat piket atau Waka." },
       { judul: "Pembinaan dan usulan remisi", langkah: [
-        "Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK (lencana = siswa BK belum diklaim): Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.",
+        "Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK (lencana = siswa BK belum diklaim): Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap).",
         "Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.",
         "Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.",
       ], catatan: "Remisi Tanpa prestasi hanya untuk siswa yang punya catatan pelanggaran pada tahun ajaran ini; usulan yang tidak memenuhi syarat tidak dapat disetujui." },
@@ -170,7 +169,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Selesai bertugas, tekan Keluar.",
       ], catatan: "Akun dipakai bersama, jadi nama dipilih sendiri. Semua tindakan juga tercatat di log aktivitas beserta perangkat." },
       { judul: "Siswa tidak masuk: Izin, Sakit, Dispensasi", langkah: [
-        "Beranda menampilkan siswa yang belum tap hari ini.",
+        "Beranda menampilkan siswa yang belum tap hari ini. Kabar izin dari orang tua atau wali kelas disampaikan ke piket; Anda yang mencatatnya.",
         "Pada nama siswa tekan Izin, Sakit, atau Dispensasi (siswa mewakili sekolah, dihitung hadir).",
         "Isi keterangan (wajib, min. 3 huruf) dan centang Surat fisik diterima bila ada. Simpan arsip surat di map dokumen.",
         "Tanggal lain atau izin terencana: tombol Izin tanggal lain / terencana (maksimal 7 hari ke depan; hanya Izin atau Dispensasi).",
@@ -205,17 +204,13 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
     bagian: [
       { judul: "Masuk dan menu", langkah: [
         "Buka alamat aplikasi, pilih tab Admin, isi email dan password akun wali kelas dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).",
-        "Menu: Dashboard, Izin & kehadiran, Siswa kelas, Pelanggaran, Pembinaan, Usulan remisi, Laporan, Panduan, Pengaturan (ganti password), dan Keluar.",
+        "Menu: Dashboard, Kehadiran kelas, Siswa kelas, Pembinaan, Usulan remisi, Laporan, Panduan, Pengaturan (ganti password), dan Keluar.",
         "Bila memegang lebih dari satu kelas, pilih kelas di bagian atas halaman. Anda hanya melihat siswa kelas binaan; siswa kelas lain tidak tampil.",
       ] },
-      { judul: "Izin dan sakit", langkah: [
-        "Menu Izin & kehadiran: siswa yang belum tap tampil dengan tombol Izin dan Sakit (Dispensasi dan Hadir manual tidak tersedia untuk wali).",
-        "Isi keterangan (wajib) dan centang bila surat fisik diterima. Tanggal mundur dibatasi sama seperti piket.",
-        "Siswa yang Alfa-nya sudah dikonfirmasi Waka tidak dapat diubah menjadi Izin atau Sakit.",
-      ] },
-      { judul: "Pelanggaran ringan", langkah: [
-        "Menu Pelanggaran: pilih siswa kelas binaan dan pelanggaran Ringan atau yang bertakziran dari daftar tata tertib. Poin dan takziran tetap dari daftar resmi.",
-        "Catatan Anda tampil di Catatan saya dan dapat dihapus dengan alasan. Pelanggaran Sedang/Berat dicatat oleh Waka.",
+      { judul: "Memantau kehadiran", langkah: [
+        "Menu Kehadiran kelas: status hari ini siswa kelas binaan (hanya melihat).",
+        "Wali kelas tidak mencatat Izin, Sakit, Dispensasi, atau pelanggaran. Bila orang tua memberi kabar izin atau ada pelanggaran, teruskan ke Guru Piket atau Waka.",
+        "Catatan wali yang lama tetap tersimpan dan tetap dihitung.",
       ] },
       { judul: "Laporan", langkah: [
         "Menu Laporan: pilih tahun ajaran dan tanggal dari sampai (maksimal 1 tahun ajaran), lalu tekan Tampilkan. Isinya satu baris per siswa kelas binaan yang sedang dipilih.",
@@ -282,7 +277,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       { judul: "Arti status", langkah: [
         "Tepat waktu: tap kartu sebelum batas masuk.",
         "Terlambat: tap kartu setelah batas masuk.",
-        "Izin atau Sakit: sekolah mencatat keterangan.",
+        "Izin atau Sakit: guru piket mencatat keterangan. Kabari piket sekolah bila anak tidak masuk.",
         "Dispensasi: anak mewakili sekolah (lomba dll). Dihitung HADIR.",
         "Tanpa keterangan (Alfa): tidak tap dan tidak ada keterangan.",
         "Belum tap: belum tap kartu dan batas keterlambatan belum lewat.",
@@ -306,8 +301,16 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
   },
 
   sop: {
-    kode: "sop", judul: "SOP Harian Presensi+", untuk: "Admin/TU, piket, dan waka", berkas: "SOP_HARIAN.md",
+    kode: "sop", judul: "SOP Harian Presensi+", untuk: "Semua peran (TU, piket, Wakasis, wali kelas, BK, Kepala)", berkas: "SOP_HARIAN.md",
     bagian: [
+      { judul: "Pembagian tugas: satu tugas satu pengisi", langkah: [
+        "TU (admin): pantau alat, kelola data siswa, akun, dan backup. Tidak mengisi izin, presensi, atau kalender.",
+        "Piket: izin harian (Izin, Sakit, Dispensasi), presensi manual, izin per jam dan Alfa per jam hari ini, pelanggaran Ringan.",
+        "Wakasis: validasi Alfa, pelanggaran Sedang atau Berat, saran pelanggaran, kalender, penugasan BK, izin pembinaan ke orang tua.",
+        "Wali kelas: memantau kelas, pembinaan T1, usulan remisi, laporan. Tidak mencatat izin atau pelanggaran.",
+        "Guru BK: pembinaan T2, konseling rahasia, usulan remisi.",
+        "Kepala Madrasah: cadangan Wakasis; pembinaan T3 sampai SP3; pemutus akhir.",
+      ] },
       { judul: "Pagi (sebelum jam masuk): cek alat online", langkah: [
         "Admin/TU: buka Dashboard, pastikan alat Online dan jam terakhir terlihat baru.",
         "Bila Offline: periksa listrik dan WiFi, tekan Restart di menu Perangkat, tunggu 1 sampai 2 menit.",
@@ -324,7 +327,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Waka: buka Perlu ditinjau, Setujui atau Abaikan saran pelanggaran (terlambat, tidak tap pulang, bolos jam, Lupa/Hilang KTM).",
         "Waka: isi Presensi per jam bila ada siswa bolos pelajaran (sel A).",
         "Waka: lihat banner Tap rendah di Dashboard; isi Presensi manual atau tekan Konfirmasi hari ini normal.",
-        "Waka/Admin: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H).",
+        "Waka: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H). TU mengingatkan lewat kartu Kontrol kalender.",
       ] },
       { judul: "Sabtu: backup", langkah: [
         "Admin: Pengaturan, kartu Backup terakhir, Buka Firebase Console, Ekspor JSON, simpan berkas di tempat aman (bukan hanya di laptop sekolah).",

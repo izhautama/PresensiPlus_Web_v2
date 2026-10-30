@@ -13,7 +13,7 @@ Untuk: Orang tua atau wali siswa
 
 1. Tepat waktu: tap kartu sebelum batas masuk.
 2. Terlambat: tap kartu setelah batas masuk.
-3. Izin atau Sakit: sekolah mencatat keterangan.
+3. Izin atau Sakit: guru piket mencatat keterangan. Kabari piket sekolah bila anak tidak masuk.
 4. Dispensasi: anak mewakili sekolah (lomba dll). Dihitung HADIR.
 5. Tanpa keterangan (Alfa): tidak tap dan tidak ada keterangan.
 6. Belum tap: belum tap kartu dan batas keterlambatan belum lewat.

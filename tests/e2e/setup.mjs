@@ -6,6 +6,14 @@ import { muatRulesTerverifikasi } from "../emu.mjs";
 
 export const T = hitungTanggal();
 
+/** Gabung dalam (deep merge) beberapa objek tanggal->data. Dipakai karena beberapa tanggal skenario bisa SAMA pada hari nyata tertentu
+ *  (mis. Selasa sesudah Minggu terakhir bulan: hariKerjaSekitarMinggu = kemarin); kunci kembar pada literal objek akan saling menimpa. */
+const gabung = (...sumber) => {
+  const out = {};
+  for (const x of sumber) for (const [k, v] of Object.entries(x)) out[k] = v && typeof v === "object" && !Array.isArray(v) && out[k] && typeof out[k] === "object" ? gabung(out[k], v) : v;
+  return out;
+};
+
 const DB = "http://127.0.0.1:9000";
 const AUTH = "http://127.0.0.1:9099";
 const OWNER = { Authorization: "Bearer owner" };
@@ -112,15 +120,17 @@ async function siapkan(nama, { ns, ver }) {
     attendance: attendanceDariLog({ [T.kemarin]: log13, [T.hariIni]: log14, [T.minggu]: log18 }),
     izin: { [T.kemarin]: { 444: "Sakit" } },
     validasi: { [T.kemarin]: { 555: { status: "Alfa", oleh: id.waka, ts: now } }, [T.minggu]: { 555: { status: "Alfa", oleh: id.waka, ts: now } } },
-    lessons: {
+    lessons: gabung(
+      {
       [T.kemarin]: {
         "XI IPS": { meta: { 2: { mapel: "Matematika" } }, absen: { 222: { 2: "A" } }, oleh: id.waka, ts: now },
         "X IPA": { absen: { 333: { 6: "S" } }, oleh: id.waka, ts: now },
       },
       // Uji laporan per jam: hari Minggu HARUS diabaikan (333 jam 1-3 Alfa & 555 jam 1 Alfa di hari Minggu); 333 jam 2 Dispensasi di hari kerja
-      [T.mingguBulanIni]: { "X IPA": { meta: { 1: { mapel: "Fikih" } }, absen: { 333: { 1: "A", 2: "A", 3: "A" }, 555: { 1: "A" } }, oleh: id.waka, ts: now } },
-      [T.hariKerjaSekitarMinggu]: { "X IPA": { absen: { 333: { 2: "D" } }, oleh: id.waka, ts: now } },
-    },
+      },
+      { [T.mingguBulanIni]: { "X IPA": { meta: { 1: { mapel: "Fikih" } }, absen: { 333: { 1: "A", 2: "A", 3: "A" }, 555: { 1: "A" } }, oleh: id.waka, ts: now } } },
+      { [T.hariKerjaSekitarMinggu]: { "X IPA": { absen: { 333: { 2: "D" } }, oleh: id.waka, ts: now } } },
+    ),
   };
   const put = await fetch(`${DB}/.json?ns=${ns}`, { method: "PUT", headers: OWNER, body: JSON.stringify(seed) });
   if (!put.ok) throw new Error(`gagal mengisi data awal (${nama}): ${put.status} ${await put.text()}`);

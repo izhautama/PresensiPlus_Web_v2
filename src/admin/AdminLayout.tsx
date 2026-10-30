@@ -107,9 +107,8 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
     base: "/wali", role: "Wali Kelas", short: "WL", menuLabel: "Menu wali kelas",
     nav: [
       { to: "/wali", label: "Dashboard", icon: "grid", title: "Dashboard wali kelas" },
-      { to: "/wali/izin", label: "Izin & kehadiran", icon: "check", title: "Izin & kehadiran kelas" },
+      { to: "/wali/kehadiran", label: "Kehadiran kelas", icon: "check", title: "Kehadiran kelas (hanya melihat)" },
       { to: "/wali/siswa", label: "Siswa kelas", icon: "users", title: "Siswa kelas binaan" },
-      { to: "/wali/pelanggaran", label: "Pelanggaran", icon: "warning", title: "Pelanggaran ringan" },
       { to: "/wali/pembinaan", label: "Pembinaan", icon: "bell", title: "Pembinaan siswa" },
       { to: "/wali/usulan", label: "Usulan remisi", icon: "file", title: "Usulan remisi" },
       { to: "/wali/laporan", label: "Laporan", icon: "download", title: "Laporan kelas binaan" },

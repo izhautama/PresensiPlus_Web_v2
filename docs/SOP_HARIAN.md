@@ -1,6 +1,15 @@
 # SOP Harian Presensi+
 
-Untuk: Admin/TU, piket, dan waka
+Untuk: Semua peran (TU, piket, Wakasis, wali kelas, BK, Kepala)
+
+## Pembagian tugas: satu tugas satu pengisi
+
+1. TU (admin): pantau alat, kelola data siswa, akun, dan backup. Tidak mengisi izin, presensi, atau kalender.
+2. Piket: izin harian (Izin, Sakit, Dispensasi), presensi manual, izin per jam dan Alfa per jam hari ini, pelanggaran Ringan.
+3. Wakasis: validasi Alfa, pelanggaran Sedang atau Berat, saran pelanggaran, kalender, penugasan BK, izin pembinaan ke orang tua.
+4. Wali kelas: memantau kelas, pembinaan T1, usulan remisi, laporan. Tidak mencatat izin atau pelanggaran.
+5. Guru BK: pembinaan T2, konseling rahasia, usulan remisi.
+6. Kepala Madrasah: cadangan Wakasis; pembinaan T3 sampai SP3; pemutus akhir.
 
 ## Pagi (sebelum jam masuk): cek alat online
 
@@ -21,7 +30,7 @@ Untuk: Admin/TU, piket, dan waka
 2. Waka: buka Perlu ditinjau, Setujui atau Abaikan saran pelanggaran (terlambat, tidak tap pulang, bolos jam, Lupa/Hilang KTM).
 3. Waka: isi Presensi per jam bila ada siswa bolos pelajaran (sel A).
 4. Waka: lihat banner Tap rendah di Dashboard; isi Presensi manual atau tekan Konfirmasi hari ini normal.
-5. Waka/Admin: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H).
+5. Waka: tetapkan tanggal merah atau ujian sebagai Libur di menu Kalender (sebaiknya sebelum hari H). TU mengingatkan lewat kartu Kontrol kalender.
 
 ## Sabtu: backup
 

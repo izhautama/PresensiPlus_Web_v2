@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { endAt, onValue, orderByKey, query, startAt } from "firebase/database";
 import { useAdminData } from "../admin/AdminData";
+import { useAuth } from "../auth/AuthContext";
 import { batasJam } from "../lib/attendance";
 import { AMBANG_BAWAAN, bangunRingkasan, hitungBukti, validAmbang, type OverrideKalender, type PetaHari, type RingkasanHari } from "../lib/hariEfektif";
 import type { ManualTap } from "../lib/manual";
@@ -44,7 +45,11 @@ let sudahOtomatis = "";
  *  - sekali per sesi/hari: kemarin dan hari-hari sebelumnya (maks. 31 hari) yang belum punya ringkasan;
  *  - hari ini: saat status efektif berubah, dan setelah jam pulang saat jumlah berubah (+ penanda tap rendah).
  */
-export function useKalenderOtomatis(aktifkan = true) {
+export function useKalenderOtomatis(aktifkanDasar = true) {
+  // v2.5.2: TU (admin) hanya membaca kalender. Penghitungan otomatis dimatikan menurut PERAN sesi (bukan komponen): Kepala yang memakai
+  // Dashboard yang sama tetap menghitung; waka dan piket juga.
+  const { session } = useAuth();
+  const aktifkan = aktifkanDasar && !!session && session.role !== "admin" && session.role !== "ortu";
   const { today, log, manualToday, now, schedule, ready, buktiSiap } = useAdminData();
   const tersimpan = useLive<RingkasanHari>(`kalenderEfektif/${today}`);
   const override = useLive<OverrideKalender>(`kalender/${today}`);
@@ -55,7 +60,7 @@ export function useKalenderOtomatis(aktifkan = true) {
     if (!aktifkan || sudahOtomatis === today) return;
     sudahOtomatis = today;
     hitungOtomatis(today).catch(() => { sudahOtomatis = ""; });
-  }, [today]);
+  }, [today, aktifkan]);
 
   const bukti = hitungBukti(log, manualToday);
   const lewatPulang = nowHM(now) >= batasJam(schedule, "Semua", namaHari(today)).Pulang[0];
@@ -66,7 +71,7 @@ export function useKalenderOtomatis(aktifkan = true) {
       .catch(() => { /* gagal sementara: dicoba lagi pada perubahan berikutnya */ })
       .finally(() => { sibuk.current = false; });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, buktiSiap, today, bukti.tap, bukti.manual, tersimpan.data, tersimpan.loading, override.data, override.loading, ambang, lewatPulang]);
+  }, [aktifkan, ready, buktiSiap, today, bukti.tap, bukti.manual, tersimpan.data, tersimpan.loading, override.data, override.loading, ambang, lewatPulang]);
 }
 
 /** Tanggal ber-tap rendah dalam 3 hari terakhir (untuk banner Dashboard). */

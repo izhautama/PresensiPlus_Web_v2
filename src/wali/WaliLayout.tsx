@@ -7,8 +7,7 @@ import { DisiplinKelasProvider } from "./DisiplinKelas";
 import { WaliDataProvider, useKelasWali } from "./WaliData";
 
 const Dashboard = lazy(() => import("./Dashboard"));
-const Beranda = lazy(() => import("../piket/Beranda"));
-const Pelanggaran = lazy(() => import("../piket/Pelanggaran"));
+const KehadiranKelas = lazy(() => import("./KehadiranKelas"));
 const SiswaKelas = lazy(() => import("./SiswaKelas"));
 const DetailSiswa = lazy(() => import("./DetailSiswa"));
 const Pembinaan = lazy(() => import("./Pembinaan"));
@@ -31,10 +30,10 @@ export default function WaliLayout() {
           <TanpaKelas />
           <Routes>
             <Route index element={<Dashboard />} />
-            <Route path="izin" element={<Beranda />} />
+            <Route path="kehadiran" element={<KehadiranKelas />} />
+            <Route path="izin" element={<Navigate to="/wali/kehadiran" replace />} />
             <Route path="siswa" element={<SiswaKelas />} />
             <Route path="siswa/:nis" element={<DetailSiswa />} />
-            <Route path="pelanggaran" element={<Pelanggaran />} />
             <Route path="pembinaan" element={<Pembinaan />} />
             <Route path="laporan" element={<Laporan />} />
             <Route path="usulan" element={<UsulanRemisi />} />

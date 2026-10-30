@@ -51,7 +51,7 @@ Klien baru memakai node baru (`pembinaan`, `usulRemisi`, ...); bila hosting lebi
 ## Peran
 | Peran | Dibuat oleh | Ringkas |
 |---|---|---|
-| `admin` | Firebase Console | Kelola siswa, jadwal, alat, akun pimpinan/staf. Kesiswaan hanya lihat. |
+| `admin` | Firebase Console | Kelola siswa, jadwal, alat, akun pimpinan/staf, backup (TU). Kesiswaan, izin, presensi, dan kalender **hanya lihat** (v2.5.2). |
 | `kepala`, `waka`, `piket` | Admin, di Pengaturan → "Akun Pimpinan & Staf" | `kepala`/`waka`: modul kesiswaan penuh (waka juga presensi per jam). `piket`: **akun bersama** meja piket, hak sangat sempit. |
 | `device` | Console | Alat ESP32; hanya menulis tap/log/status, tidak dapat menghapus. |
 
@@ -211,6 +211,25 @@ Branch `v2.5.1` (dari `v2.5`, belum di-tag, belum di-deploy).
 **E2E v2.5.1** (`tests/e2e/v251.spec.mjs`): 5 skenario, desktop 5/5 dan mobile 5/5 (laporan wali, laporan BK, tandai/batal hapus, cabut opsional dua jalur, lencana waka dan kepala).
 
 **Uji tertunda** (fase uji akhir v2.4 + v2.5 + v2.5.1): mutasi semua grup; E2E penuh `flow.spec.mjs`; mobile 5x.
+
+## Satu tugas satu pengisi (v2.5.2; keputusan Kepala Madrasah)
+
+Setiap data punya SATU peran pengisi; peran lain hanya melihat. Ditegakkan Security Rules (bukan hanya UI), dibangkitkan `scripts/build-rules.mjs`.
+
+| Data | Pengisi | Dicabut dari |
+|---|---|---|
+| Izin harian (`izin`, `izinMeta`, `attendance/.../ket`, `catatan`) | piket, waka, kepala | admin (TU), wali kelas |
+| Pelanggaran baru | piket (Ringan/bertakziran), waka, kepala | wali kelas (menu Pelanggaran dihapus) |
+| Kalender (`kalender`), ambang (`sistem/ambangHariEfektif`), konfirmasi `normal` | **waka**, **kepala** (cadangan Wakasis) | admin (TU) |
+| `kalenderEfektif` (hitung otomatis/ulang) | waka, kepala; piket dengan log `hitung-kalender` | admin |
+| `attendance/{nis}/{tgl}` | hanya alat (`device`), sekali tulis | admin |
+
+Catatan: (1) data lama TIDAK diubah; catatan pelanggaran/izin bersumber `wali` yang sudah ada tetap terbaca dan dihitung (waka/kepala masih dapat menghapus lunak). (2) Wali kelas kini memakai halaman baca-saja **Kehadiran kelas** (`src/wali/KehadiranKelas.tsx`) dengan catatan "kabar izin diteruskan ke Guru Piket"; alamat `/wali/izin` dialihkan ke sana. (3) Hitung otomatis `kalenderEfektif` (`useKalenderOtomatis`) dimatikan menurut PERAN sesi, bukan komponen: admin dan ortu tidak menulis; kepala (yang memakai Dashboard yang sama dengan admin), waka, dan piket tetap menghitung. (4) Kartu **Kontrol kalender** (`src/lib/kontrolKalender.ts` + `src/kesiswaan/KontrolKalender.tsx`, fungsi murni; Dashboard TU dan Waka/Kepala): hari kerja pada tahun ajaran berjalan sampai kemarin dengan tap 0, manual 0, tanpa override = kandidat tanggal merah/kegiatan; TU hanya mengingatkan Waka, Waka/Kepala punya tautan ke Kalender. Hari tanpa ringkasan dilaporkan terpisah ("belum dihitung") dan tidak dituduh. (5) `aktifSejak` migrasi kalender kini ditulis waka/kepala sekali saja per siswa dengan log `migrasi-kalender` (rules: tanpa data lama, tanggal valid); penanda `sistem/migrasiKalender` (sekali tulis, oleh/ts/dari/sampai, baca admin/waka/kepala) menonaktifkan tombol migrasi setelah dijalankan. (6) Panduan dan `docs/SOP_HARIAN.md` memuat bagian "Pembagian tugas" satu baris per peran; generator `scripts/buat-panduan.mjs` tidak diubah.
+
+**Status uji v2.5.2** (dijalankan 27 Oktober 2026 di emulator; tiap proses dibatasi 10 menit, log di luar repo; belum di-merge, belum di-tag, belum di-deploy):
+- `tsc` + `npm run build` bersih; `npm run test:unit` lolos (termasuk `tests/kontrolKalender.test.mjs` yang baru); `npm run test:rules` **2317 lolos, 0 gagal** (26 uji lama dibalik sesuai peran baru; uji baru: wali ditolak, admin ditolak, kepala boleh kalender/ambang/normal, `aktifSejak` dan penanda migrasi); `npm run test:migrasi` **97 + 41 lolos** (replay izin kini memakai Waka).
+- **E2E penuh**: desktop **51/51**, HP **51/51** (skenario baru: Data siswa tanpa ikon izin, Kontrol kalender TU lalu Waka, hitung kalender menurut peran, kepala mengatur override, admin hanya lihat, penanda migrasi, wali memantau saja). Seed E2E diperbaiki: tanggal skenario yang bisa kembar pada hari tertentu (Selasa sesudah Minggu terakhir bulan) kini digabung, bukan saling menimpa (kegagalan "5 vs 6 saran" itu ada juga di v2.5.1).
+- **Mutasi** (`tests/mutation.mjs`): `dasar` **31/31** (+2 ekuivalen), `kalender` **49/49**, `kritis` **41/41** (+1 ekuivalen), `wali` seluruh mutan hidup tertangkap (1 ekuivalen baru: izinMeta lingkup jam oleh wali, karena wali tidak lagi punya jalur tulis `izinMeta`); 24 mutan baru/diganti (hak wali dan admin yang dicabut, penanda migrasi, `aktifSejak`, kepala cadangan). Mutan lama bersumber hak wali yang kini mustahil dilaporkan USANG oleh harness (tidak dihapus). Grup `manual` **41/41** tertangkap (+2 ekuivalen; 43 mutan) dan `piket` **52/52** (+3 ekuivalen, 1 USANG: [36] `izinMeta` jendela `hariKe` piket, pola sudah tidak ada) dijalankan 28 Oktober 2026; tidak ada mutan yang lolos. Grup `pembinaan`, `bk`, `saran`, `perjam` tetap di daftar pengerasan pasca-rilis. **Deteksi migrasi kalender** (`src/lib/statusMigrasi.ts`): tanpa penanda `sistem/migrasiKalender`, tetapi semua profil punya `aktifSejak` dan `kalenderEfektif` berisi -> kartu Migrasi menampilkan "Migrasi sudah dijalankan (terdeteksi dari data)", tombol nonaktif; Waka/Kepala dapat menulis penanda sekali (dengan log) lewat "Tandai sudah dimigrasi". Uji: `tests/statusMigrasi.test.mjs` dan satu skenario E2E. **`aktifSejak` siswa baru**: tambah siswa di aplikasi (`tambahSiswa`, `src/services/db.ts`) sudah mengisi `profiles/{nis}/aktifSejak` = hari ini (waktu server) pada update yang sama; siswa tanpa `aktifSejak` dihitung Alpha untuk SEMUA hari efektif sejak awal rentang (`rekapSiswa`). Pagar: unit (`hariEfektif.test.mjs`, termasuk pemeriksaan statis `tambahSiswa`/`ubahSiswa`), rules (update gabungan tambah siswa oleh admin; waka, kepala, ortu ditolak), E2E (form Tambah siswa). Jalur impor Python (`scripts/migrasi_firebase.py`) belum mengisi `aktifSejak` untuk NIS baru. Hasil akhir: `test:rules` 2323/0, E2E desktop 53/53, HP 53/53.
 
 ## Status uji sprint final (tag `v2.5.1`; mencakup v2.4 + v2.5 + v2.5.1)
 

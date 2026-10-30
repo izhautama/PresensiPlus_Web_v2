@@ -23,18 +23,19 @@ Untuk: Waka Kesiswaan
 
 ## Presensi per jam dan saran
 
-1. Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Waka dapat menimpa atau menghapus sel apa pun, termasuk A dari piket (titik oranye), kapan saja dalam tahun ajaran.
-2. Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan dari status harian, tidak disimpan, dan hilang bila ada tap atau manual.
-3. Kartu A dari piket hari ini di Dashboard: tekan Tinjau di grid.
-4. Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM). Alfa seharian bukan pelanggaran otomatis; catat manual bila perlu.
-5. Centang saran lalu Setujui terpilih atau Abaikan. Tidak ada poin tanpa persetujuan Anda.
-6. Saran yang belum dipetakan ke aturan diberi peringatan; atur di Tata tertib, tab Pemetaan saran.
+1. Presensi per jam: pilih tanggal dan kelas, isi sel S, I, D, atau A per jam pelajaran lalu Simpan. Anda dapat menimpa atau menghapus sel apa pun, termasuk A dari piket (titik oranye).
+2. Siswa Alfa seharian otomatis tampil A di jam 1 sampai 9 (terkunci); berketerangan harian tampil I, S, atau D. Nilai ini diturunkan, tidak disimpan.
+3. Perlu ditinjau: saran pelanggaran otomatis (terlambat, tidak tap pulang, bolos jam, Lupa membawa KTM, Menghilangkan KTM).
+4. Centang saran lalu Setujui terpilih atau Abaikan. Tidak ada poin tanpa persetujuan Anda.
+5. Saran yang belum dipetakan ke aturan diberi peringatan; atur di Tata tertib, tab Pemetaan saran.
 
 ## Kalender dan tap rendah
 
-1. Menu Kalender: tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan; ambang dan Hitung ulang ada di halaman ini.
-2. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.
-3. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi, agar validasi Alfa dibuka.
+1. Menu Kalender adalah tugas Anda (Kepala cadangan; TU hanya melihat). Tanggal tanpa bukti bukan hari efektif, jadi siswa tidak dihitung Alpha. Atur Libur (tanggal merah, ujian) atau Efektif (hari pengganti) dengan alasan.
+2. Kartu Kontrol kalender di Dashboard mencantumkan hari kerja tanpa tap dan tanpa presensi manual yang belum Anda tandai; tandai lewat Buka Kalender.
+3. Ambang dan Hitung ulang ada di halaman Kalender. Migrasi sekali jalan: Periksa (dry-run) dulu, lalu Terapkan; setelahnya tombol nonaktif.
+4. Dashboard menampilkan banner Tap rendah bila tap hari itu kurang dari separuh biasanya. Validasi Alfa hari itu ditahan.
+5. Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi.
 
 ## Guru BK
 
@@ -46,11 +47,11 @@ Untuk: Waka Kesiswaan
 1. Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).
 2. Ubah kelas, Cabut, dan Pasang kembali ada pada tiap baris. Kelas tambahan dan pergantian massal hanya admin.
 
-> Catatan: Wali hanya melihat siswa kelasnya dan mencatat Izin/Sakit serta pelanggaran Ringan atau bertakziran; semua tindakannya tercatat di log.
+> Catatan: Wali hanya memantau siswa kelasnya (kehadiran, pembinaan, usulan remisi); izin dan pelanggaran dicatat piket atau Waka.
 
 ## Pembinaan dan usulan remisi
 
-1. Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK (lencana = siswa BK belum diklaim): Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap); pembatalan Kepala mengunci level.
+1. Pembinaan: rekap wali dan BK; koreksi yang Selesai (alasan wajib). Penugasan BK (lencana = siswa BK belum diklaim): Tunjuk atau Pindahkan. Izin ke orang tua: pembinaan tersembunyi sampai diizinkan (ringkas atau lengkap).
 2. Menu Usulan remisi: lencana angka menunjukkan usulan wali yang menunggu. Tekan Setujui (poin siswa langsung berkurang) atau Tolak (alasan wajib). Keputusan hanya dapat dibuat sekali.
 3. Tata tertib, tab Ambang pembinaan: Penanggung jawab tiap ambang (wali kelas, BK, atau Kepala) hanya dapat diubah Kepala, dan terkunci setelah ambang dipakai pembinaan.
 

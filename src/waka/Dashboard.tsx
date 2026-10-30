@@ -4,6 +4,7 @@ import Icon from "../components/Icon";
 import { Empty, StatusBadge } from "../components/ui";
 import { useAdminData } from "../admin/AdminData";
 import BannerTapRendah from "../kesiswaan/BannerTapRendah";
+import KontrolKalender from "../kesiswaan/KontrolKalender";
 import { useKalenderOtomatis } from "../kesiswaan/useKalender";
 import { initials, toneOf } from "../lib/attendance";
 import { labelTa, levelDari, perluTindakLanjut, poinBertanda, ringkas, taKey } from "../lib/discipline";
@@ -59,6 +60,7 @@ export default function Dashboard() {
   return (
     <>
       <BannerTapRendah />
+      <KontrolKalender />
       <section className="welcome">
         <div>
           <p className="eyebrow">KESISWAAN · {labelTa(ta).toUpperCase()}</p>

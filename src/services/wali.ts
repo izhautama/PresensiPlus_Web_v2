@@ -1,12 +1,9 @@
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { get, serverTimestamp } from "firebase/database";
 import { getSecondaryAuth } from "../lib/firebase";
-import { taKey, type Rule } from "../lib/discipline";
-import { hariKeDariTanggal } from "../lib/piket";
 import { kelasWaliKosong, rencanaPerbaikan, selisihCermin, selisihIndeks, type CerminWali, type HasilKonsistensi, type SiswaCfg, type StaffWali } from "../lib/konsistensi";
 import { kirimUpdate, sisipkanAktivitas } from "./aktivitas";
 import { PeranGagal, r } from "./db";
-import { newKey } from "./discipline";
 
 type Updates = Record<string, unknown>;
 export type Pengelola = "admin" | "waka";
@@ -131,43 +128,4 @@ export type SiswaWali = { nis: string; nama: string; kelas: string };
 /** Konteks tulis wali: uid akun + nama guru (akun per guru, tanpa layar pilih petugas). */
 export type KonteksWali = { uid: string; nama: string };
 
-/**
- * Catat pelanggaran Ringan/bertakziran dari MASTER (poin/nama/kategori/takziran identik master) dengan sumber "wali".
- * records + recordMeta (nama wali + hariKe untuk jendela waktu) + log aktivitas dalam SATU update. Tanpa piketHarian.
- */
-export async function pelanggaranWali(a: { siswa: SiswaWali[]; ruleId: string; rule: Rule; tanggal: string }, ctx: KonteksWali, sumber: "wali" | "bk" = "wali") {
-  const u: Updates = {};
-  sisipkanAktivitas(u, { aksi: "pelanggaran", nis: a.siswa.length === 1 ? a.siswa[0].nis : undefined, detail: `${a.rule.nama} (${a.rule.poin} poin) ${a.tanggal}: ${a.siswa.map((s) => s.nama).join(", ")}` });
-  for (const s of a.siswa) {
-    const id = newKey(`discipline/records/${s.nis}`);
-    u[`discipline/records/${s.nis}/${id}`] = {
-      jenis: "pelanggaran", refId: a.ruleId, nama: a.rule.nama, kategori: a.rule.kategori, poin: a.rule.poin,
-      tanggal: a.tanggal, ta: taKey(a.tanggal), sumber, ...(a.rule.takziran ? { takziran: a.rule.takziran } : {}),
-    };
-    u[`discipline/recordMeta/${s.nis}/${id}`] = { dibuatOleh: ctx.uid, dibuatNama: ctx.nama.slice(0, 60), dibuatTs: serverTimestamp(), hariKe: hariKeDariTanggal(a.tanggal) };
-  }
-  await kirimUpdate(u);
-}
-
-export type CatatanWali = {
-  nis: string; nama: string; kelas: string; pelanggaran: string; takziran?: string; petugas: string; hariKe: number;
-  refId: string; poin: number; kategori?: string; tanggal: string;
-};
-
-/** Soft delete catatan wali sendiri: hilang dari node publik; alasan + snapshot di recordMeta. */
-export async function hapusPelanggaranWali(a: { id: string; item: CatatanWali; alasan: string }, ctx: KonteksWali, sumber: "wali" | "bk" = "wali") {
-  const { item } = a;
-  const m = `discipline/recordMeta/${item.nis}/${a.id}`;
-  const u: Updates = {};
-  sisipkanAktivitas(u, { aksi: "hapus-pelanggaran", nis: item.nis, detail: `Hapus ${item.pelanggaran} (${item.nama}): ${a.alasan.trim()}` });
-  u[`discipline/records/${item.nis}/${a.id}`] = null;
-  u[`${m}/dihapus`] = true;
-  u[`${m}/alasanHapus`] = a.alasan.trim().slice(0, 200);
-  u[`${m}/snapshot`] = {
-    jenis: "pelanggaran", refId: item.refId, nama: item.pelanggaran, ...(item.kategori ? { kategori: item.kategori } : {}), poin: item.poin,
-    tanggal: item.tanggal, ta: taKey(item.tanggal), sumber, ...(item.takziran ? { takziran: item.takziran } : {}),
-  };
-  u[`${m}/diubahOleh`] = ctx.uid;
-  u[`${m}/diubahTs`] = serverTimestamp();
-  await kirimUpdate(u);
-}
+// (v2.5.2) pelanggaranWali/hapusPelanggaranWali dihapus: wali kelas tidak lagi mencatat pelanggaran (Piket/Waka/Kepala). Catatan lama bersumber 'wali' tetap sah.
