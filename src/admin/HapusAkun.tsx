@@ -35,7 +35,7 @@ export function TandaiHapusDialog({ uid, nama, email, peran, onClose }: {
     finally { setBusy(false); }
   };
   return (
-    <Modal title="Tandai hapus permanen" subtitle={`${nama} · ${PERAN_HAPUS_LABEL[peran]} · ${email}`} onClose={onClose} width={520}>
+    <Modal title="Hapus akun" subtitle={`${nama} · ${PERAN_HAPUS_LABEL[peran]} · ${email}`} onClose={onClose} width={520}>
       <form className="modal-form" onSubmit={submit} noValidate data-testid="form-tandai-hapus">
         <div className="notice warn"><Icon name="warning" size={17} /><span>Ini hanya MENANDAI. Akun Firebase Authentication dan datanya baru terhapus saat operator menjalankan skrip lokal <b>hapus_akun.py</b> (dry-run dulu). Penghapusan tidak dapat dibatalkan dan email menjadi bebas dipakai ulang. Jejak audit (log, pembinaan, konseling, catatan disiplin) tetap ada.</span></div>
         {peran === "bk" && <div className="notice" data-testid="peringatan-klaim-bk"><Icon name="users" size={17} /><span>Pastikan klaim BK akun ini sudah dilepas/dipindah oleh Waka. Skrip akan menolak bila masih ada klaim aktif.</span></div>}
@@ -45,7 +45,7 @@ export function TandaiHapusDialog({ uid, nama, email, peran, onClose }: {
         <Field label={`Ketik email untuk konfirmasi: ${email}`} error={err}>
           <input className="text-input" value={ketik} onChange={(e) => setKetik(e.target.value)} autoComplete="off" aria-label="Ketik email untuk konfirmasi" />
         </Field>
-        <div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Batal</button><button className="primary-button danger" disabled={busy}>{busy ? <Spinner /> : null}Tandai hapus permanen</button></div>
+        <div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Batal</button><button className="danger-button" disabled={busy}>{busy ? <Spinner /> : null}Hapus akun</button></div>
       </form>
     </Modal>
   );
@@ -65,7 +65,7 @@ export function DaftarMenungguHapus() {
     <article className="panel kepala-panel" data-testid="menunggu-dihapus">
       <div className="panel-header"><div><p className="panel-title">Menunggu dihapus permanen <span className="badge badge-lemah" data-testid="jumlah-menunggu-hapus">{daftar.length}</span></p><span>Dihapus oleh skrip lokal: buka notebook Setup_Migrasi_Firebase (sel Hapus akun) atau jalankan <code>python scripts/hapus_akun.py</code>; dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan setelah dijalankan.</span></div></div>
       {live.error ? <Empty icon="alert" title="Gagal memuat" text={live.error} /> : live.loading ? <div className="page-loader"><Spinner dark /></div> : daftar.length === 0 ? <p className="modal-note">Tidak ada akun yang menunggu dihapus.</p> : (
-        <div className="simple-list">
+        <div className="simple-list daftar-akun">
           {daftar.map(([uid, h]) => (
             <div key={uid} data-uid={uid}>
               <span><b>{h.nama}</b><small>{PERAN_HAPUS_LABEL[h.peran] ?? h.peran} · {h.email} · ditandai {tglMs(h.ts)}</small></span>

@@ -751,8 +751,11 @@ test("waka melihat hasil input piket: laporan izin & surat, nama petugas, menimp
   await expect(baris.filter({ hasText: "ANDI TEST" }).filter({ hasText: "seharian" })).toContainText("Bu Rina");
   await expect(baris.filter({ hasText: "BUDI TEST" }).first()).toContainText("jam ke-7");
   await page.getByLabel("Hanya tanpa surat fisik").check();
-  await expect(baris.filter({ hasText: "CITRA TEST" })).toHaveCount(1); // Izin terencana tanpa surat
-  await expect(baris.filter({ hasText: "EKO TEST" })).toHaveCount(1); // Dispensasi tanpa surat
+  // izin terencana CITRA jatuh pada T.besok: laporan hanya menampilkan sampai BULAN INI (input bulan dibatasi max = bulan ini),
+  // jadi pada hari terakhir bulan "besok" ada di bulan depan dan memang tidak tampil di laporan bulan ini
+  const besokBulanIni = T.besok.slice(0, 7) === T.hariIni.slice(0, 7);
+  await expect(baris.filter({ hasText: "CITRA TEST" })).toHaveCount(besokBulanIni ? 1 : 0); // Izin terencana tanpa surat
+  await expect(baris.filter({ hasText: "EKO TEST" })).toHaveCount(1); // Dispensasi tanpa surat (bukan tanggal besok)
   await expect(baris.filter({ hasText: "DINA TEST" })).toHaveCount(0); // surat diterima
   await expect(baris.filter({ hasText: "ANDI TEST" })).toHaveCount(0);
 

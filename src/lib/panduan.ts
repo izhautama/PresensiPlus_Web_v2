@@ -48,7 +48,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.",
       ] },
       { judul: "Hapus akun permanen", langkah: [
-        "Wali kelas atau Guru BK yang sudah dicabut: tekan Tandai hapus permanen, isi alasan, ketik email. Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
+        "Wali kelas atau Guru BK yang sudah dicabut: tekan Hapus akun, isi alasan, ketik email (tombol ini hanya menandai; akun baru benar-benar terhapus setelah skrip hapus_akun.py dijalankan). Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
         "Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.",
         "BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu. Akun yang dicabut sebelum v2.5.1: Firebase Console, Authentication, Users, titik tiga, Delete account.",
       ] },

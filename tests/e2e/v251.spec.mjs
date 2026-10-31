@@ -178,17 +178,29 @@ test("admin: tandai hapus permanen akun BK yang dicabut lalu batalkan; admin tid
   const baris = page.locator(`[data-uid="${uidBkHapus}"]`);
   await expect(baris.getByText("Dicabut", { exact: true })).toBeVisible();
   await expect(page.locator(`[data-uid="${uidBk}"]`).getByTestId("tandai-hapus"), "akun aktif tidak punya tombol hapus").toHaveCount(0);
+  // tata letak: tombol aksi bertuliskan teks tidak terpotong/saling menimpa dan daftar tidak punya scrollbar sendiri
+  await expect(baris.getByRole("button", { name: /^Hapus akun/ })).toHaveText("Hapus akun");
+  const kotak = await baris.locator(".row-actions button").evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, bt: b.bottom, w: b.width, teksPenuh: e.scrollWidth <= e.clientWidth + 1 }; }));
+  expect(kotak.length, "Pasang kembali, Hapus akun, Reset password").toBe(3);
+  for (const k of kotak) { expect(k.w, "tombol cukup lebar untuk teksnya").toBeGreaterThan(60); expect(k.teksPenuh, "teks tombol tidak terpotong").toBe(true); }
+  for (let i = 0; i < kotak.length; i++) for (let j = i + 1; j < kotak.length; j++) {
+    const a = kotak[i], b = kotak[j];
+    const bertumpuk = a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.bt - 0.5 && b.t < a.bt - 0.5;
+    expect(bertumpuk, `tombol ${i} dan ${j} tidak saling menimpa`).toBe(false);
+  }
+  const daftar = page.getByTestId("daftar-bk").locator(".simple-list");
+  expect(await daftar.evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1), "daftar tanpa scrollbar").toBe(true);
   await baris.getByTestId("tandai-hapus").click();
   const dlg = page.getByTestId("form-tandai-hapus");
   await expect(dlg.getByTestId("peringatan-klaim-bk")).toContainText("Pastikan klaim BK akun ini sudah dilepas/dipindah oleh Waka. Skrip akan menolak bila masih ada klaim aktif.");
-  await dlg.getByRole("button", { name: "Tandai hapus permanen" }).click();
+  await dlg.getByRole("button", { name: "Hapus akun" }).click();
   await expect(dlg.getByText("Alasan 10-300 karakter")).toBeVisible();
   await dlg.getByLabel("Alasan penghapusan").fill("Guru sudah pindah tugas ke sekolah lain");
   await dlg.getByLabel("Ketik email untuk konfirmasi").fill("salah@x.test");
-  await dlg.getByRole("button", { name: "Tandai hapus permanen" }).click();
+  await dlg.getByRole("button", { name: "Hapus akun" }).click();
   await expect(dlg.getByText(/Ketik email akun persis/)).toBeVisible();
   await dlg.getByLabel("Ketik email untuk konfirmasi").fill(emailStaf("bkhapus"));
-  await dlg.getByRole("button", { name: "Tandai hapus permanen" }).click();
+  await dlg.getByRole("button", { name: "Hapus akun" }).click();
   await expect(dlg).toHaveCount(0);
   expect((await rest("GET", `hapusAkun/${uidBkHapus}`))?.peran).toBe("bk");
   await menu(page, "Pengaturan");
