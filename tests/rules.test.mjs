@@ -2618,25 +2618,49 @@ await tolak("konselingAudit: kepala TIDAK menulis", kepala, "PUT", "konselingAud
 const umum = JSON.stringify((await http("GET", "discipline/audit", { owner: true })).json ?? {}) + JSON.stringify((await http("GET", "activity", { owner: true })).json ?? {});
 await cek("konseling: isi catatan tidak bocor ke audit umum / log aktivitas (klien menulis detail tanpa isi)", waka, `activity/${TGLN}`, () => !umum.includes("masalah keluarga yang memengaruhi belajarnya"));
 
-// ---- AKUN BK: dibuat admin (bebas) dan waka (per-field, hanya role 'bk' bersama staff.role 'bk')
+// ---- AKUN BK (v2.5.3): dikelola admin (bebas, termasuk hapus) dan KEPALA (per-field: buat, cabut, pasang kembali); waka TIDAK lagi
 const staffBkBaru = (uid, nama) => ({ [`staff/${uid}/email`]: `${nama}@uji.test`, [`staff/${uid}/nama`]: nama, [`staff/${uid}/role`]: "bk", [`staff/${uid}/dibuat`]: SV_ANGKA });
+const cerminBk = (uid, nama) => ({ [`bkAkun/${uid}/email`]: `${nama}@uji.test`, [`bkAkun/${uid}/nama`]: nama, [`bkAkun/${uid}/aktif`]: true });
 await uji("akun BK: admin membuat (role + staff)", admin, "PATCH", "", { [`roles/${bkBaru1.uid}`]: "bk", [`staff/${bkBaru1.uid}`]: stfBk("bkbaru1"), [`bkAkun/${bkBaru1.uid}`]: { email: "bkbaru1@uji.test", nama: "bkbaru1", aktif: true } }, "izin");
-await uji("akun BK: waka membuat (role + staff per-field + cermin bkAkun)", waka, "PATCH", "", { [`roles/${bkBaru2.uid}`]: "bk", ...staffBkBaru(bkBaru2.uid, "bkbaru2"), [`bkAkun/${bkBaru2.uid}/email`]: "bkbaru2@uji.test", [`bkAkun/${bkBaru2.uid}/nama`]: "bkbaru2", [`bkAkun/${bkBaru2.uid}/aktif`]: true }, "izin");
-await uji("akun BK: waka memasang role 'bk' pada uid segar TANPA staff.role 'bk' DITOLAK", waka, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk" }, "tolak");
-await uji("akun BK: waka memasang role 'bk' dengan staff.role 'wali' DITOLAK", waka, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk", [`staff/${bkBaru3.uid}/email`]: "x@uji.test", [`staff/${bkBaru3.uid}/nama`]: "x", [`staff/${bkBaru3.uid}/role`]: "wali", [`staff/${bkBaru3.uid}/dibuat`]: SV_ANGKA }, "tolak");
-await tolak("akun BK: waka TIDAK memberi role 'admin'", waka, "PUT", `roles/${bkBaru2.uid}`, "admin");
-await tolak("akun BK: waka TIDAK memberi role 'kepala'", waka, "PUT", `roles/${bkBaru2.uid}`, "kepala");
-await tolak("akun BK: waka TIDAK menulis node staff utuh", waka, "PUT", `staff/${bkBaru2.uid}`, stfBk("bkbaru2"));
-await tolak("akun BK: kepala TIDAK membuat akun", kepala, "PUT", `roles/${bkBaru1.uid}`, "bk");
+await uji("akun BK: waka TIDAK membuat (role + staff per-field + cermin bkAkun)", waka, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk", ...staffBkBaru(bkBaru3.uid, "bkbaru3"), ...cerminBk(bkBaru3.uid, "bkbaru3") }, "tolak");
+await tolak("akun BK: waka TIDAK menulis role 'bk' saja", waka, "PUT", `roles/${bkBaru3.uid}`, "bk");
+await tolak("akun BK: waka TIDAK menulis entri staff BK per-field", waka, "PUT", `staff/${bkBaru3.uid}/role`, "bk");
+await tolak("akun BK: waka TIDAK menulis cermin bkAkun", waka, "PUT", `bkAkun/${bkBaru3.uid}/aktif`, true);
+await uji("akun BK: kepala membuat (role + staff per-field + cermin bkAkun)", kepala, "PATCH", "", { [`roles/${bkBaru2.uid}`]: "bk", ...staffBkBaru(bkBaru2.uid, "bkbaru2"), ...cerminBk(bkBaru2.uid, "bkbaru2") }, "izin");
+await uji("akun BK: kepala memasang role 'bk' pada uid segar TANPA staff.role 'bk' DITOLAK", kepala, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk" }, "tolak");
+await uji("akun BK: kepala memasang role 'bk' dengan staff.role 'wali' DITOLAK", kepala, "PATCH", "", { [`roles/${bkBaru3.uid}`]: "bk", [`staff/${bkBaru3.uid}/email`]: "x@uji.test", [`staff/${bkBaru3.uid}/nama`]: "x", [`staff/${bkBaru3.uid}/role`]: "wali", [`staff/${bkBaru3.uid}/dibuat`]: SV_ANGKA }, "tolak");
+await uji("akun BK: kepala membuat entri staff role 'wali' / 'waka' DITOLAK", kepala, "PATCH", "", { [`staff/${bkBaru3.uid}/email`]: "x@uji.test", [`staff/${bkBaru3.uid}/nama`]: "x", [`staff/${bkBaru3.uid}/role`]: "waka", [`staff/${bkBaru3.uid}/dibuat`]: SV_ANGKA }, "tolak");
+for (const r of ["admin", "kepala", "waka", "piket", "wali"]) await tolak(`akun BK: kepala TIDAK memberi role '${r}'`, kepala, "PUT", `roles/${bkBaru3.uid}`, r);
+await tolak("akun BK: kepala TIDAK menulis node staff utuh", kepala, "PUT", `staff/${bkBaru2.uid}`, stfBk("bkbaru2"));
+await tolak("akun BK: kepala TIDAK mencabut akun non-BK (waka)", kepala, "DELETE", `roles/${waka.uid}`);
+await tolak("akun BK: kepala TIDAK mencabut akun non-BK (piket)", kepala, "DELETE", `roles/${piket.uid}`);
+await tolak("akun BK: kepala TIDAK mencabut akun wali", kepala, "DELETE", `roles/${waliA.uid}`);
 await tolak("akun BK: piket TIDAK membuat akun", piket, "PUT", `roles/${bkBaru1.uid}`, "bk");
-await izin("akun BK: waka mencabut (hapus role bk)", waka, "DELETE", `roles/${bkBaru2.uid}`);
-await izin("akun BK: waka menonaktifkan di cermin (aktif=false)", waka, "PUT", `bkAkun/${bkBaru2.uid}/aktif`, false);
-await izin("akun BK: waka membaca cermin bkAkun", waka, "GET", "bkAkun");
+await tolak("akun BK: waka TIDAK mencabut (hapus role bk)", waka, "DELETE", `roles/${bkBaru2.uid}`);
+await tolak("akun BK: waka TIDAK menonaktifkan di cermin (aktif=false)", waka, "PUT", `bkAkun/${bkBaru2.uid}/aktif`, false);
+await izin("akun BK: kepala mencabut (hapus role bk)", kepala, "DELETE", `roles/${bkBaru2.uid}`);
+await izin("akun BK: kepala menonaktifkan di cermin (aktif=false)", kepala, "PUT", `bkAkun/${bkBaru2.uid}/aktif`, false);
+// staff.role = 'bk' sudah ada, role dicabut: kepala tetap hanya boleh memasang 'bk' (bukan role lain)
+for (const r of ["admin", "kepala", "waka", "piket", "wali"]) await tolak(`akun BK: kepala TIDAK memasang role '${r}' pada akun yang staff.role-nya 'bk'`, kepala, "PUT", `roles/${bkBaru2.uid}`, r);
+// cermin bkAkun milik akun yang BUKAN BK (staff.role 'wali', data tidak konsisten buatan admin): kepala tidak boleh mengubah aktif
+await http("PUT", `staff/${bkBaru3.uid}`, { owner: true, body: { email: "bkbaru3@uji.test", nama: "bkbaru3", role: "wali", dibuat: 1 } });
+await http("PUT", `bkAkun/${bkBaru3.uid}`, { owner: true, body: { email: "bkbaru3@uji.test", nama: "bkbaru3", aktif: false } });
+await tolak("akun BK: kepala TIDAK mengubah aktif cermin untuk akun yang staff.role-nya bukan 'bk'", kepala, "PUT", `bkAkun/${bkBaru3.uid}/aktif`, true);
+await http("DELETE", `bkAkun/${bkBaru3.uid}`, { owner: true });
+await http("DELETE", `staff/${bkBaru3.uid}`, { owner: true });
+await izin("akun BK: waka membaca cermin bkAkun (untuk penugasan)", waka, "GET", "bkAkun");
 await izin("akun BK: kepala membaca cermin bkAkun", kepala, "GET", "bkAkun");
-await tolak("akun BK: waka TIDAK mengubah email cermin yang sudah ada", waka, "PUT", `bkAkun/${bkBaru2.uid}/email`, "ganti@uji.test");
+await tolak("akun BK: kepala TIDAK mengubah email cermin yang sudah ada", kepala, "PUT", `bkAkun/${bkBaru2.uid}/email`, "ganti@uji.test");
+await tolak("akun BK: kepala TIDAK menghapus cermin bkAkun", kepala, "DELETE", `bkAkun/${bkBaru2.uid}`);
+await tolak("akun BK: kepala TIDAK menghapus entri staff", kepala, "DELETE", `staff/${bkBaru2.uid}`);
+await tolak("akun BK: kepala TIDAK membaca node staff", kepala, "GET", "staff");
+await uji("akun BK: kepala TIDAK menghapus staff + bkAkun lewat update gabungan", kepala, "PATCH", "", { [`staff/${bkBaru2.uid}`]: null, [`bkAkun/${bkBaru2.uid}`]: null }, "tolak");
 await izin("akun BK: akun BK membaca bkAkun (v2.5: daftar BK untuk penunjukan/pemindahan)", bkA, "GET", "bkAkun");
 await tolak("akun BK: wali TIDAK membaca bkAkun", waliA, "GET", "bkAkun");
 await tolak("akun BK: piket TIDAK membaca bkAkun", piket, "GET", "bkAkun");
+await izin("akun BK: kepala memasang kembali role bk (staff.role sudah 'bk')", kepala, "PUT", `roles/${bkBaru2.uid}`, "bk");
+await izin("akun BK: kepala mengaktifkan kembali cermin (aktif=true)", kepala, "PUT", `bkAkun/${bkBaru2.uid}/aktif`, true);
+await izin("akun BK: admin mencabut lalu memasang kembali role bk", admin, "DELETE", `roles/${bkBaru2.uid}`);
 await izin("akun BK: admin memasang kembali role bk", admin, "PUT", `roles/${bkBaru2.uid}`, "bk");
 
 seksi("PERANGKAT PIKET — piketPerangkat (create-only)");

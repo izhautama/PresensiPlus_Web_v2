@@ -13,11 +13,12 @@ import { buatAkunBk, cabutBk, pasangAkunBk, pasangKembaliBk, type BkAkun, type P
 
 /**
  * Pengelolaan akun Guru BK (akun per guru; wewenang lintas semua kelas, tanpa wewenang izin/Alfa/presensi).
- * ADMIN dan WAKA dapat membuat/mencabut akun; catatan konseling hanya dapat dibaca BK dan Kepala (bukan pengelola akun).
+ * ADMIN dan KEPALA dapat membuat/mencabut/memasang kembali akun (v2.5.3; waka tidak lagi). Hanya ADMIN yang dapat menghapus akun dan mereset password.
+ * Catatan konseling hanya dapat dibaca BK dan Kepala.
  */
 export default function GuruBk() {
   const mode = usePanelMode();
-  const oleh: Pengelola = mode === "admin" ? "admin" : "waka";
+  const oleh: Pengelola = mode === "admin" ? "admin" : "kepala";
   const notify = useToast();
   const live = useLive<Record<string, BkAkun>>("bkAkun");
   const daftar = useMemo(() => Object.entries(live.data ?? {}).sort((a, b) => a[1].nama.localeCompare(b[1].nama)), [live.data]);

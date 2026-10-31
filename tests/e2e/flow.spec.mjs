@@ -2336,7 +2336,7 @@ test("v2.4 lupa KTM lengkap: manual 07:05 lalu tap alat 07:40 tetap HADIR; jam d
 });
 
 // ===================================================================== v2.4-b: PERAN BK (Guru Bimbingan Konseling)
-test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat siswa semua kelas", async ({ page, browser }) => {
+test("bk: admin dan kepala membuat akun BK (waka tidak); BK masuk ke panel /bk dan melihat siswa semua kelas", async ({ page, browser }) => {
   const lap = await siapkan(page);
   await loginStaf(page, "admin");
   await menu(page, "Guru BK");
@@ -2363,11 +2363,11 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   await expect(page).toHaveURL(/\/admin\/guru-bk$/);
   bersih(lap, "admin (guru BK)");
 
-  // waka: juga boleh membuat akun BK (per-field), tetapi tidak melihat catatan konseling
+  // kepala: juga boleh membuat akun BK (per-field), tetapi tidak dapat menghapus akun atau mereset password (khusus admin)
   const kW = await browser.newContext(opsiKonteks());
   const pw = await kW.newPage();
   const lapW = await siapkan(pw);
-  await loginStaf(pw, "waka");
+  await loginStaf(pw, "kepala");
   await menu(pw, "Guru BK");
   await expect(pw.getByTestId("daftar-bk")).toContainText("Bu Konselor Satu");
   await pw.getByRole("button", { name: "Tambah guru BK" }).click();
@@ -2378,9 +2378,29 @@ test("bk: admin dan waka membuat akun BK; BK masuk ke panel /bk dan melihat sisw
   await d2.getByLabel("Ulangi password").fill("sementara-123");
   await d2.getByRole("button", { name: "Simpan" }).click();
   await expect(toast(pw)).toContainText("Akun BK Pak Konselor Dua dibuat");
-  await expect(pw.locator("aside.sidebar").getByRole("link", { name: /^Konseling/ })).toHaveCount(0);
-  bersih(lapW, "waka (guru BK)");
+  const baris2 = pw.locator("[data-testid=daftar-bk] [data-uid]", { hasText: "Pak Konselor Dua" });
+  await expect(baris2).toContainText("Aktif");
+  await expect(baris2.getByRole("button", { name: "Reset password Pak Konselor Dua" }), "kepala tidak mereset password").toHaveCount(0);
+  await baris2.getByRole("button", { name: "Cabut Pak Konselor Dua" }).click();
+  await expect(toast(pw)).toContainText("Akses Pak Konselor Dua dicabut");
+  await expect(baris2).toContainText("Dicabut");
+  await expect(baris2.getByRole("button", { name: "Hapus akun Pak Konselor Dua" }), "kepala tidak menghapus akun").toHaveCount(0);
+  await baris2.getByRole("button", { name: "Pasang kembali Pak Konselor Dua" }).click();
+  await expect(toast(pw)).toContainText("Akses Pak Konselor Dua dipasang kembali");
+  await expect(baris2).toContainText("Aktif");
+  bersih(lapW, "kepala (guru BK)");
   await kW.close();
+
+  // waka: tidak lagi mengelola akun BK (tanpa menu, rute dialihkan)
+  const kWk = await browser.newContext(opsiKonteks());
+  const pwk = await kWk.newPage();
+  const lapWk = await siapkan(pwk);
+  await loginStaf(pwk, "waka");
+  await expect(pwk.locator("aside.sidebar").getByRole("link", { name: /^Guru BK/ })).toHaveCount(0);
+  await pwk.goto("/waka/guru-bk");
+  await expect(pwk).toHaveURL(/\/waka$/);
+  bersih(lapWk, "waka (tanpa guru BK)");
+  await kWk.close();
 
   // BK masuk: panel /bk, siswa dari SEMUA kelas, menu tanpa izin/Alfa/manual
   const kB = await browser.newContext(opsiKonteks());

@@ -19,7 +19,6 @@ const Panduan = lazy(() => import("../pages/Panduan"));
 const PembinaanRekap = lazy(() => import("../kesiswaan/PembinaanRekap"));
 const UsulanRemisi = lazy(() => import("../kesiswaan/UsulanRemisi"));
 const WaliKelas = lazy(() => import("../kesiswaan/WaliKelas"));
-const GuruBk = lazy(() => import("../kesiswaan/GuruBk"));
 const IzinOrtu = lazy(() => import("../kesiswaan/IzinOrtu"));
 const PenugasanBk = lazy(() => import("../kesiswaan/PenugasanBk"));
 const Kalender = lazy(() => import("../kesiswaan/Kalender"));
@@ -46,7 +45,6 @@ export default function WakaLayout() {
           <Route path="audit" element={<Audit />} />
           <Route path="presensi-manual" element={<PresensiManual />} />
           <Route path="wali-kelas" element={<WaliKelas />} />
-          <Route path="guru-bk" element={<GuruBk />} />
           <Route path="kalender" element={<Kalender />} />
           <Route path="panduan" element={<Panduan peran="waka" />} />
           <Route path="log-aktivitas" element={<LogAktivitas />} />

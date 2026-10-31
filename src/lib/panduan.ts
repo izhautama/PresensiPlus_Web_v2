@@ -45,10 +45,10 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Guru BK", langkah: [
         "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara); akun per guru, lintas kelas.",
-        "Cabut dan Pasang kembali seperti wali. Konseling hanya terbaca BK.",
+        "Cabut, Pasang kembali, Reset password, Hapus akun. Kepala hanya menambah, mencabut, memasang kembali.",
       ] },
       { judul: "Hapus akun permanen", langkah: [
-        "Guru BK yang sudah dicabut: tekan Hapus akun, isi alasan, ketik email; akun langsung hilang dari aplikasi (Waka harus sudah melepas klaimnya). Akun login di Firebase Authentication baru terhapus setelah skrip hapus_akun.py dijalankan (opsional). Wali kelas dicabut: tekan Tandai hapus akun (hanya menandai). Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
+        "Guru BK yang sudah dicabut: tekan Hapus akun, isi alasan, ketik email; akun langsung hilang dari aplikasi (Waka harus sudah melepas klaimnya). Akun login di Firebase Authentication baru terhapus setelah skrip hapus_akun.py dijalankan (opsional). Wali kelas dicabut: tekan Tandai hapus akun (hanya menandai). Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).",
         "Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.",
         "BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu. Akun yang dicabut sebelum v2.5.1: Firebase Console, Authentication, Users, titik tiga, Delete account.",
       ] },
@@ -94,11 +94,12 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
       ] },
       { judul: "Pembinaan dan usulan remisi", langkah: [
         "Menu Pembinaan: bagian Perlu dibina (Kepala) memuat siswa pada ambang Kepala (lv03 dan seterusnya) dengan tombol Catat pembinaan; lencana menu = yang belum selesai. Rekap semua kelompok dapat disaring dan diunduh CSV. Anda dapat mengoreksi pembinaan Selesai di bawahnya (alasan wajib).",
+        "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Hanya menonaktifkan; menghapus akun dan reset password tugas Admin. Klaim aktif tampil per akun; mencabut BK yang masih memegang klaim menampilkan daftar siswa dan tombol ke Penugasan BK.",
         "Menu Penugasan BK (lencana = siswa BK belum diklaim), Izin ke orang tua, dan Migrasi pembinaan (sekali, pratinjau dulu). Catatan konseling rahasia hanya terbaca BK, tidak oleh Kepala.",
         "Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.",
       ] },
       { judul: "Yang tidak dapat dilakukan", langkah: [
-        "Mengelola akun staf, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.",
+        "Mengelola akun staf selain BK, menghapus akun BK, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.",
         "Melihat Log aktivitas akun piket: hanya Admin dan Waka.",
       ] },
     ],
@@ -138,8 +139,8 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
         "Isi Presensi manual untuk siswa yang hadir, atau tekan Konfirmasi hari ini normal bila memang sepi.",
       ] },
       { judul: "Guru BK", langkah: [
-        "Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Konseling hanya terbaca BK.",
-        "Klaim aktif tampil per akun. Mencabut BK yang masih memegang klaim menampilkan daftar siswa dan tombol ke Penugasan BK.",
+        "Akun Guru BK dikelola Admin dan Kepala, bukan Waka. Anda tetap menugaskan BK ke siswa lewat menu Penugasan BK.",
+        "Perlu akun BK baru atau dicabut? Minta Kepala atau Admin.",
       ] },
       { judul: "Wali kelas", langkah: [
         "Menu Wali kelas: Tambah wali kelas, isi nama, email asli, password sementara, dan kelas utama (tepat satu).",
@@ -239,7 +240,7 @@ export const PANDUAN: Record<KodePanduan, Panduan> = {
     kode: "bk", judul: "Panduan Guru BK", untuk: "Guru Bimbingan Konseling (akun per guru)", berkas: "PANDUAN_BK.md",
     bagian: [
       { judul: "Masuk dan menu", langkah: [
-        "Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).",
+        "Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau kepala (akun milik Anda sendiri, jangan dibagikan).",
         "Menu: Dashboard, Siswa, Pembinaan, Usulan remisi, Laporan, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.",
         "Anda tidak mencatat pelanggaran dan tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.",
       ] },

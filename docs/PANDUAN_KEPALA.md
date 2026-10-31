@@ -31,12 +31,13 @@ Untuk: Kepala Madrasah
 ## Pembinaan dan usulan remisi
 
 1. Menu Pembinaan: bagian Perlu dibina (Kepala) memuat siswa pada ambang Kepala (lv03 dan seterusnya) dengan tombol Catat pembinaan; lencana menu = yang belum selesai. Rekap semua kelompok dapat disaring dan diunduh CSV. Anda dapat mengoreksi pembinaan Selesai di bawahnya (alasan wajib).
-2. Menu Penugasan BK (lencana = siswa BK belum diklaim), Izin ke orang tua, dan Migrasi pembinaan (sekali, pratinjau dulu). Catatan konseling rahasia hanya terbaca BK, tidak oleh Kepala.
-3. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
+2. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Hanya menonaktifkan; menghapus akun dan reset password tugas Admin. Klaim aktif tampil per akun; mencabut BK yang masih memegang klaim menampilkan daftar siswa dan tombol ke Penugasan BK.
+3. Menu Penugasan BK (lencana = siswa BK belum diklaim), Izin ke orang tua, dan Migrasi pembinaan (sekali, pratinjau dulu). Catatan konseling rahasia hanya terbaca BK, tidak oleh Kepala.
+4. Menu Usulan remisi: Anda dapat menyetujui atau menolak usulan wali (alasan wajib bila menolak). Keputusan hanya sekali.
 
 ## Yang tidak dapat dilakukan
 
-1. Mengelola akun staf, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.
+1. Mengelola akun staf selain BK, menghapus akun BK, mereset PIN orang tua, atau mengubah data siswa dan jadwal: tugas Admin.
 2. Melihat Log aktivitas akun piket: hanya Admin dan Waka.
 
 ---

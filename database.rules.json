@@ -5,7 +5,7 @@
     "roles": {
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('roles').child(auth.uid).val() === 'admin')",
-        ".write": "auth != null && $uid !== auth.uid && ((root.child('roles').child(auth.uid).val() === 'admin' && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket' || data.val() === 'wali' || data.val() === 'bk') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk')) || (root.child('roles').child(auth.uid).val() === 'waka' && ((data.val() === 'bk' && !newData.exists()) || (!data.exists() && newData.val() === 'bk' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'bk') || (data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket') || (data.val() === 'wali' && !newData.exists()) || (!data.exists() && newData.val() === 'wali' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'))))",
+        ".write": "auth != null && $uid !== auth.uid && ((root.child('roles').child(auth.uid).val() === 'admin' && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket' || data.val() === 'wali' || data.val() === 'bk') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk')) || (root.child('roles').child(auth.uid).val() === 'kepala' && ((data.val() === 'bk' && !newData.exists()) || (!data.exists() && newData.val() === 'bk' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'bk'))) || (root.child('roles').child(auth.uid).val() === 'waka' && ((data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket') || (data.val() === 'wali' && !newData.exists()) || (!data.exists() && newData.val() === 'wali' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'))))",
         ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'"
       }
     },
@@ -16,19 +16,19 @@
         ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
         ".validate": "newData.hasChildren(['email', 'nama', 'role', 'dibuat'])",
         "email": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && (newData.parent().child('role').val() === 'wali' || newData.parent().child('role').val() === 'bk')",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().child('role').val() === 'wali' || auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().child('role').val() === 'bk'",
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
         },
         "nama": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && (newData.parent().child('role').val() === 'wali' || newData.parent().child('role').val() === 'bk')",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().child('role').val() === 'wali' || auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().child('role').val() === 'bk'",
           ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
         },
         "role": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && (newData.parent().child('role').val() === 'wali' || newData.parent().child('role').val() === 'bk') && (newData.val() === 'wali' || newData.val() === 'bk')",
+          ".write": "(auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().child('role').val() === 'wali' && newData.val() === 'wali') || (auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().child('role').val() === 'bk' && newData.val() === 'bk')",
           ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'"
         },
         "dibuat": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && (newData.parent().child('role').val() === 'wali' || newData.parent().child('role').val() === 'bk')",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().child('role').val() === 'wali' || auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().child('role').val() === 'bk'",
           ".validate": "newData.isNumber()"
         },
         "kelasUtama": {
@@ -84,15 +84,15 @@
         ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'admin'",
         ".validate": "newData.hasChildren(['email', 'nama', 'aktif'])",
         "email": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
         },
         "nama": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && !data.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && !data.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
           ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
         },
         "aktif": {
-          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'waka' && newData.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
+          ".write": "auth != null && root.child('roles').child(auth.uid).val() === 'kepala' && newData.exists() && newData.parent().parent().parent().child('staff').child($uid).child('role').val() === 'bk'",
           ".validate": "newData.isBoolean()"
         },
         "$other": {

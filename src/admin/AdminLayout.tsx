@@ -60,7 +60,7 @@ const kesiswaan = (base: string, denganHarian: boolean): NavItem[] => {
     const i = baru.findIndex((x) => x.to.endsWith("/usulan-remisi"));
     baru.splice(i, 0, { to: `${base}/pembinaan`, label: "Pembinaan", icon: "users", title: "Rekap pembinaan" }, { to: `${base}/penugasan-bk`, label: "Penugasan BK", icon: "users", title: "Penugasan BK" }, { to: `${base}/izin-ortu`, label: "Izin ke orang tua", icon: "eye", title: "Izin tampil ke orang tua" });
   }
-  if (base === "/kepala") baru.push({ to: `${base}/migrasi-pembinaan`, label: "Migrasi pembinaan", icon: "activity", title: "Migrasi pembinaan v2.5" });
+  if (base === "/kepala") baru.push({ to: `${base}/guru-bk`, label: "Guru BK", icon: "users", title: "Guru BK" }, { to: `${base}/migrasi-pembinaan`, label: "Migrasi pembinaan", icon: "activity", title: "Migrasi pembinaan v2.5" });
   if (base === "/admin") baru.push({ to: `${base}/petugas-piket`, label: "Petugas piket", icon: "users", title: "Petugas piket" });
   if (base === "/admin") baru.push({ to: `${base}/wali-kelas`, label: "Wali kelas", icon: "users", title: "Wali kelas" });
   if (base === "/admin") baru.push({ to: `${base}/guru-bk`, label: "Guru BK", icon: "users", title: "Guru BK" });
@@ -135,7 +135,6 @@ const PANEL: Record<PanelMode, { base: string; role: string; short: string; menu
       laporanKes("/waka", "Laporan"),
       { to: "/waka/petugas-piket", label: "Petugas piket", icon: "users", title: "Petugas piket" },
       { to: "/waka/wali-kelas", label: "Wali kelas", icon: "users", title: "Wali kelas" },
-      { to: "/waka/guru-bk", label: "Guru BK", icon: "users", title: "Guru BK" },
       ...kesiswaan("/waka", false).filter((x) => x.to !== "/waka/laporan-kesiswaan"),
       { to: "/waka/log-aktivitas", label: "Log aktivitas", icon: "activity", title: "Log aktivitas akun" },
       { to: "/waka/panduan", label: "Panduan", icon: "file", title: "Panduan" },

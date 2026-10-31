@@ -55,6 +55,6 @@ assert.match(teks("admin"), /Guru BK/); assert.match(teks("waka"), /Guru BK/); a
 // v2.5.1: laporan wali/BK, hapus akun permanen, lencana pembinaan kepala/waka
 assert.match(teks("wali"), /Laporan/); assert.match(teks("wali"), /titik koma/); assert.match(teks("bk"), /Laporan/); assert.match(teks("bk"), /tanpa nama siswa/);
 assert.match(teks("admin"), /Hapus akun permanen/); assert.match(teks("admin"), /HAPUS/); assert.match(teks("admin"), /tidak dapat dibatalkan/i); assert.match(teks("admin"), /klaim aktif/i);
-assert.match(teks("kepala"), /Perlu dibina \(Kepala\)/); assert.match(teks("waka"), /Klaim aktif/); assert.match(teks("waka"), /lencana/i);
+assert.match(teks("kepala"), /Perlu dibina \(Kepala\)/); assert.match(teks("kepala"), /Klaim aktif/); assert.match(teks("waka"), /Kepala atau Admin/); assert.match(teks("waka"), /lencana/i);
 console.log("panduan v2.5.1 ok");
 assert.match(teks("admin"), /centang Tandai juga untuk hapus permanen/); assert.match(teks("admin"), /Firebase Console, Authentication, Users/);
