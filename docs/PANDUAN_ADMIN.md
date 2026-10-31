@@ -48,7 +48,7 @@ Untuk: Administrator / TU sekolah
 
 ## Hapus akun permanen
 
-1. Wali kelas atau Guru BK yang sudah dicabut: tekan Hapus akun, isi alasan, ketik email (tombol ini hanya menandai; akun baru benar-benar terhapus setelah skrip hapus_akun.py dijalankan). Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).
+1. Guru BK yang sudah dicabut: tekan Hapus akun, isi alasan, ketik email; akun langsung hilang dari aplikasi (Waka harus sudah melepas klaimnya). Akun login di Firebase Authentication baru terhapus setelah skrip hapus_akun.py dijalankan (opsional). Wali kelas dicabut: tekan Tandai hapus akun (hanya menandai). Kepala, Waka, atau Piket: saat Cabut akses, centang Tandai juga untuk hapus permanen (bawaan tidak dicentang). Tanda masuk daftar Menunggu dihapus (dapat dibatalkan).
 2. Penghapusan nyata dilakukan skrip lokal hapus_akun.py (atau sel Hapus akun di notebook): dry-run dulu, lalu ketik HAPUS. Tidak dapat dibatalkan; email jadi bebas dipakai ulang; log dan riwayat tetap ada.
 3. BK dengan klaim aktif ditolak skrip: minta Waka melepas atau memindahkan klaim dulu. Akun yang dicabut sebelum v2.5.1: Firebase Console, Authentication, Users, titik tiga, Delete account.
 

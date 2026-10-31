@@ -171,7 +171,7 @@ test("BK: Laporan semua kelas, filter kelas, CSV tanpa kolom terlarang", async (
   bersih(lap, "bk laporan");
 });
 
-test("admin: tandai hapus permanen akun BK yang dicabut lalu batalkan; admin tidak membaca klaim", async ({ page }) => {
+test("admin: hapus akun BK yang dicabut LANGSUNG hilang dari aplikasi (antrean skrip untuk akun login); admin tidak membaca klaim", async ({ page }) => {
   const lap = await siapkan(page);
   await masuk(page, emailStaf("admin"));
   await menu(page, "Guru BK");
@@ -192,7 +192,9 @@ test("admin: tandai hapus permanen akun BK yang dicabut lalu batalkan; admin tid
   expect(await daftar.evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1), "daftar tanpa scrollbar").toBe(true);
   await baris.getByTestId("tandai-hapus").click();
   const dlg = page.getByTestId("form-tandai-hapus");
-  await expect(dlg.getByTestId("peringatan-klaim-bk")).toContainText("Pastikan klaim BK akun ini sudah dilepas/dipindah oleh Waka. Skrip akan menolak bila masih ada klaim aktif.");
+  await expect(dlg.getByTestId("peringatan-klaim-bk")).toContainText("Pastikan klaim BK akun ini sudah dilepas/dipindah oleh Waka");
+  await expect(dlg.getByTestId("info-hapus-langsung")).toContainText("langsung hilang dari aplikasi");
+  await expect(page.getByRole("dialog", { name: "Hapus akun BK" })).toBeVisible();
   await dlg.getByRole("button", { name: "Hapus akun" }).click();
   await expect(dlg.getByText("Alasan 10-300 karakter")).toBeVisible();
   await dlg.getByLabel("Alasan penghapusan").fill("Guru sudah pindah tugas ke sekolah lain");
@@ -202,15 +204,25 @@ test("admin: tandai hapus permanen akun BK yang dicabut lalu batalkan; admin tid
   await dlg.getByLabel("Ketik email untuk konfirmasi").fill(emailStaf("bkhapus"));
   await dlg.getByRole("button", { name: "Hapus akun" }).click();
   await expect(dlg).toHaveCount(0);
-  expect((await rest("GET", `hapusAkun/${uidBkHapus}`))?.peran).toBe("bk");
+  // akun langsung hilang: staff + bkAkun dihapus, tidak ada di daftar; tanda hapusAkun tersimpan sebagai antrean untuk skrip (akun login)
+  await expect(page.locator(`[data-uid="${uidBkHapus}"]`)).toHaveCount(0);
+  expect(await rest("GET", `staff/${uidBkHapus}`), "staff dihapus").toBeNull();
+  expect(await rest("GET", `bkAkun/${uidBkHapus}`), "cermin bkAkun dihapus").toBeNull();
+  expect(await rest("GET", `roles/${uidBkHapus}`), "tetap tanpa role").toBeNull();
+  expect((await rest("GET", `hapusAkun/${uidBkHapus}`))?.peran, "tanda tersimpan sebagai antrean skrip").toBe("bk");
+  await expect(page.locator(`[data-uid="${uidBk}"]`), "BK lain tidak terpengaruh").toBeVisible();
   await menu(page, "Pengaturan");
   const panel = page.getByTestId("menunggu-dihapus");
   await expect(panel.getByTestId("jumlah-menunggu-hapus")).toHaveText("1");
-  await panel.getByTestId("batal-tanda-hapus").click();
-  await expect(panel.getByTestId("jumlah-menunggu-hapus")).toHaveText("0");
-  expect(await rest("GET", `hapusAkun/${uidBkHapus}`)).toBeNull();
-  const log = Object.values((await rest("GET", `activity/${hariNyata()}`)) ?? {}).map((e) => e.aksi);
-  expect(log).toContain("tandai-hapus-akun"); expect(log).toContain("batal-hapus-akun");
+  await expect(panel.getByTestId("sudah-dihapus-aplikasi")).toContainText("Sudah dihapus dari aplikasi");
+  await expect(panel.getByTestId("batal-tanda-hapus"), "akun yang sudah dihapus tidak dapat dikembalikan lewat batal tanda").toHaveCount(0);
+  expect(await rest("GET", `hapusAkun/${uidBkHapus}`), "tanda tidak berubah").not.toBeNull();
+  const log = Object.values((await rest("GET", `activity/${hariNyata()}`)) ?? []);
+  const entri = log.find((e) => e.aksi === "tandai-hapus-akun");
+  expect(entri, "log tandai-hapus-akun").toBeTruthy();
+  expect(entri.detail).toContain("Hapus akun BK");
+  expect(entri.detail).toContain("dari aplikasi");
+  expect(log.some((e) => e.aksi === "batal-hapus-akun"), "tidak ada pembatalan").toBe(false);
   bersih(lap, "admin hapus akun");
 });
 
@@ -229,6 +241,7 @@ test("admin: Cabut akses — tanda hapus OPSIONAL (bawaan tidak dicentang; tanpa
   expect(await rest("GET", `staff/${uidCabutA}`), "staff dihapus (perilaku lama)").toBeNull();
   expect(await rest("GET", `hapusAkun/${uidCabutA}`), "TIDAK ada tanda hapus").toBeNull();
   // jalur 2: DENGAN centang -> alasan wajib 10-300, tanda ditulis dalam update yang sama
+  const antre = Object.keys((await rest("GET", "hapusAkun")) ?? {}).length; // antrean yang sudah ada (mis. akun BK yang dihapus di tes sebelumnya tetap menunggu skrip)
   await page.getByRole("button", { name: "Cabut akses Waka Cabut B" }).click();
   await page.getByTestId("centang-tandai-hapus").check();
   await page.getByLabel("Ketik email untuk konfirmasi").fill(emailStaf("cabutb"));
@@ -243,9 +256,9 @@ test("admin: Cabut akses — tanda hapus OPSIONAL (bawaan tidak dicentang; tanpa
   expect(await rest("GET", `staff/${uidCabutB}`)).toBeNull();
   const tanda = await rest("GET", `hapusAkun/${uidCabutB}`);
   expect(tanda?.peran).toBe("waka"); expect(tanda?.email).toBe(emailStaf("cabutb")); expect(tanda?.alasan).toContain("pindah tugas");
-  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText("1");
-  await page.getByTestId("menunggu-dihapus").getByTestId("batal-tanda-hapus").click();
-  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText("0");
+  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText(String(antre + 1));
+  await page.getByTestId("menunggu-dihapus").locator(`[data-uid="${uidCabutB}"]`).getByTestId("batal-tanda-hapus").click();
+  await expect(page.getByTestId("menunggu-dihapus").getByTestId("jumlah-menunggu-hapus")).toHaveText(String(antre));
   bersih(lap, "admin cabut opsional");
 });
 

@@ -785,11 +785,11 @@ button.kode { position: relative; }
 .simple-list.daftar-akun { max-height: none; overflow: visible; }
 .simple-list.daftar-akun > div { flex-wrap: wrap; row-gap: 8px; }
 .simple-list.daftar-akun .row-actions { flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
-.simple-list.daftar-akun .row-actions button { width: auto; height: auto; min-height: 32px; padding: 6px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-size: 12px; font-weight: 700; border: 1px solid #dfe6e1; border-radius: 8px; background: #fff; color: #308261; }
-.simple-list.daftar-akun .row-actions button:hover:not(:disabled) { background: #f2f8f4; border-color: #bcd7c7; color: #176f4b; }
-.simple-list.daftar-akun .row-actions button.danger { color: #b34a37; border-color: #efcfc7; }
-.simple-list.daftar-akun .row-actions button.danger:hover:not(:disabled) { background: #fdf3f1; border-color: #e3b5aa; color: #983b2b; }
-.simple-list.daftar-akun .row-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.simple-list.daftar-akun:not(.daftar-ikon) .row-actions button { width: auto; height: auto; min-height: 32px; padding: 6px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-size: 12px; font-weight: 700; border: 1px solid #dfe6e1; border-radius: 8px; background: #fff; color: #308261; }
+.simple-list.daftar-akun:not(.daftar-ikon) .row-actions button:hover:not(:disabled) { background: #f2f8f4; border-color: #bcd7c7; color: #176f4b; }
+.simple-list.daftar-akun:not(.daftar-ikon) .row-actions button.danger { color: #b34a37; border-color: #efcfc7; }
+.simple-list.daftar-akun:not(.daftar-ikon) .row-actions button.danger:hover:not(:disabled) { background: #fdf3f1; border-color: #e3b5aa; color: #983b2b; }
+.simple-list.daftar-akun:not(.daftar-ikon) .row-actions button:disabled { opacity: .5; cursor: not-allowed; }
 /* akun dicabut: hanya identitas yang diredupkan, tombol aksi tetap jelas */
 .simple-list.daftar-akun > .petugas-nonaktif { opacity: 1; }
 .simple-list.daftar-akun > .petugas-nonaktif > span:not(.row-actions) { opacity: .6; }
@@ -798,3 +798,8 @@ button.kode { position: relative; }
 .simple-list.daftar-akun small { flex: 0 1 auto; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 .simple-list.daftar-akun > div > span { min-width: 0; }
 @media (max-width: 560px) { .simple-list.daftar-akun .row-actions { flex-basis: 100%; justify-content: flex-start; } }
+/* daftar bertombol ikon (Akun Pimpinan & Staf): ikon 32x32 tetap, hanya identitas dan wrap yang dirapikan */
+.simple-list.daftar-ikon .row-actions { flex-wrap: nowrap; }
+.simple-list.daftar-ikon > div { padding: 12px 0; }
+.simple-list.daftar-ikon small { color: #6b766f; line-height: 1.45; }
+.simple-list.daftar-akun .notice-hilang { color: #6b766f; font-size: 12px; font-weight: 600; }

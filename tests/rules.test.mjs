@@ -2843,6 +2843,35 @@ await uji("cabut akses: DENGAN tanda hapus + alasan + log (satu update) diterima
 await cek("cabut akses dengan tanda: staff + roles hilang, hapusAkun tersimpan", admin, `hapusAkun/${hCabutB.uid}`, (j) => j?.peran === "piket" && j.email === emailH("hcabutb"));
 await cek("cabut akses dengan tanda: staff dan roles akun itu kosong", admin, `staff/${hCabutB.uid}`, (j) => j === null);
 
+// -- v2.5.3: hapus akun BK LANGSUNG dari aplikasi (staff + bkAkun dihapus; tanda hapusAkun jadi antrean skrip untuk akun Auth)
+seksi("HAPUS AKUN BK LANGSUNG v2.5.3 — staff + bkAkun dihapus admin dalam satu update; peran lain ditolak");
+const hL1 = await buatUser("hl1@uji.test"), hL2 = await buatUser("hl2@uji.test"), hL3 = await buatUser("hl3@uji.test"), hL4 = await buatUser("hl4@uji.test");
+await http("PATCH", "", { owner: true, body: {
+  [`staff/${hL1.uid}`]: stH("hl1", "bk"), [`bkAkun/${hL1.uid}`]: { email: emailH("hl1"), nama: "hl1", aktif: false },
+  [`staff/${hL2.uid}`]: stH("hl2", "bk"), [`bkAkun/${hL2.uid}`]: { email: emailH("hl2"), nama: "hl2", aktif: false },
+  [`staff/${hL3.uid}`]: stH("hl3", "bk"), [`bkAkun/${hL3.uid}`]: { email: emailH("hl3"), nama: "hl3", aktif: false },
+  [`staff/${hL4.uid}`]: stH("hl4", "bk"), [`bkAkun/${hL4.uid}`]: { email: emailH("hl4"), nama: "hl4", aktif: false },
+} });
+const langsungBody = (u, h, nama, o = {}) => ({
+  ...(o.tanpaLog ? {} : act(u, o.aksi ?? "tandai-hapus-akun").body),
+  [`staff/${h.uid}`]: null, [`bkAkun/${h.uid}`]: null,
+  ...(o.tanpaTanda ? {} : { [`hapusAkun/${h.uid}`]: tandaH(h.uid, nama, "bk") }),
+});
+await uji("hapus BK langsung: waka TIDAK dapat menghapus staff + bkAkun", waka, "PATCH", "", langsungBody(waka, hL3, "hl3", { tanpaTanda: true, aksi: "atur-bk" }), "tolak");
+await uji("hapus BK langsung: kepala TIDAK dapat menghapus staff + bkAkun", kepala, "PATCH", "", langsungBody(kepala, hL3, "hl3", { tanpaTanda: true, aksi: "atur-bk" }), "tolak");
+await uji("hapus BK langsung: BK lain TIDAK dapat menghapus staff + bkAkun", bkA, "PATCH", "", langsungBody(bkA, hL3, "hl3", { tanpaTanda: true, aksi: "atur-bk" }), "tolak");
+await uji("hapus BK langsung: belum ditandai TANPA log ditolak (tanda wajib log)", admin, "PATCH", "", langsungBody(admin, hL1, "hl1", { tanpaLog: true }), "tolak");
+await uji("hapus BK langsung: log aksi salah ('atur-bk') saat membuat tanda ditolak", admin, "PATCH", "", langsungBody(admin, hL1, "hl1", { aksi: "atur-bk" }), "tolak");
+await uji("hapus BK langsung: akun BK yang MASIH AKTIF (roles ada) tidak dapat ditandai ditolak", admin, "PATCH", "", { ...act(admin, "tandai-hapus-akun").body, [`staff/${hAktifBk.uid}`]: null, [`hapusAkun/${hAktifBk.uid}`]: tandaH(hAktifBk.uid, "haktifbk", "bk") }, "tolak");
+await uji("hapus BK langsung: admin menghapus (belum ditandai) = staff + bkAkun + tanda + log diterima", admin, "PATCH", "", langsungBody(admin, hL1, "hl1"), "izin");
+await cek("hapus BK langsung: staff dan bkAkun hilang", admin, `staff/${hL1.uid}`, (j) => j === null);
+await cek("hapus BK langsung: bkAkun hilang dan tanda (antrean skrip) tersimpan", admin, `hapusAkun/${hL1.uid}`, (j) => j?.peran === "bk" && j.email === emailH("hl1"));
+await uji("hapus BK langsung: sudah ditandai lebih dulu -> hapus staff + bkAkun dengan log 'atur-bk' diterima", admin, "PATCH", "", { ...markBody(admin, hL2.uid, "hl2", "bk") }, "izin");
+await uji("hapus BK langsung: lanjut hapus staff + bkAkun (tanda tidak ditulis ulang) diterima", admin, "PATCH", "", langsungBody(admin, hL2, "hl2", { tanpaTanda: true, aksi: "atur-bk" }), "izin");
+await cek("hapus BK langsung: tanda yang sudah ada tetap utuh", admin, `hapusAkun/${hL2.uid}`, (j) => j?.email === emailH("hl2"));
+await uji("hapus BK langsung: menulis ulang tanda yang sudah ada ditolak (sekali tulis)", admin, "PATCH", "", langsungBody(admin, hL2, "hl2"), "tolak");
+await uji("hapus BK langsung: admin tanpa tanda dan tanpa log boleh menghapus staff + bkAkun (hak admin atas akun, tanpa tanda = perilaku lama)", admin, "PATCH", "", { [`staff/${hL4.uid}`]: null, [`bkAkun/${hL4.uid}`]: null }, "izin");
+
 // -- aksi log baru: ekspor-laporan (wali/BK), hapus-akun-permanen (entri skrip), aksi acak tetap ditolak
 const logSaja = (u, aksi, detail, o = {}) => act(u, aksi, { entri: { detail }, ...o }).body;
 await uji("log: wali A menulis aksi 'ekspor-laporan' (tanpa NIS/nama) diterima", waliA, "PATCH", "", logSaja(waliA, "ekspor-laporan", "CSV laporan wali, kelas X, 2026-10-01 s.d. 2026-10-31, 32 siswa"), "izin");

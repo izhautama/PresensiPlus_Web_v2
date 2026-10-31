@@ -61,7 +61,7 @@ export default function WaliKelas() {
                   {w.aktif
                     ? <button className="ghost-button" aria-label={`Cabut ${w.nama}`} disabled={busy === `cabut-${uid}`} onClick={() => aksi(uid, w, "cabut")}>Cabut</button>
                     : <button className="ghost-button" aria-label={`Pasang kembali ${w.nama}`} disabled={busy === `pasang-${uid}`} onClick={() => aksi(uid, w, "pasang")}>Pasang kembali</button>}
-                  {admin && !w.aktif && <button className="ghost-button danger" aria-label={`Hapus akun ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Hapus akun</button>}
+                  {admin && !w.aktif && <button className="ghost-button danger" aria-label={`Tandai hapus akun ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Tandai hapus akun</button>}
                   {admin && <button className="ghost-button" aria-label={`Reset password ${w.nama}`} disabled={busy === `reset-${uid}`} onClick={() => aksi(uid, w, "reset")}>Reset password</button>}
                 </span>
               </div>
