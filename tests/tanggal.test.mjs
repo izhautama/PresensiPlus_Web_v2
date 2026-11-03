@@ -27,7 +27,9 @@ for (let d = 0; d < 21; d++) {
     assert.ok(selisih(T.minggu, T.hariIni) >= 1 && selisih(T.minggu, T.hariIni) <= 7);
     assert.equal(selisih(T.max, T.hariIni), 7);
     assert.equal(selisih(T.hariIni, T.min), 2);
-    assert.equal(selisih(T.besok, T.hariIni), 1);
+    // besok = hari kerja berikutnya: hari Sabtu -> Senin (Minggu libur tidak masuk laporan izin)
+    assert.notEqual(hari(T.besok), 0, `besok bukan Minggu (${ket})`);
+    assert.equal(selisih(T.besok, T.hariIni), hari(nyata) === 6 ? 2 : 1, `besok = hariIni + 1 (Sabtu: + 2) (${ket})`);
     assert.equal(T.waktu.toISOString(), `${T.hariIni}T09:00:00.000Z`, "16:00 WIB pada hari nyata");
     assert.equal(T.waktuMinggu.toISOString(), `${T.minggu}T09:00:00.000Z`);
     assert.equal(T.mingguBulanIni.slice(0, 7), T.hariKerjaSekitarMinggu.slice(0, 7), "Minggu uji dan hari kerja tetangga satu bulan");

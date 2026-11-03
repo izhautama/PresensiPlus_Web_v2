@@ -5,13 +5,13 @@ import { kirimUpdate, sisipkanAktivitas } from "./aktivitas";
 import { PeranGagal } from "./db";
 
 type Updates = Record<string, unknown>;
-export type Pengelola = "admin" | "waka";
-/** Cermin untuk tampilan waka/kepala (waka tidak boleh membaca node staff). */
+export type Pengelola = "admin" | "kepala";
+/** Cermin untuk tampilan waka/kepala (kepala tidak boleh membaca node staff). */
 export type BkAkun = { email: string; nama: string; aktif: boolean };
 
 /**
- * Buat akun BK (akun PER GURU). Admin menulis node utuh; waka menulis per-field (rules hanya mengizinkan waka membuat entri akun BK field demi field,
- * dan role 'bk' hanya bila staff/{uid}/role = 'bk' pada update yang sama).
+ * Buat akun BK (akun PER GURU). Admin menulis node utuh; kepala menulis per-field (rules hanya mengizinkan kepala membuat entri akun BK field demi field,
+ * dan role 'bk' hanya bila staff/{uid}/role = 'bk' pada update yang sama). Waka tidak mengelola akun BK (v2.5.3).
  */
 export async function buatAkunBk(a: { nama: string; email: string; password: string }, oleh: Pengelola) {
   const sec = await getSecondaryAuth();

@@ -51,7 +51,7 @@ export default function StaffAccounts() {
       {staff.error ? <Empty icon="alert" title="Gagal memuat daftar akun" text={staff.error} /> : staff.loading ? <div className="page-loader"><Spinner dark /></div> : daftar.length === 0 ? (
         <Empty icon="users" title="Belum ada akun pimpinan/staf" text="Klik Tambah akun untuk membuat satu." />
       ) : (
-        <div className="simple-list">
+        <div className="simple-list daftar-akun daftar-ikon">
           {daftar.map(([uid, s]) => (
             <div key={uid}>
               <span><b>{s.nama}</b><small>{PERAN_STAF[s.role] ?? s.role} · {s.email} · dibuat {tgl(s.dibuat)}{akunPiket.data?.[uid]?.terkunci ? " · TERKUNCI" : ""}</small></span>

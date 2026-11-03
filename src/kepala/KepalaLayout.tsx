@@ -26,6 +26,7 @@ const Kalender = lazy(() => import("../kesiswaan/Kalender"));
 const IzinOrtu = lazy(() => import("../kesiswaan/IzinOrtu"));
 const PenugasanBk = lazy(() => import("../kesiswaan/PenugasanBk"));
 const MigrasiPembinaan = lazy(() => import("./MigrasiPembinaan"));
+const GuruBk = lazy(() => import("../kesiswaan/GuruBk"));
 
 /** Panel Kepala Madrasah. AdminDataProvider hanya berlangganan path yang diizinkan Security Rules untuk kepala. */
 export default function KepalaLayout() {
@@ -52,6 +53,7 @@ export default function KepalaLayout() {
           <Route path="kalender" element={<Kalender />} />
           <Route path="izin-ortu" element={<IzinOrtu />} />
           <Route path="penugasan-bk" element={<PenugasanBk />} />
+          <Route path="guru-bk" element={<GuruBk />} />
           <Route path="migrasi-pembinaan" element={<MigrasiPembinaan />} />
           <Route path="panduan" element={<Panduan peran="kepala" />} />
           <Route path="*" element={<Navigate to="/kepala" replace />} />

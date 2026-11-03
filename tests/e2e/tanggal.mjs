@@ -14,6 +14,7 @@ export function hitungTanggal(sekarangMs = Date.now()) {
   const h = hariKeDari(sekarangMs); // hari nyata (WIB)
   const dapatDijalankan = weekdayDari(h) !== 0;
   const kemarinHk = weekdayDari(h - 1) === 0 ? h - 2 : h - 1; // lewati Minggu
+  const besokHk = weekdayDari(h + 1) === 0 ? h + 2 : h + 1; // hari kerja berikutnya: pada hari Sabtu 'besok' = Senin, bukan Minggu (libur, tidak masuk laporan izin)
   const wdJangkar = weekdayDari(h);
   const minggu = h + ((7 - wdJangkar) % 7 || 7); // Minggu berikutnya (setelah hari ini)
   // Minggu di BULAN YANG SAMA dengan hari ini (untuk uji laporan per jam bulanan) + satu hari kerja bertetangga di bulan itu
@@ -23,7 +24,7 @@ export function hitungTanggal(sekarangMs = Date.now()) {
   return {
     dapatDijalankan,
     mingguBulanIni: iso(mingguBulanIni), hariKerjaSekitarMinggu: iso(tetangga),
-    hariIni: iso(h), kemarin: iso(kemarinHk), besok: iso(h + 1), minggu: iso(minggu),
+    hariIni: iso(h), kemarin: iso(kemarinHk), besok: iso(besokHk), minggu: iso(minggu),
     min: iso(h - 2), max: iso(h + 7), jauh: iso(h + 9),
     waktu: new Date(h * HARI_MS + 9 * 3_600_000), // 16:00 WIB = 09:00 UTC pada hari nyata
     waktuMinggu: new Date(minggu * HARI_MS + 9 * 3_600_000),

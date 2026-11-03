@@ -39,8 +39,8 @@ Untuk: Waka Kesiswaan
 
 ## Guru BK
 
-1. Menu Guru BK: Tambah guru BK (nama, email asli, password sementara), Cabut, atau Pasang kembali. Konseling hanya terbaca BK.
-2. Klaim aktif tampil per akun. Mencabut BK yang masih memegang klaim menampilkan daftar siswa dan tombol ke Penugasan BK.
+1. Akun Guru BK dikelola Admin dan Kepala, bukan Waka. Anda tetap menugaskan BK ke siswa lewat menu Penugasan BK.
+2. Perlu akun BK baru atau dicabut? Minta Kepala atau Admin.
 
 ## Wali kelas
 

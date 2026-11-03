@@ -75,8 +75,10 @@ const usulPembuat = (nis) => `((${isWali} && ${waliDari(nis)}) || ${bkDari(nis)}
 const STF_BARU = "newData.parent().parent().parent().child('staff').child($uid)";
 const WALI_CERMIN_BUAT = `auth != null && ${isWaka} && !data.exists() && ${STF_BARU}.child('role').val() === 'wali'`;
 /** waka membuat entri akun wali: create-only per field, hanya untuk role 'wali' */
-const WALI_DIBUAT = `auth != null && ${isWaka} && !data.exists() && (newData.parent().child('role').val() === 'wali' || newData.parent().child('role').val() === 'bk')`;
-const BK_CERMIN_BUAT = `auth != null && ${isWaka} && !data.exists() && ${STF_BARU}.child('role').val() === 'bk'`;
+const WALI_DIBUAT = `auth != null && ${isWaka} && !data.exists() && newData.parent().child('role').val() === 'wali'`;
+/** v2.5.3: akun BK dikelola admin dan KEPALA (bukan waka). Kepala membuat entri staff create-only per field, hanya untuk role 'bk'. */
+const BK_DIBUAT = `auth != null && ${isKepala} && !data.exists() && newData.parent().child('role').val() === 'bk'`;
+const BK_CERMIN_BUAT = `auth != null && ${isKepala} && !data.exists() && ${STF_BARU}.child('role').val() === 'bk'`;
 const milikAnak = `auth != null && (root.child('parents').child($nis).child('uid').val() === auth.uid || ${binaanDari("$nis")})`;
 const KATEGORI = "newData.val() === 'Sangat Berat' || newData.val() === 'Berat' || newData.val() === 'Sedang' || newData.val() === 'Ringan'";
 
@@ -499,10 +501,11 @@ export function buildRules() {
     roles: {
       $uid: {
         ".read": `auth != null && (auth.uid === $uid || ${isAdmin})`,
-        // admin: kelola kepala/waka/piket/wali. waka: kunci/buka-kunci akun piket (hapus role / pasang 'piket' bila staff.role = piket) dan
+        // admin: kelola kepala/waka/piket/wali/bk. waka: kunci/buka-kunci akun piket (hapus role / pasang 'piket' bila staff.role = piket) dan
         // buat/cabut akun WALI (set 'wali' hanya bila staff/{uid}.role = 'wali' pada update yang sama atau sudah ada; hapus role 'wali').
+        // v2.5.3 kepala: buat/cabut/pasang kembali akun BK SAJA (set 'bk' hanya bila staff/{uid}.role = 'bk' pada update yang sama); waka tidak lagi mengelola BK.
         // Tidak ada yang dapat memberi 'admin'/'device' atau mengubah role dirinya sendiri.
-        ".write": `auth != null && $uid !== auth.uid && ((${isAdmin} && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket' || data.val() === 'wali' || data.val() === 'bk') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk')) || (${isWaka} && ((data.val() === 'bk' && !newData.exists()) || (!data.exists() && newData.val() === 'bk' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'bk') || (data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket') || (data.val() === 'wali' && !newData.exists()) || (!data.exists() && newData.val() === 'wali' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'))))`,
+        ".write": `auth != null && $uid !== auth.uid && ((${isAdmin} && (data.val() === null || data.val() === 'kepala' || data.val() === 'waka' || data.val() === 'piket' || data.val() === 'wali' || data.val() === 'bk') && (!newData.exists() || newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk')) || (${isKepala} && ((data.val() === 'bk' && !newData.exists()) || (!data.exists() && newData.val() === 'bk' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'bk'))) || (${isWaka} && ((data.val() === 'piket' && !newData.exists()) || (!data.exists() && newData.val() === 'piket' && root.child('staff').child($uid).child('role').val() === 'piket') || (data.val() === 'wali' && !newData.exists()) || (!data.exists() && newData.val() === 'wali' && newData.parent().parent().child('staff').child($uid).child('role').val() === 'wali'))))`,
         ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'",
       },
     },
@@ -514,10 +517,10 @@ export function buildRules() {
         ".read": `auth != null && (auth.uid === $uid || ${isAdmin})`,
         ".write": adminSaja,
         ".validate": "newData.hasChildren(['email', 'nama', 'role', 'dibuat'])",
-        email: { ".write": WALI_DIBUAT, ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
-        nama: { ".write": WALI_DIBUAT, ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
-        role: { ".write": `${WALI_DIBUAT} && (newData.val() === 'wali' || newData.val() === 'bk')`, ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'" },
-        dibuat: { ".write": WALI_DIBUAT, ".validate": "newData.isNumber()" },
+        email: { ".write": `${WALI_DIBUAT} || ${BK_DIBUAT}`, ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        nama: { ".write": `${WALI_DIBUAT} || ${BK_DIBUAT}`, ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
+        role: { ".write": `(${WALI_DIBUAT} && newData.val() === 'wali') || (${BK_DIBUAT} && newData.val() === 'bk')`, ".validate": "newData.val() === 'kepala' || newData.val() === 'waka' || newData.val() === 'piket' || newData.val() === 'wali' || newData.val() === 'bk'" },
+        dibuat: { ".write": `${WALI_DIBUAT} || ${BK_DIBUAT}`, ".validate": "newData.isNumber()" },
         kelasUtama: { ".write": `auth != null && (${isAdmin} || (${isWaka} && newData.parent().child('role').val() === 'wali' && newData.exists()))`, ".validate": `newData.isString() && newData.val().matches(${KELAS_KEY_RE})` },
         kelasTambahan: {
           $kelas: { ".write": adminSaja, ".validate": `newData.val() === true && $kelas.matches(${KELAS_KEY_RE})` },
@@ -541,8 +544,8 @@ export function buildRules() {
         $other: { ".validate": false },
       },
     },
-    // Cermin akun BK untuk TAMPILAN waka/kepala (waka tidak boleh membaca node staff). Otoritas tetap roles + staff. Admin menulis bebas; waka: create-only
-    // email/nama dan aktif (cabut/pasang kembali), HANYA untuk akun yang staff.role = 'bk'.
+    // Cermin akun BK untuk TAMPILAN waka/kepala (kepala tidak boleh membaca node staff). Otoritas tetap roles + staff. Admin menulis bebas (termasuk hapus);
+    // v2.5.3 KEPALA (bukan waka): create-only email/nama dan aktif (cabut/pasang kembali), HANYA untuk akun yang staff.role = 'bk'.
     bkAkun: {
       ".read": anyOf(isAdmin, isKepala, isWaka, isBk),
       $uid: {
@@ -550,7 +553,7 @@ export function buildRules() {
         ".validate": "newData.hasChildren(['email', 'nama', 'aktif'])",
         email: { ".write": BK_CERMIN_BUAT, ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
         nama: { ".write": BK_CERMIN_BUAT, ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
-        aktif: { ".write": `auth != null && ${isWaka} && newData.exists() && ${STF_BARU}.child('role').val() === 'bk'`, ".validate": "newData.isBoolean()" },
+        aktif: { ".write": `auth != null && ${isKepala} && newData.exists() && ${STF_BARU}.child('role').val() === 'bk'`, ".validate": "newData.isBoolean()" },
         $other: { ".validate": false },
       },
     },

@@ -13,11 +13,12 @@ import { buatAkunBk, cabutBk, pasangAkunBk, pasangKembaliBk, type BkAkun, type P
 
 /**
  * Pengelolaan akun Guru BK (akun per guru; wewenang lintas semua kelas, tanpa wewenang izin/Alfa/presensi).
- * ADMIN dan WAKA dapat membuat/mencabut akun; catatan konseling hanya dapat dibaca BK dan Kepala (bukan pengelola akun).
+ * ADMIN dan KEPALA dapat membuat/mencabut/memasang kembali akun (v2.5.3; waka tidak lagi). Hanya ADMIN yang dapat menghapus akun dan mereset password.
+ * Catatan konseling hanya dapat dibaca BK dan Kepala.
  */
 export default function GuruBk() {
   const mode = usePanelMode();
-  const oleh: Pengelola = mode === "admin" ? "admin" : "waka";
+  const oleh: Pengelola = mode === "admin" ? "admin" : "kepala";
   const notify = useToast();
   const live = useLive<Record<string, BkAkun>>("bkAkun");
   const daftar = useMemo(() => Object.entries(live.data ?? {}).sort((a, b) => a[1].nama.localeCompare(b[1].nama)), [live.data]);
@@ -54,7 +55,7 @@ export default function GuruBk() {
         {live.error ? <Empty icon="alert" title="Gagal memuat" text={live.error} /> : live.loading ? <div className="page-loader"><Spinner dark /></div> : daftar.length === 0 ? (
           <Empty icon="users" title="Belum ada guru BK" text="Tambahkan akun untuk tiap guru BK. Isi catatan konseling hanya dapat dibaca BK dan Kepala Madrasah." />
         ) : (
-          <div className="simple-list">
+          <div className="simple-list daftar-akun">
             {daftar.map(([uid, w]) => (
               <div key={uid} data-uid={uid} className={w.aktif ? "" : "petugas-nonaktif"}>
                 <span><b>{w.nama}</b><small>{w.email}</small></span>
@@ -63,7 +64,7 @@ export default function GuruBk() {
                   {w.aktif
                     ? <button className="ghost-button" aria-label={`Cabut ${w.nama}`} disabled={busy === `cabut-${uid}`} onClick={() => mintaCabut(uid, w)}>Cabut</button>
                     : <button className="ghost-button" aria-label={`Pasang kembali ${w.nama}`} disabled={busy === `pasang-${uid}`} onClick={() => aksi(uid, w, "pasang")}>Pasang kembali</button>}
-                  {oleh === "admin" && !w.aktif && <button className="ghost-button danger" aria-label={`Tandai hapus permanen ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Tandai hapus permanen</button>}
+                  {oleh === "admin" && !w.aktif && <button className="ghost-button danger" aria-label={`Hapus akun ${w.nama}`} onClick={() => setHapus([uid, w])} data-testid="tandai-hapus">Hapus akun</button>}
                   {oleh === "admin" && <button className="ghost-button" aria-label={`Reset password ${w.nama}`} disabled={busy === `reset-${uid}`} onClick={() => aksi(uid, w, "reset")}>Reset password</button>}
                 </span>
               </div>

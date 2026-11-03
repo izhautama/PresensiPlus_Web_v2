@@ -4,7 +4,7 @@ Untuk: Guru Bimbingan Konseling (akun per guru)
 
 ## Masuk dan menu
 
-1. Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau waka (akun milik Anda sendiri, jangan dibagikan).
+1. Buka alamat aplikasi, pilih tab Admin, isi email dan password akun BK dari admin atau kepala (akun milik Anda sendiri, jangan dibagikan).
 2. Menu: Dashboard, Siswa, Pembinaan, Usulan remisi, Laporan, Konseling, Panduan, Pengaturan (ganti password), dan Keluar. Wewenang Anda berlaku untuk SEMUA kelas.
 3. Anda tidak mencatat pelanggaran dan tidak dapat mengisi izin, presensi per jam, Alfa, presensi manual, kalender, tata tertib, atau akun. Semua tindakan tercatat di log aktivitas atas nama Anda.
 
