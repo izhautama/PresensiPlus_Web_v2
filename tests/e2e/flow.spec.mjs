@@ -1331,6 +1331,7 @@ const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json?ns=${PROJECTS
 const tanggalKosong = (...kecuali) => { for (let k = 2; k <= 9; k++) { const d = hariDi(T.hariIni, -k); if (!hariMinggu(d) && !kecuali.includes(d) && d !== T.kemarin) return d; } throw new Error("tidak ada tanggal kosong"); };
 async function pilihTanggalKal(page, d) {
   const sel = page.locator(`button.kal-hari[data-tgl="${d}"]`);
+  if (!(await sel.count())) await page.getByRole("button", { name: "Bulan ini" }).click(); // mulai dari bulan berjalan (tanggal sasaran bisa di bulan sebelumnya ATAU bulan berjalan)
   for (let i = 0; i < 6 && !(await sel.count()); i++) await page.getByRole("button", { name: "Bulan sebelumnya" }).click();
   await sel.click();
   return sel;
